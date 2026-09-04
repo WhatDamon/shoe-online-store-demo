@@ -11,7 +11,12 @@ import type { CanonicalSize } from '@/server/catalog/types'
 import type { ProductView } from '@/server/catalog/service'
 import type { ChatMessage } from './use-chat-stream'
 import { MessageList } from './message-list'
-import { SuggestionChips } from './suggestion-chips'
+import {
+  CONTEXT_SUGGESTIONS,
+  GENERAL_SUGGESTIONS,
+  SuggestionChips,
+  SUGGESTIONS,
+} from './suggestion-chips'
 
 export interface AssistantPanelProps {
   isOpen: boolean
@@ -82,13 +87,27 @@ export function AssistantPanel({
           </div>
         ) : null}
 
+        {/* 商品会话中常驻上下文 chips：welcome 只在无消息时出现，
+            PDP "Find my size" 自动开场使消息非空 → welcome 永不与商品共存，
+            若 context chips 仅放 welcome，outfit/size-fit 在 UI 内将永远不可达。 */}
+        {product && !showWelcome && !isStreaming ? (
+          <div className="flex shrink-0 flex-wrap gap-2 border-b border-neutral-100 px-4 py-2.5">
+            <SuggestionChips onPick={onPick} items={CONTEXT_SUGGESTIONS} />
+          </div>
+        ) : null}
+
         <div className="min-h-0 flex-1">
           {showWelcome ? (
             <div className="flex h-full flex-col gap-4 overflow-y-auto px-4 py-4">
               <div className="max-w-[85%] rounded-2xl rounded-bl-sm border border-neutral-200 bg-white px-3.5 py-2.5 text-sm leading-6 text-neutral-800">
                 Hi — need a hand finding your pair?
               </div>
-              <SuggestionChips onPick={onPick} />
+              {/* size-fit/outfit 需商品上下文；无商品时不渲染死路入口（服务端会回
+                  "Pick a product first"）。welcome 与商品共存不可达，防御性取全量。 */}
+              <SuggestionChips
+                onPick={onPick}
+                items={product ? SUGGESTIONS : GENERAL_SUGGESTIONS}
+              />
             </div>
           ) : (
             <MessageList

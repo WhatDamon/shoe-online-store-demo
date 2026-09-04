@@ -27,6 +27,18 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
 
   const close = useCallback(() => setIsOpen(false), [])
 
+  // size-fit 是否已结算：最近一条助手消息为含结构化推荐的已结束消息。
+  // 已结算后自由输入再走 size-fit 只会让确定性核心再次追问尺码（死循环），
+  // 故 handleSend 自动转向 shopping（用户仍可用上下文 chips 显式重入 size-fit/outfit）。
+  const sizeFitSettled = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i]
+      if (m.role !== 'assistant') continue
+      return m.sizeFit != null && !m.streaming && !m.error
+    }
+    return false
+  }, [messages])
+
   const handleChip = useCallback(
     (chipMode: Mode, label: string) => {
       const needsProduct = chipMode === 'size-fit' || chipMode === 'outfit'
@@ -54,10 +66,13 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
 
   const handleSend = useCallback(
     (text: string) => {
+      // size-fit 已结算后的自由输入自动转 shopping；同时落定 mode，避免下一条仍粘滞 size-fit。
+      const nextMode = mode === 'size-fit' && sizeFitSettled ? 'shopping' : mode
+      if (nextMode !== mode) setMode(nextMode)
       const ref = product ? { handle: product.handle, title: product.title } : null
-      send(mode, text, ref)
+      send(nextMode, text, ref)
     },
-    [mode, product, send],
+    [mode, product, send, sizeFitSettled],
   )
 
   const value = useMemo<AssistantHandle>(
@@ -73,7 +88,12 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         isOpen={isOpen}
         onClose={close}
         product={product}
-        onRemoveProduct={() => setProduct(null)}
+        onRemoveProduct={() => {
+          // 移除上下文 chip 后 mode 归位 shopping：否则仍处 size-fit/outfit 的
+          // 下一条必然得到服务端 "Pick a product first" invalid 错误。
+          setProduct(null)
+          setMode('shopping')
+        }}
         onSend={handleSend}
         onPick={handleChip}
         onRetry={retry}

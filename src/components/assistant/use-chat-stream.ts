@@ -46,6 +46,25 @@ export interface ChatStream {
 
 const NETWORK_ERROR_TEXT = 'Something went wrong on our end — please try again.'
 
+/** 结果卡运行时 shape 守卫：parseEvent 对 productCards 只验 Array.isArray，坏 item
+ *  （缺 handle/palette 等）会让 ProductVisual 抛 TypeError 打崩整条会话，故在
+ *  入口过滤，渲染侧只需消费干净数据。 */
+function isValidCard(c: unknown): c is ProductCard {
+  if (typeof c !== 'object' || c === null) return false
+  const o = c as Record<string, unknown>
+  return (
+    typeof o.handle === 'string' &&
+    o.handle.length > 0 &&
+    typeof o.title === 'string' &&
+    typeof o.price === 'number' &&
+    Number.isFinite(o.price) &&
+    Array.isArray(o.palette) &&
+    o.palette.length >= 2 &&
+    (o.palette as unknown[]).every((x) => typeof x === 'string' && x.length > 0) &&
+    o.imageKind === 'local'
+  )
+}
+
 const uid = (): string =>
   typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
     ? crypto.randomUUID()
@@ -123,8 +142,9 @@ export function useChatStream(): ChatStream {
           prev.map((m) => (m.id === id ? { ...m, content: m.content + event.text } : m)),
         )
       } else if (event.type === 'productCards') {
+        const items = event.items.filter(isValidCard)
         setMessages((prev) =>
-          prev.map((m) => (m.id === id ? { ...m, cards: event.items } : m)),
+          prev.map((m) => (m.id === id ? { ...m, cards: items } : m)),
         )
       } else if (event.type === 'sizeFit') {
         setMessages((prev) =>

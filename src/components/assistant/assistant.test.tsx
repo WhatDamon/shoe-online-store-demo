@@ -96,14 +96,13 @@ describe('assistant FAB + panel', () => {
     await user.click(fab)
 
     expect(await screen.findByText(/need a hand finding your pair/i)).toBeInTheDocument()
-    for (const label of [
-      'Find my size',
-      'Style it with',
-      'Help me pick',
-      'Everyday sneakers under $150',
-    ]) {
+    // 无商品上下文：只出通用建议，不出 size-fit/outfit（服务端要求 product 引用，
+    // 无上下文时这两条是死路入口——点击必得 "Pick a product first" 错误）。
+    for (const label of ['Help me pick', 'Everyday sneakers under $150']) {
       expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
     }
+    expect(screen.queryByRole('button', { name: 'Find my size' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Style it with' })).not.toBeInTheDocument()
   })
 
   it('renders streamed product result cards linking to the detail page', async () => {
@@ -120,6 +119,8 @@ describe('assistant FAB + panel', () => {
               imageKind: 'local',
               palette: ['#e8e6e0', '#d8d4cb'],
             },
+            // 坏 item：缺 palette，渲染前应被过滤而非打崩会话
+            { handle: 'broken', title: 'Broken', price: 99, imageKind: 'local' },
           ],
         }),
         frame({ type: 'delta', text: 'Here is your match: the Daily Drift.' }),
@@ -142,6 +143,7 @@ describe('assistant FAB + panel', () => {
     const link = await screen.findByRole('link', { name: /Daily Drift/i })
     expect(link).toHaveAttribute('href', '/product/daily-drift')
     expect(within(link).getByText('$128.00')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Broken/i })).not.toBeInTheDocument()
     expect(await screen.findByText(/Here is your match/i)).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/ai/chat',
@@ -284,5 +286,100 @@ describe('assistant FAB + panel', () => {
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: 'Remove Daily Drift' })).not.toBeInTheDocument(),
     )
+  })
+
+  it('keeps context chips reachable during a product session and Style it with sends outfit mode', async () => {
+    nav.pathname = '/'
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        streamedResponse([
+          frame({
+            type: 'delta',
+            text: 'Can you tell me the size you usually wear, or your foot length in cm?',
+          }),
+          frame({ type: 'done' }),
+        ]),
+      )
+      .mockResolvedValueOnce(
+        streamedResponse([
+          frame({ type: 'delta', text: 'Try the Daily Drift with a merino crew and slim chinos.' }),
+          frame({ type: 'done' }),
+        ]),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+    render(
+      <AssistantProvider>
+        <OpenSizeFit />
+      </AssistantProvider>,
+    )
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: 'find my size on PDP' }))
+    await screen.findByText(/size you usually wear/i)
+
+    // PDP 自动开场使消息非空 → welcome 已隐，上下文 chips 常驻面板使 outfit 可达
+    const outfitChip = await screen.findByRole('button', { name: 'Style it with' })
+    expect(screen.getByRole('button', { name: 'Find my size' })).toBeInTheDocument()
+    await user.click(outfitChip)
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+    const body = JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string)
+    expect(body.mode).toBe('outfit')
+    expect(body.product).toEqual({ handle: 'daily-drift', title: 'Daily Drift' })
+  })
+
+  it('routes a free-form follow-up to shopping after a size-fit recommendation settles', async () => {
+    nav.pathname = '/'
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        streamedResponse([
+          frame({
+            type: 'delta',
+            text: 'Can you tell me the size you usually wear, or your foot length in cm?',
+          }),
+          frame({ type: 'done' }),
+        ]),
+      )
+      .mockResolvedValueOnce(
+        streamedResponse([
+          frame({
+            type: 'sizeFit',
+            recommended: 43,
+            alternatives: [42],
+            rationale: 'Daily Drift runs true to size.',
+          }),
+          frame({ type: 'delta', text: 'Daily Drift runs true to size.' }),
+          frame({ type: 'done' }),
+        ]),
+      )
+      .mockResolvedValueOnce(
+        streamedResponse([
+          frame({ type: 'delta', text: 'Here are a few everyday options in the collection.' }),
+          frame({ type: 'done' }),
+        ]),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+    render(
+      <AssistantProvider>
+        <OpenSizeFit />
+      </AssistantProvider>,
+    )
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: 'find my size on PDP' }))
+    await screen.findByText(/size you usually wear/i)
+    const input = screen.getByRole('textbox', { name: 'Message' })
+    await user.type(input, 'I usually wear US 9')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    await screen.findByText('Try US 9')
+
+    // size-fit 已结算：再输自由文本不应粘滞 size-fit 追问尺码，应转 shopping
+    await user.type(input, 'Any colour options?')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3))
+    const body = JSON.parse((fetchMock.mock.calls[2][1] as RequestInit).body as string)
+    expect(body.mode).toBe('shopping')
   })
 })
