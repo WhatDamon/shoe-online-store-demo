@@ -4,7 +4,7 @@ import { site } from '@/lib/site'
 export function Footer() {
   return (
     <footer className="bg-ink text-canvas">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-14 md:flex-row md:items-start md:justify-between">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 pb-8 pt-14 md:flex-row md:items-start md:justify-between">
         <div className="max-w-xs">
           <Link
             href="/"
@@ -29,6 +29,10 @@ export function Footer() {
         </nav>
         <p className="text-sm text-canvas/50">© 2026 {site.name}</p>
       </div>
+      {/* 核心 Slogan：全站页脚收尾，每页可见（规格克制：小号、低对比） */}
+      <p className="mx-auto w-full max-w-6xl border-t border-canvas/10 px-4 pb-12 pt-6 text-center text-sm text-canvas/50">
+        {site.tagline}
+      </p>
     </footer>
   )
 }

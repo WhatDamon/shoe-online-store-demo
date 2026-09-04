@@ -40,8 +40,16 @@ export async function GET() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', fontSize: 26, color: '#57534e' }}>
-          {site.name} — no warehouses, no waste.
+        <div
+          style={{
+            display: 'flex',
+            fontSize: 26,
+            color: '#57534e',
+            maxWidth: 1000,
+            flexWrap: 'wrap',
+          }}
+        >
+          {site.tagline}
         </div>
       </div>
     ),

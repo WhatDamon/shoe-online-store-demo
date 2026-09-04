@@ -26,6 +26,10 @@ describe('SiteShell', () => {
     // Footer 底部导航
     const footer = screen.getByRole('contentinfo')
     expect(within(footer).getByRole('link', { name: 'Shop' })).toHaveAttribute('href', '/shop')
+    // 核心 Slogan 收尾（品牌声明全站可见）
+    expect(
+      within(footer).getByText('3D Printed. Closed-Loop. A New Footwear Phenomenon.')
+    ).toBeInTheDocument()
   })
 
   it('keeps the same structure for the overlay tone (landing)', () => {
