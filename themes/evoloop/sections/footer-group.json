@@ -190,10 +190,15 @@
         "padding-block-start": 20,
         "padding-block-end": 48
       }
+    },
+    "evoloop_slogan": {
+      "type": "evoloop-brand-strip",
+      "blocks": {}
     }
   },
   "order": [
     "footer_m9NzUG",
-    "footer_utilities_jLGE8U"
+    "footer_utilities_jLGE8U",
+    "evoloop_slogan"
   ]
 }

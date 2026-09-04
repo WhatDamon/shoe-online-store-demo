@@ -23,27 +23,38 @@ Evoloop 购物（结账）端的 Shopify 主题。**基于 Shopify Horizon 4.1.5
 
 ### 图片恢复（仓库已剥离二进制）
 
-提交中**不含任何二进制图片**。原 zip 中有 `assets/hero-slide-1/2/3.jpg`
-（约 1.8MB），模板里对它们的引用已置空（首页 hero 会落到 Shopify 占位图，
-无破图）。需要恢复演示用大图时，解压原始 zip：
+提交中**不含任何二进制图片**。原 zip 中有 `assets/hero-slide-1/2/3.jpg`（约 1.8MB，供 Horizon 的 hero carousel 区块使用）。当前首页已改用无图的 Evoloop 品牌首页（见下），不需要这些图；若日后在任意页面添加 Horizon carousel 区块并想用实拍图，解压原始 zip 后到主题编辑器重选即可：
 
 ```bash
 unzip -o ~/Downloads/horizon-product-carousel-v2-images-20260905-3d-shoes.zip \
   'assets/hero-slide-*.jpg' -d themes/evoloop
 ```
 
-然后回到 Shopify 主题编辑器，在首页 hero 每个 slide 的图片选择器里重新选图即可。
+## Evoloop 品牌层（导入即可见，不再“一眼 Horizon”）
+
+主题默认观感 = Evoloop 品牌（与 Next 网站一致），改四层：
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 色板 | `config/settings_data.json` | `color_palette`（current + Horizon preset）已改为 Evoloop：background `#fafaf8`（canvas）、foreground `#111111`（ink）、color1 `#525252`（次级文本）、color2 `#e5e5e5`（描边）；主按钮默认 ink 黑底白字 |
+| 字体 | `assets/evoloop-brand.css` + `snippets/evoloop-brand.liquid` | 标题用 Google Fonts Newsreader（`var(--font-heading--family)` 覆盖，离线回退 serif）；正文/子标题/按钮用系统无衬线栈；加载顺序保证在 Horizon 变量之后（`layout/theme.liquid` head 尾部 `{% render 'evoloop-brand' %}`） |
+| 首页 | `templates/index.json` + `sections/evoloop-hero.liquid` | 品牌 Hero（kicker/标语/描述/CTA，无图无 AI）+ 品牌词 marquee（Horizon marquee 区块）+ 精选商品列表（product-list，空店自动降级为占位骨架；接 collection 后展示商品） |
+| 页脚/商品页 | `sections/evoloop-brand-strip.liquid`（已加入 footer 静态组尾部，每页显示 slogan 条）；`sections/main-3d-shoes-custom.liquid` 与 `snippets/evoloop-assistant.liquid` 硬编码色值已对齐 canvas/ink/hairline |
+
+**自定义入口**：改色改 `settings_data.json` 的 `color_palette` 或主题编辑器 Color；改字改 `assets/evoloop-brand.css` 顶部的变量（或编辑器 Fonts，注意运行时由 brand.css 覆盖，编辑器的字体选择为兼容占位）；改首页文案改主题编辑器首页的 Evoloop hero / Marquee 区块文本。
+
+> 注意：标题字体依赖 Google Fonts 外链；无法访问 fonts.googleapis.com 的环境会自动落到 `ui-serif / Georgia` 回退，不破版。
 
 ## 与上游的差异（增量清单）
 
-| 变更                                                                                                                                           | 位置                                                                                                                                                        |
-| ------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| theme_info 更名 Evoloop；品牌入口都在 Shopify 后台/`shop.name` 与主题编辑器设置                                                                | `config/settings_schema.json`                                                                                                                               |
-| 二进制图剥离 + 首页 hero 引用置空（占位 svg 兜底）                                                                                              | `templates/index.json`                                                                                                                                      |
-| **语言仅保留英文**：57 个 locale → 仅 `en.default.json` + `en.default.schema.json`                                                              | `locales/`（55 个非英文语言包已删除）                                                                                                                       |
-| **内容剥离（设计之外）**：删除 blog/article/gift_card 模板及其家族与死代码（main-blog/main-blog-post/header-announcements、blog-comment-form、_blog-post-*/死 blocks、gift-card css、account/orders 图标、Horizon JS 开发脚手架）；库存见 README 下段 | 全树 |
-| **Evoloop 3D 视觉兜底**（能力 1，见下）                                                                                                          | `snippets/evoloop-product-visual.liquid`、`assets/evoloop-product-visual.js`、`sections/main-3d-shoes-custom.liquid`                                        |
-| **Evoloop AI 助手插槽**（能力 2，见下）                                                                                                          | `config/settings_schema.json`（设置组）、`snippets/evoloop-assistant.liquid`、`assets/evoloop-assistant.js`、`sections/main-3d-shoes-custom.liquid`        |
+| 变更                                                                                                                                                                                                                                                  | 位置                                                                                                                                                |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| theme_info 更名 Evoloop；品牌入口都在 Shopify 后台/`shop.name` 与主题编辑器设置                                                                                                                                                                       | `config/settings_schema.json`                                                                                                                       |
+| 二进制图剥离 + 首页 hero 引用置空（占位 svg 兜底）                                                                                                                                                                                                    | `templates/index.json`                                                                                                                              |
+| **语言仅保留英文**：57 个 locale → 仅 `en.default.json` + `en.default.schema.json`                                                                                                                                                                    | `locales/`（55 个非英文语言包已删除）                                                                                                               |
+| **内容剥离（设计之外）**：删除 blog/article/gift_card 模板及其家族与死代码（main-blog/main-blog-post/header-announcements、blog-comment-form、_blog-post-*/死 blocks、gift-card css、account/orders 图标、Horizon JS 开发脚手架）；库存见 README 下段 | 全树                                                                                                                                                |
+| **Evoloop 3D 视觉兜底**（能力 1，见下）                                                                                                                                                                                                               | `snippets/evoloop-product-visual.liquid`、`assets/evoloop-product-visual.js`、`sections/main-3d-shoes-custom.liquid`                                |
+| **Evoloop AI 助手插槽**（能力 2，见下）                                                                                                                                                                                                               | `config/settings_schema.json`（设置组）、`snippets/evoloop-assistant.liquid`、`assets/evoloop-assistant.js`、`sections/main-3d-shoes-custom.liquid` |
 
 ## PDP 模板
 

@@ -1,0 +1,68 @@
+{%- comment -%}
+  Evoloop homepage hero — typographic brand hero mirroring the Evoloop
+  Next.js landing page (克制, zero imagery, zero AI presence).
+  Visuals live in assets/evoloop-brand.css (loaded globally via
+  snippets/evoloop-brand.liquid).
+{%- endcomment -%}
+<section class="evo-hero">
+  <div class="evo-hero__inner">
+    {%- if section.settings.kicker != blank -%}
+      <p class="evo-hero__kicker">{{ section.settings.kicker }}</p>
+    {%- endif -%}
+    {%- if section.settings.title != blank -%}
+      <h1 class="evo-hero__title">{{ section.settings.title }}</h1>
+    {%- endif -%}
+    {%- if section.settings.support != blank -%}
+      <p class="evo-hero__support">{{ section.settings.support }}</p>
+    {%- endif -%}
+    {%- if section.settings.cta_label != blank and section.settings.cta_link != blank -%}
+      <a class="evo-btn" href="{{ section.settings.cta_link }}">{{ section.settings.cta_label }}</a>
+    {%- endif -%}
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Evoloop hero",
+  "tag": "section",
+  "settings": [
+    {
+      "type": "text",
+      "id": "kicker",
+      "label": "Kicker",
+      "default": "A new kind of footwear"
+    },
+    {
+      "type": "textarea",
+      "id": "title",
+      "label": "Headline",
+      "default": "3D Printed. Closed-Loop. A New Footwear Phenomenon."
+    },
+    {
+      "type": "textarea",
+      "id": "support",
+      "label": "Supporting copy",
+      "default": "Casual shoes, printed to order in your size."
+    },
+    {
+      "type": "text",
+      "id": "cta_label",
+      "label": "Button label",
+      "default": "Shop the collection"
+    },
+    {
+      "type": "url",
+      "id": "cta_link",
+      "label": "Button link",
+      "default": "/collections/all"
+    }
+  ],
+  "presets": [
+    {
+      "name": "Evoloop hero",
+      "category": "Evoloop",
+      "settings": {}
+    }
+  ]
+}
+{% endschema %}
