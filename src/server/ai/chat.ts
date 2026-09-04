@@ -10,8 +10,7 @@ import { catalog } from '@/server/catalog/adapter'
 import type { Product } from '@/server/catalog/types'
 import { getProductForMarket } from '@/server/catalog/service'
 import { retrieve } from '@/server/search/retrieval'
-import { createRepository } from '@/server/search/repository'
-import { db } from '@/db/client'
+import { createDefaultRepository } from '@/server/search/repository'
 import { createSizeFitEvent } from './events'
 import type { AiContext, AiProvider } from './provider'
 import type { ChatEvent, Mode, ProductCard } from './events'
@@ -41,7 +40,7 @@ export const NO_MATCH_TEXT =
   "I couldn't find a style that matches that yet — try different words or browse the shop."
 
 let shared: Guardrails | null = null
-const sharedGuardrails = (): Guardrails => (shared ??= createGuardrails(createRepository(db())))
+const sharedGuardrails = (): Guardrails => (shared ??= createGuardrails(createDefaultRepository()))
 
 /** GuardrailError → 对应 code + 温和文案（code 1:1 透传，含 'turns'）；其余 → provider 错误。 */
 const toErrorEvent = (e: unknown): ChatEvent => {

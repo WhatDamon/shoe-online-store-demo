@@ -2,8 +2,7 @@ import { cosine } from './vector'
 import { catalog } from '@/server/catalog/adapter'
 import { embed, embeddingsAvailable } from './embedder'
 import { keywordSearch } from './keyword'
-import { createRepository } from './repository'
-import { db } from '@/db/client'
+import { createDefaultRepository } from './repository'
 import type { Product } from '@/server/catalog/types'
 
 export interface RetrievalResult {
@@ -21,12 +20,12 @@ export const hashText = (s: string) => {
   return String(h)
 }
 
-type Repo = ReturnType<typeof createRepository>
+type Repo = ReturnType<typeof createDefaultRepository>
 
 export async function retrieve(
   query: string,
   opts: { embedIfAvailable?: boolean } = { embedIfAvailable: true },
-  repo: Repo = createRepository(db()),
+  repo: Repo = createDefaultRepository(),
 ): Promise<RetrievalResult[]> {
   const products = await catalog.getProducts({}) // 规格 §5：≤2k 目录内存余弦可行
   if (opts.embedIfAvailable && (await embeddingsAvailable())) {

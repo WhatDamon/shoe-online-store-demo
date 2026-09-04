@@ -1,21 +1,15 @@
 import { eq, sql } from 'drizzle-orm'
-import { productEmbeddings, aiUsage } from '@/db/schema'
-import { sqliteDb, createPostgresDb } from '@/db/client'
-import { resolveDbDriver } from '@/db/dialect'
+import { aiUsage, productEmbeddings } from '@/db/schema-postgres'
+import { ensurePgTables } from '@/db/client'
+import type { PgAppDb } from '@/db/client'
 import { parseVector } from './vector'
-import type { AppDb } from '@/db/client'
-import { createPostgresRepository } from './repository-postgres'
+import type { EmbeddingRow } from './repository'
 
-export interface EmbeddingRow {
-  productId: string
-  contentHash: string
-  model: string
-  vector: number[]
-}
-
-export function createRepository(db: AppDb) {
+/** Postgres 实现（决策 #13）：方法形状与 sqlite 版完全一致 → 可当 Repository 用。 */
+export function createPostgresRepository(db: PgAppDb) {
   return {
     async getEmbedding(productId: string): Promise<EmbeddingRow | null> {
+      await ensurePgTables(db)
       const row = await db
         .select()
         .from(productEmbeddings)
@@ -31,6 +25,7 @@ export function createRepository(db: AppDb) {
         : null
     },
     async upsertEmbedding(row: EmbeddingRow): Promise<void> {
+      await ensurePgTables(db)
       await db
         .insert(productEmbeddings)
         .values({
@@ -49,6 +44,7 @@ export function createRepository(db: AppDb) {
         })
     },
     async allEmbeddings(model: string): Promise<EmbeddingRow[]> {
+      await ensurePgTables(db)
       const rows = await db
         .select()
         .from(productEmbeddings)
@@ -67,9 +63,11 @@ export function createRepository(db: AppDb) {
       completionTokens: number
       sessionKey: string
     }): Promise<void> {
+      await ensurePgTables(db)
       await db.insert(aiUsage).values({ ...u, createdAt: Date.now() })
     },
     async dayTokenUsage(day: string): Promise<number> {
+      await ensurePgTables(db)
       const [row] = await db
         .select({
           total: sql<number>`coalesce(sum(${aiUsage.promptTokens} + ${aiUsage.completionTokens}), 0)`,
@@ -80,19 +78,9 @@ export function createRepository(db: AppDb) {
     },
     async wipe(): Promise<void> {
       // 仅测试
+      await ensurePgTables(db)
       await db.delete(productEmbeddings)
       await db.delete(aiUsage)
     },
   }
-}
-
-export type Repository = ReturnType<typeof createRepository>
-
-/** 决策 #13：按 DB_DRIVER 返回默认驱动实现（sqlite 本地 / postgres 云端）。 */
-export function createDefaultRepository(): Repository {
-  if (resolveDbDriver() === 'postgres') {
-    const pg = createPostgresDb()
-    return createPostgresRepository(pg)
-  }
-  return createRepository(sqliteDb())
 }

@@ -19,7 +19,7 @@ catalog is a local seed of 16 shoes; product visuals are **programmatically gene
 - **Next.js 16.3.4** (App Router, Turbopack) + React 19 + TypeScript 5
 - **Bun 1.3** as package manager and runtime (required — see below)
 - **Tailwind CSS v4** + **shadcn/ui** (Base UI preset)
-- **Drizzle ORM** over **SQLite** (`bun:sqlite`), Postgres-ready via `DATABASE_URL` swap
+- **Drizzle ORM**, dual-driver (spec decision #13): **SQLite** (`bun:sqlite`, default, zero-setup) or **Postgres** (`postgres.js`, Cloud SQL-ready) — chosen by `DB_DRIVER` in the environment
 - **Vitest** (unit + React Testing Library), **ESLint**, `tsc --noEmit`
 - AI: OpenAI-compatible streaming client with a deterministic **Mock mode** when no key is set
 
@@ -36,13 +36,17 @@ cp .env.example .env.local      # defaults are fine — empty AI_API_KEY = Mock 
 bun run dev               # http://localhost:3000
 ```
 
-> **Bun runtime required for dev/build/start.** The `next` CLI normally runs on the Node runtime,
-> but this project's DB layer imports `bun:sqlite` (server-only code under `src/server`, `src/db`),
+> **Bun runtime required for the default SQLite driver.** The `next` CLI normally runs on the Node
+> runtime, but the SQLite driver imports `bun:sqlite` (server-only code under `src/server`, `src/db`),
 > so the npm scripts bake in `bun --bun next …` — plain `bun run dev|build|start` already runs the
 > CLI on the Bun runtime. (No `--bun` prefix needed anymore; the scripts do it.)
+>
+> Set `DB_DRIVER=postgres` (with a `DATABASE_URL=postgres://…`) and the app runs on plain Node
+> runtimes too — the pg path uses `postgres.js` only, no Bun-specific imports.
 
-First run auto-creates the SQLite file at `./data/local.db` with two tables
-(`product_embeddings`, `ai_usage`) via idempotent `CREATE TABLE IF NOT EXISTS` — no migration step.
+First run auto-creates the schema (two tables `product_embeddings`, `ai_usage`) via idempotent
+`CREATE TABLE IF NOT EXISTS` on **either** driver — SQLite file at `./data/local.db`, or the
+Postgres database behind `DATABASE_URL`. No migration step.
 
 ### What you can do without any setup
 
@@ -84,7 +88,8 @@ See [`.env.example`](.env.example) for the annotated template. Summary:
 | `AI_MAX_MESSAGE_CHARS` | `800` | Max characters per incoming user message |
 | `AI_DAILY_TOKEN_CAP` | `1000000` | Daily token budget (SUM over `ai_usage` per UTC day) |
 | `AI_DISABLE_REAL` | `0` | `1` forces Mock mode even with a key (abuse kill switch) |
-| `DATABASE_URL` | `./data/local.db` | SQLite file; swap to a `pg://…` URL for Postgres |
+| `DB_DRIVER` | `sqlite` | `sqlite` (default) or `postgres` — selects the app DB driver (decision #13) |
+| `DATABASE_URL` | `./data/local.db` | sqlite: local file; postgres: `postgres://…` connection string |
 | `SHOPIFY_DOMAIN`, `SHOPIFY_STOREFRONT_TOKEN` | *(empty)* | Reserved. Catalog adapter switches seed → Shopify only when **both** are set (not yet active). |
 
 ### Enabling real AI
@@ -122,7 +127,7 @@ src/
     search/                # embedder, keyword search, retrieval (embedding cache + cosine), vector
     ai/                    # providers (Mock/OpenAI-compatible), chat orchestration, SSE events, prompts
     guardrails/            # rate limit, session state (turns/TTL/trim), token budget, soft copy
-  db/                      # Drizzle schema (2 tables), bun:sqlite client (sync, idempotent)
+  db/                      # Drizzle dual-driver schemas (2 tables each: sqlite-core + pg-core), clients
   lib/                     # shared pure helpers (site, market, wishlist, size charts, formats, SEO)
   test/                    # bun:sqlite → node:sqlite test compat shim (test-only)
 ```
