@@ -30,6 +30,13 @@ let snapshot: string[] = []
 let loaded = false
 const listeners = new Set<() => void>()
 
+// React 19 requires the server snapshot to be referentially stable: returning a
+// fresh `[]` literal each call violates useSyncExternalStore's caching contract
+// and trips the dev check "The result of getServerSnapshot should be cached to
+// avoid an infinite loop" whenever a hydration interruption (e.g. a browser
+// extension mutating <body>) forces React's recovery path to re-read it.
+const EMPTY_ITEMS: string[] = []
+
 const ensureLoaded = (): string[] => {
   if (!loaded) {
     snapshot = loadWishlist()
@@ -47,7 +54,7 @@ const subscribe = (listener: () => void) => {
 
 const getSnapshot = (): string[] => ensureLoaded()
 
-const getServerSnapshot = (): string[] => []
+const getServerSnapshot = (): string[] => EMPTY_ITEMS
 
 export function WishlistProvider({ children }: { children: ReactNode }) {
   const items = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
