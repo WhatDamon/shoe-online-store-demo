@@ -1,6 +1,6 @@
 # 鞋类购物网站 · 前端体验 + 克制的 AI 助手 — 设计规格
 
-> 日期：2026-09-04 · 状态：已获用户逐节批准 · 下一步：writing-plans 创建实现计划
+> 日期：2026-09-04 · 状态：已获用户批准；2026-09-05 增补决策 #12–#14（双驱动 DB / 云端选型 / Shopify 映射缺口）
 
 ## 1. 概述与定位
 
@@ -45,7 +45,7 @@
 - **Bun** 1.3.x：包管理 + 脚本运行（`bun run dev` 等）
 - **Next.js 16**（App Router + React 19 + TypeScript，Turbopack 构建）；版本在脚手架时锁定最新稳定
 - **shadcn/ui + Tailwind CSS v4**：组件与设计 token
-- **Drizzle ORM**：跨 SQL（SQLite 本地 / Postgres 上线，仅换 `DATABASE_URL`）
+- **Drizzle ORM**：双驱动（决策 #13）——`DB_DRIVER=sqlite|postgres` 选择；SQLite 本地默认，Postgres 连云端（Cloud SQL，决策 #12）。schema 按方言各一份（仅 2 张表，成本可控），不再是“仅换 `DATABASE_URL`”
 - **OpenAI SDK（兼容模式）**：`baseURL / apiKey / model` 全可配 → 兼容 OpenAI / DeepSeek / 各类网关
 - 测试：**Vitest + React Testing Library**
 
@@ -96,7 +96,7 @@ type CatalogAdapter = {
 
 **筛选维度**：Collection / Size（当前市场体系）/ Price range / Sort；搜索框支持自然语言 → 走后端检索（见 §8）。
 
-## 7. 本地数据库（Drizzle，跨 SQL）
+## 7. 应用数据库（Drizzle，双驱动 `DB_DRIVER`）
 
 两表，各司其职：
 
@@ -109,18 +109,21 @@ product_embeddings: {
 }
 
 ai_usage: {           // 匿名成本计量（§8.5），无个人信息
-  id: integer PK autoincrement,
+  id: PK,              // sqlite AUTOINCREMENT / pg serial（随驱动）
   day: text,           // YYYY-MM-DD，日预算聚合键
   model: text,
   promptTokens: integer,
   completionTokens: integer,
   sessionKey: text,    // 匿名会话指纹
-  createdAt: integer,
+  createdAt: integer,  // 毫秒时间戳（pg 用 bigint，防 2038 溢出）
 }
 ```
 
 - 不做收藏表（localStorage，P6）、不做 AI 会话表（仅会话内记忆；回合计数走内存，见 §8.5）。
-- SQLite 文件默认；Postgres 仅换 `DATABASE_URL` + drizzle 方言配置。
+- **驱动选择（决策 #13）**：`DB_DRIVER=sqlite|postgres`，默认 `sqlite`（本地 `./data/local.db`，行为与今完全一致）；`postgres` 面向 Cloud SQL（决策 #12）。驱动在 `db()` 单例内**懒加载**判定（与 `market.code` 同类先例），启动即校验，未知值报错。
+- **schema 按方言两份小文件**（`sqlite-core` / `pg-core`），列语义对齐 + 契约测试防漂移；两侧均保留启动自动 `CREATE TABLE IF NOT EXISTS`（零迁移 DX）；drizzle-kit 迁移留待 schema 演进再启用。
+- **pg 驱动选 `postgres.js`**：Bun（本地）与 Node（Vercel / Cloud Run / Functions）双运行时通用——部署目标未定不阻塞。部署待定项（连接池形态 / Cloud SQL connector / 护栏出内存）记录于决策 #12，届时另议。
+- 修正早期“Postgres 仅换 `DATABASE_URL`”表述：方言、驱动、schema、测试 seam 需同步改（决策 #13）。
 
 ## 8. AI 助手设计
 
@@ -215,12 +218,13 @@ docs/superpowers/specs/  本规格
 | `AI_DAILY_TOKEN_CAP` | 每日 token 预算，超限温和拒答（默认 ~1M/日） |
 | `AI_DISABLE_REAL` | 强制 Mock 总开关（遇滥用一键止血） |
 | `SITE_MARKET` | 市场配置（默认 `US`），决定尺码展示体系（US/EU/UK/JP/CN，§6 换算） |
-| `DATABASE_URL` | 默认 `file:./data/local.db`；上线换 Postgres |
+| `DB_DRIVER` | `sqlite`（默认）/ `postgres`：应用数据库驱动选择（决策 #13） |
+| `DATABASE_URL` | sqlite：本地文件（默认 `./data/local.db`）；postgres：`postgres://…` 连 Cloud SQL |
 | `SHOPIFY_*` | 预留（本期忽略） |
 
 ## 12. 工程 / 测试 / 可靠性
 
-- **脚本**（Bun）：`dev / build / start`、`db:generate / db:push`、`test`、`typecheck`、`lint`；门禁 = lint + typecheck + test + build。
+- **脚本**（Bun）：`dev / build / start / test / typecheck / lint / format / format:check`；DB 迁移命令（drizzle-kit `db:generate / db:migrate`）待 schema 演进时启用（当前启动自动建表）；门禁 = lint + typecheck + test + build。
 - **测试（v1）**：Vitest —— seed 筛选、检索排序（余弦/关键词 golden cases）、Mock provider 输出契约（§8.4 行格式）、意图路由、美元格式化；尺码 —— 换算表 golden（US/EU/UK/JP/CN ↔ mm）、市场筛选与展示换算；护栏 —— IP/会话令牌桶限流、回合上限与历史裁剪、日预算强制（内存 SQLite）、离题 redirect 与限流温和文案 golden；RTL —— 助手流式渲染（mock SSE）、尺码选择器、筛选与 URL 同步、愿望单切换、发送中禁发与超时中止。
 - **错误处理**：路由层 try/catch → SSE `error` + UI 重试；商品缺失 `notFound()`；全局 `error.tsx / not-found.tsx / loading.tsx`。
 - **性能/SEO**：`generateMetadata` + OG（本地生成）；主图 inline SVG（零网络请求），lifestyle 远程图 `next/image` + 静默兜底；markdown 用轻量渲染（不引重型依赖）。
@@ -240,6 +244,9 @@ docs/superpowers/specs/  本规格
 9. 鞋码多市场 = 配置级单市场切换（`SITE_MARKET` 默认 US）+ 脚长 mm 锚换算表 → 数据/换算先行，全站仍英文/USD，新市场仅补表改配置
 10. 产品定位 = 3D 打印休闲鞋：本期商品字段/描述先行体现打印制造，Landing 品牌叙事暂缓（用户分期决策）
 11. 主图改本地程序化 SVG（组件化参数渲染）→ 3D 定位素材自洽、离线一致、零图床依赖；`remote` 字段保留供真实素材替换
+12. **云端数据库澄清与选型**：不存在 “Firebase Cloud SQL”。目标 = **GCP Cloud SQL for PostgreSQL**（保留 Drizzle/关系型：ai_usage 日 SUM 与未来订单×商品分析顺畅）；Firestore 备选被否（NoSQL → 弃 ORM/SQL）。**部署目标未定**（Vercel / Cloud Run / Functions）→ 以运行时通用 pg 驱动解耦，不阻塞开发（用户决策 2026-09-05）
+13. **SQLite 保留 + `.env` 双驱动**：`DB_DRIVER=sqlite|postgres`（默认 sqlite，本地/测试零回归）；Postgres 路径用 `postgres.js`（Bun/Node 通用）；schema 按方言两小份 + 契约测试；`db()` 懒分派；启动自动建表两侧保留，drizzle-kit 迁移延后。**修正旧表述**：Postgres 不是“仅换 `DATABASE_URL`”（方言/驱动/schema/测试 seam 需同步改）（用户决策 2026-09-05）
+14. **Shopify 真接入的数据映射缺口（实现时落定）**：商品仍直读 Storefront、**不镜像**（P4：无 products 表、无 webhook）；3D 专属字段（construction/palette/density/features/fitNotes/subtitle）经 product metafields（Admin 写、Storefront 读）；sizes：Shopify variant 选项值 → canonical EU 的源映射策略；`getBuyUrl` 以商品/变体直达链接起步，checkout 就绪后换 cart→checkoutUrl；PDP 切 Storefront 后改 dynamic/ISR（构建期依赖 Shopify 在线）（记录于 2026-09-05 设计评审）
 
 ## 14. 待办下一步
 
