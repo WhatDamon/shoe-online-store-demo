@@ -69,3 +69,9 @@ export function useWishlist(): WishlistValue {
   if (!ctx) throw new Error('useWishlist must be used within a WishlistProvider')
   return ctx
 }
+
+// 非抛出版本：允许在 Provider 未必存在的场景（如商品卡单元测试、Provider 尚未挂载的
+// SSR 首帧）安全探测——返回 null 时调用方应隐藏收藏控件，而不是崩溃。
+export function useOptionalWishlist(): WishlistValue | null {
+  return useContext(WishlistContext)
+}
