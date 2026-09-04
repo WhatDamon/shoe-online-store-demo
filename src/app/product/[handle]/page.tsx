@@ -64,34 +64,34 @@ export default async function ProductPage({
 
           <p className="text-[15px] leading-7 text-neutral-600">{product.description}</p>
 
-          <ProductActions product={product} buyUrl={buyUrl} />
-
-          <Accordion className="border-t border-neutral-200">
-            <AccordionItem value="materials-fit">
-              <AccordionTrigger>Materials &amp; fit</AccordionTrigger>
-              <AccordionContent>
-                <ul className="mb-4 list-disc space-y-1 pl-4 text-neutral-600">
-                  {product.features.map(feature => (
-                    <li key={feature}>{feature}</li>
-                  ))}
-                </ul>
-                <p className="text-neutral-600">{product.fitNotes}</p>
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="shipping">
-              <AccordionTrigger>Shipping &amp; returns</AccordionTrigger>
-              <AccordionContent>
-                <p className="mb-3 text-neutral-600">
-                  Every pair is printed to order in our studio, so nothing sits in a warehouse —
-                  we only print what you buy.
-                </p>
-                <p className="text-neutral-600">
-                  Orders ship in recycled packaging once your pair is printed. Free returns within
-                  30 days.
-                </p>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
+          <ProductActions product={product} buyUrl={buyUrl}>
+            <Accordion className="border-t border-neutral-200">
+              <AccordionItem value="materials-fit">
+                <AccordionTrigger>Materials &amp; fit</AccordionTrigger>
+                <AccordionContent>
+                  <ul className="mb-4 list-disc space-y-1 pl-4 text-neutral-600">
+                    {product.features.map(feature => (
+                      <li key={feature}>{feature}</li>
+                    ))}
+                  </ul>
+                  <p className="text-neutral-600">{product.fitNotes}</p>
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="shipping">
+                <AccordionTrigger>Shipping &amp; returns</AccordionTrigger>
+                <AccordionContent>
+                  <p className="mb-3 text-neutral-600">
+                    Every pair is printed to order in our studio, so nothing sits in a warehouse —
+                    we only print what you buy.
+                  </p>
+                  <p className="text-neutral-600">
+                    Orders ship in recycled packaging once your pair is printed. Free returns within
+                    30 days.
+                  </p>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </ProductActions>
         </div>
       </div>
 

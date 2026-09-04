@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { CanonicalSize } from '@/server/catalog/types'
 import type { ProductView } from '@/server/catalog/service'
 import { useAssistant } from '@/components/assistant/assistant-provider'
@@ -8,18 +8,24 @@ import { SizeSelector } from './size-selector'
 import { ProductBuyBar } from './product-buy-bar'
 
 // 任务 17 填充 AssistantProvider 后提供 open(mode, product?)；此处先引用契约：
-// 当前 context 为 null → 空守卫（占位入口，无对话逻辑），到任务 17 无需再改本文件。
+// 当前 context 为 null → 空守卫（占位入口，无对话逻辑）；任务 17 可换用 provider 导出的真实类型。
 type AssistantHandle = { open: (mode: 'size-fit', product: ProductView) => void }
 
 interface ProductActionsProps {
   product: ProductView
   /** 服务端已算好的结算 URL（无 store → null） */
   buyUrl: string | null
+  /**
+   * 由页面（RSC）注入、渲染于 "Find my size" 与购买条之间的内容
+   * （材质/合脚手风琴，无尺码依赖）。
+   */
+  children?: ReactNode
 }
 
-// PDP 购买群集：尺码选择（受控）+ "Find my size" 助手入口 + 购买条。
+// PDP 购买群集（规格 §9 顺序）：尺码选择（受控）→ "Find my size" → 手风琴（children 插槽）→ 购买条。
+// children 插槽让本集群保持单一 'use client' 边界共享 selected 状态，同时允许页面以 RSC 注入中间内容；
 // 持有所选尺码状态，供购买条在无 store 阶段做 aria-live 说明。
-export function ProductActions({ product, buyUrl }: ProductActionsProps) {
+export function ProductActions({ product, buyUrl, children }: ProductActionsProps) {
   const [selected, setSelected] = useState<CanonicalSize | null>(null)
   const assistant = useAssistant() as AssistantHandle | null
   const selectedLabel = product.sizeOptions.find(o => o.value === selected)?.label ?? null
@@ -36,6 +42,7 @@ export function ProductActions({ product, buyUrl }: ProductActionsProps) {
           Find my size
         </button>
       </div>
+      {children}
       <ProductBuyBar buyUrl={buyUrl} availableSoon={buyUrl == null} selectedLabel={selectedLabel} />
     </div>
   )
