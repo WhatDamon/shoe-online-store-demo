@@ -1,8 +1,8 @@
 'use client'
 
+import { useRef, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import type { FormEvent } from 'react'
-import { serializeShopParams } from '@/lib/shop-search-params'
+import { parseShopParams, serializeShopParams } from '@/lib/shop-search-params'
 import type { ShopFilter } from '@/lib/shop-search-params'
 import type { CanonicalSize } from '@/server/catalog/types'
 
@@ -61,10 +61,27 @@ export function ProductFilterBar({
   const selectedSizes = new Set(initial.sizeLabels ?? [])
   const showClear = hasActiveFilters(initial)
 
-  // 每次变更以当前 URL 筛选（服务端从 searchParams 解析出的 initial）为基底再套用
-  // 本次 patch：后续控件仍保留其它已生效参数，全部选择通过 URL 可分享。
+  // 受控 replace 模式下，服务端尚未提交新一轮筛选前 `initial` 是过期的：若每次变更
+  // 都以 `initial` 为基底重新合并，一次 RSC 往返内连续变更（如快速连勾两个尺码）会
+  // 丢弃前一次的参数。因此以 baseRef 累积「最后一次已发出」的筛选状态作为组合基底，
+  // 仅当服务端提交了本地尚未见过的状态（初次进入/浏览器 Back/外部改 URL）时回退到
+  // 已提交的 initial——连续变更在本地合成，导航最终收敛。
+  const committedQs = serializeShopParams(initial)
+  const baseRef = useRef(committedQs)
+  const lastCommittedRef = useRef(committedQs)
+
+  /** 当前组合基底：最近一次发出的筛选；若 `initial` 已变为未见过的新状态则回退到它。 */
+  const effectiveBase = (): ShopFilter => {
+    if (committedQs !== lastCommittedRef.current) {
+      lastCommittedRef.current = committedQs
+      baseRef.current = committedQs
+    }
+    return parseShopParams(new URLSearchParams(baseRef.current))
+  }
+
   const update = (patch: Partial<ShopFilter>) => {
-    const qs = serializeShopParams({ ...initial, ...patch })
+    const qs = serializeShopParams({ ...effectiveBase(), ...patch })
+    baseRef.current = qs
     router.replace(qs ? `/shop?${qs}` : '/shop')
   }
 
@@ -76,7 +93,7 @@ export function ProductFilterBar({
   }
 
   const toggleSize = (label: string, checked: boolean) => {
-    const next = new Set(initial.sizeLabels ?? [])
+    const next = new Set(effectiveBase().sizeLabels ?? [])
     if (checked) next.add(label)
     else next.delete(label)
     update({ sizeLabels: next.size ? [...next] : undefined })

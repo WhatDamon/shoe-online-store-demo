@@ -74,4 +74,19 @@ describe('ProductFilterBar', () => {
     fireEvent.click(screen.getByRole('button', { name: /clear all/i }))
     expect(replaceMock).toHaveBeenCalledWith('/shop')
   })
+
+  it('composes two rapid changes without dropping the earlier param', () => {
+    // router mock 不回传新 props —— 模拟一次 RSC 往返内连续两次变更（竞态窗口）。
+    renderBar()
+    fireEvent.change(screen.getByLabelText('Sort'), { target: { value: 'price-asc' } })
+    fireEvent.change(screen.getByLabelText('Collection'), { target: { value: 'travel' } })
+    expect(replaceMock).toHaveBeenLastCalledWith('/shop?collection=travel&sort=price-asc')
+  })
+
+  it('accumulates two size chips toggled before the server commits', () => {
+    renderBar()
+    fireEvent.click(screen.getByLabelText('US 9'))
+    fireEvent.click(screen.getByLabelText('US 8.5'))
+    expect(replaceMock).toHaveBeenLastCalledWith('/shop?size=US+9&size=US+8.5')
+  })
 })
