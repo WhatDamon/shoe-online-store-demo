@@ -34,7 +34,10 @@ let _db: AppDb | null = null
 export function db(): AppDb {
   if (!_db) {
     const file = process.env.DATABASE_URL ?? './data/local.db'
-    if (!file.startsWith(':')) mkdirSync(file.slice(0, file.lastIndexOf('/')) || '.', { recursive: true })
+    if (!file.startsWith(':'))
+      mkdirSync(file.slice(0, file.lastIndexOf('/')) || '.', {
+        recursive: true,
+      })
     _db = createDb(file)
   }
   return _db

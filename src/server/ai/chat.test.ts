@@ -56,13 +56,28 @@ describe('events SSE 帧往返', () => {
       {
         type: 'productCards',
         items: [
-          { handle: 'daily-drift', title: 'Daily Drift', price: 128, imageKind: 'local', palette: ['#a', '#b'] },
+          {
+            handle: 'daily-drift',
+            title: 'Daily Drift',
+            price: 128,
+            imageKind: 'local',
+            palette: ['#a', '#b'],
+          },
         ],
       },
-      { type: 'sizeFit', recommended: 43, alternatives: [42, 44], rationale: 'r' },
+      {
+        type: 'sizeFit',
+        recommended: 43,
+        alternatives: [42, 44],
+        rationale: 'r',
+      },
       { type: 'done' },
       { type: 'error', code: 'turns', message: GUARDRAIL_MESSAGE },
-      { type: 'error', code: 'provider', message: 'Something went wrong — please try again.' },
+      {
+        type: 'error',
+        code: 'provider',
+        message: 'Something went wrong — please try again.',
+      },
     ]
     for (const e of cases) expect(parseEvent(encodeEvent(e))).toEqual(e)
   })
@@ -77,7 +92,9 @@ describe('events SSE 帧往返', () => {
 describe('chat mock 编排', () => {
   it('find-shoes：检索命中 → productCards（含真实 handle）→ 总结 delta → done', async () => {
     const g = fresh()
-    const evs = await collect(chat(req({ mode: 'find-shoes', text: 'cloudwalk' }), { guardrails: g }))
+    const evs = await collect(
+      chat(req({ mode: 'find-shoes', text: 'cloudwalk' }), { guardrails: g }),
+    )
     const cards = evs.find((e) => e.type === 'productCards')
     expect(cards?.type).toBe('productCards')
     if (cards?.type === 'productCards') {
@@ -100,7 +117,11 @@ describe('chat mock 编排', () => {
     const g = fresh()
     const evs = await collect(
       chat(
-        req({ mode: 'size-fit', text: 'I wear US 9', product: { handle: 'daily-drift', title: 'Daily Drift' } }),
+        req({
+          mode: 'size-fit',
+          text: 'I wear US 9',
+          product: { handle: 'daily-drift', title: 'Daily Drift' },
+        }),
         { guardrails: g },
       ),
     )
@@ -118,7 +139,11 @@ describe('chat mock 编排', () => {
 
   it('离题仅一段短 delta（redirect），且无 error', async () => {
     const g = fresh()
-    const evs = await collect(chat(req({ mode: 'shopping', text: 'can you give me a recipe for bread' }), { guardrails: g }))
+    const evs = await collect(
+      chat(req({ mode: 'shopping', text: 'can you give me a recipe for bread' }), {
+        guardrails: g,
+      }),
+    )
     const deltas = evs.filter((e) => e.type === 'delta')
     expect(deltas).toHaveLength(1)
     expect((deltas[0] as ChatEvent & { type: 'delta' }).text).toBe(REDIRECT_TEXT)
@@ -128,14 +153,16 @@ describe('chat mock 编排', () => {
 
   it('语义命中全为余弦≤0 → NO_MATCH（相关性下限闭合嵌入模式零命中分支）', async () => {
     const g = fresh()
-    const spy = vi
-      .spyOn(retrievalModule, 'retrieve')
-      .mockResolvedValue([
-        { handle: 'daily-drift', score: 0 },
-        { handle: 'cloudwalk-slip', score: -0.12 },
-      ])
+    const spy = vi.spyOn(retrievalModule, 'retrieve').mockResolvedValue([
+      { handle: 'daily-drift', score: 0 },
+      { handle: 'cloudwalk-slip', score: -0.12 },
+    ])
     try {
-      const evs = await collect(chat(req({ mode: 'find-shoes', text: 'zzz nonsense' }), { guardrails: g }))
+      const evs = await collect(
+        chat(req({ mode: 'find-shoes', text: 'zzz nonsense' }), {
+          guardrails: g,
+        }),
+      )
       expect(evs.some((e) => e.type === 'productCards')).toBe(false)
       const deltas = evs.filter((e) => e.type === 'delta')
       expect(deltas).toHaveLength(1)
@@ -159,6 +186,10 @@ describe('chat mock 编排', () => {
     clock.now += 61_000
     const evs = await collect(single())
     expect(evs).toHaveLength(1)
-    expect(evs[0]).toEqual({ type: 'error', code: 'turns', message: GUARDRAIL_MESSAGE })
+    expect(evs[0]).toEqual({
+      type: 'error',
+      code: 'turns',
+      message: GUARDRAIL_MESSAGE,
+    })
   })
 })

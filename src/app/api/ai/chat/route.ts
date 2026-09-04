@@ -6,7 +6,12 @@ import type { ChatEvent, Mode } from '@/server/ai/events'
 
 const MODES: readonly string[] = ['shopping', 'size-fit', 'outfit', 'find-shoes']
 
-type Body = { sessionKey?: unknown; mode?: unknown; text?: unknown; product?: unknown }
+type Body = {
+  sessionKey?: unknown
+  mode?: unknown
+  text?: unknown
+  product?: unknown
+}
 
 export async function POST(req: Request) {
   const raw = (await req.json().catch(() => null)) as Body | null
@@ -18,9 +23,7 @@ export async function POST(req: Request) {
       : crypto.randomUUID() // 未带会话 → 新匿名会话
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'local'
   const mode: Mode =
-    typeof body.mode === 'string' && MODES.includes(body.mode)
-      ? (body.mode as Mode)
-      : 'shopping'
+    typeof body.mode === 'string' && MODES.includes(body.mode) ? (body.mode as Mode) : 'shopping'
   const text = typeof body.text === 'string' ? body.text : ''
   const product =
     typeof body.product === 'object' &&
@@ -43,7 +46,11 @@ export async function POST(req: Request) {
           if (ev.type === 'done' || ev.type === 'error') break
         }
       } catch {
-        send({ type: 'error', code: 'provider', message: 'Something went wrong — please try again.' })
+        send({
+          type: 'error',
+          code: 'provider',
+          message: 'Something went wrong — please try again.',
+        })
       }
       controller.close()
     },

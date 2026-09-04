@@ -26,7 +26,7 @@ export default async function ShopPage({
   const sp = new URLSearchParams()
   for (const [key, value] of Object.entries(raw)) {
     if (value == null) continue
-    if (Array.isArray(value)) value.forEach(v => sp.append(key, v))
+    if (Array.isArray(value)) value.forEach((v) => sp.append(key, v))
     else sp.append(key, value)
   }
   const filter = parseShopParams(sp)
@@ -35,7 +35,10 @@ export default async function ShopPage({
     listProductsForMarket(filter),
     catalog.getCollections(),
   ])
-  const collectionOptions = allCollections.map(c => ({ value: c.handle, label: c.name }))
+  const collectionOptions = allCollections.map((c) => ({
+    value: c.handle,
+    label: c.name,
+  }))
   const sizeOptions = availableSizesForSystem(market.sizeSystem)
 
   return (

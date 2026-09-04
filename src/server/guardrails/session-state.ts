@@ -1,4 +1,7 @@
-export interface SessionMessage { role: 'user' | 'assistant'; content: string }
+export interface SessionMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
 
 export const MAX_TURNS = Number(process.env.AI_MAX_TURNS ?? 20)
 export const HISTORY_TURNS = 6
@@ -11,7 +14,10 @@ export function createSessionStore(now = Date.now) {
       const s = m.get(sessionKey)
       const cur = s && nowMs - s.at < SESSION_TTL_MS ? s : { turns: 0, history: [], at: nowMs }
       const allowed = cur.turns < MAX_TURNS
-      if (allowed) { cur.turns += 1; cur.at = nowMs }
+      if (allowed) {
+        cur.turns += 1
+        cur.at = nowMs
+      }
       m.set(sessionKey, cur)
       return { allowed, history: cur.history.slice(-HISTORY_TURNS * 2) }
     },

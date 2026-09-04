@@ -16,10 +16,7 @@ interface ProductBuyBarProps {
 export function ProductBuyBar({ buyUrl, availableSoon, selectedLabel }: ProductBuyBarProps) {
   if (buyUrl && !availableSoon) {
     return (
-      <a
-        href={buyUrl}
-        className={buttonVariants({ className: 'w-full py-2.5 text-base' })}
-      >
+      <a href={buyUrl} className={buttonVariants({ className: 'w-full py-2.5 text-base' })}>
         Add to bag
       </a>
     )
@@ -30,9 +27,7 @@ export function ProductBuyBar({ buyUrl, availableSoon, selectedLabel }: ProductB
       <Button disabled className="w-full py-2.5 text-base">
         Available soon
       </Button>
-      <p className="text-xs leading-5 text-neutral-500">
-        Checkout lands on our Shopify store.
-      </p>
+      <p className="text-xs leading-5 text-neutral-500">Checkout lands on our Shopify store.</p>
       <p role="status" className="min-h-4 text-xs leading-5 text-neutral-500">
         {selectedLabel
           ? `${selectedLabel} selected — we open checkout once our store is live.`

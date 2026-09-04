@@ -25,7 +25,10 @@ export class Database {
   }
 
   prepare(sql: string): {
-    run: (...params: SQLParam[]) => { changes: number | bigint; lastInsertRowid: number | bigint }
+    run: (...params: SQLParam[]) => {
+      changes: number | bigint
+      lastInsertRowid: number | bigint
+    }
     all: (...params: SQLParam[]) => Record<string, unknown>[]
     get: (...params: SQLParam[]) => Record<string, unknown> | undefined
     values: (...params: SQLParam[]) => unknown[][]
@@ -38,7 +41,9 @@ export class Database {
       // drizzle's PreparedQuery.values() path; columns order from the statement
       values: (...params: SQLParam[]) => {
         const names = stmt.columns().map((c) => c.name)
-        return stmt.all(...params).map((row) => names.map((n) => (row as Record<string, unknown>)[n]))
+        return stmt
+          .all(...params)
+          .map((row) => names.map((n) => (row as Record<string, unknown>)[n]))
       },
     }
   }

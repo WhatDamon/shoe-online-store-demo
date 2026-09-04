@@ -12,7 +12,7 @@ describe('SiteShell', () => {
         <SiteShell>
           <h1>Page content</h1>
         </SiteShell>
-      </WishlistProvider>
+      </WishlistProvider>,
     )
 
     // AppBar banner 存在于 main 之外（全站头）
@@ -28,7 +28,7 @@ describe('SiteShell', () => {
     expect(within(footer).getByRole('link', { name: 'Shop' })).toHaveAttribute('href', '/shop')
     // 核心 Slogan 收尾（品牌声明全站可见）
     expect(
-      within(footer).getByText('3D Printed. Closed-Loop. A New Footwear Phenomenon.')
+      within(footer).getByText('3D Printed. Closed-Loop. A New Footwear Phenomenon.'),
     ).toBeInTheDocument()
   })
 
@@ -38,7 +38,7 @@ describe('SiteShell', () => {
         <SiteShell tone="overlay">
           <p>Hero content</p>
         </SiteShell>
-      </WishlistProvider>
+      </WishlistProvider>,
     )
 
     expect(screen.getByRole('banner')).toBeInTheDocument()

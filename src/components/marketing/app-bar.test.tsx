@@ -19,7 +19,7 @@ describe('AppBar', () => {
     render(
       <WishlistProvider>
         <AppBar />
-      </WishlistProvider>
+      </WishlistProvider>,
     )
 
     expect(screen.getByRole('link', { name: 'Evoloop' })).toHaveAttribute('href', '/')
@@ -44,7 +44,7 @@ describe('AppBar', () => {
       <WishlistProvider>
         <ToggleHarness handle="daily-drift" />
         <AppBar />
-      </WishlistProvider>
+      </WishlistProvider>,
     )
 
     const wishlist = screen.getByRole('link', { name: /wishlist/i })
@@ -60,12 +60,15 @@ describe('AppBar', () => {
     render(
       <WishlistProvider>
         <AppBar />
-      </WishlistProvider>
+      </WishlistProvider>,
     )
 
     // 初始：展开按钮就绪（aria-expanded=false）；只有桌面内联搜索输入框
     // （type=search → searchbox 角色）。
-    const openBtn = screen.getByRole('button', { name: 'Search', expanded: false })
+    const openBtn = screen.getByRole('button', {
+      name: 'Search',
+      expanded: false,
+    })
     expect(screen.getAllByRole('searchbox', { name: 'Search products' })).toHaveLength(1)
 
     await user.click(openBtn)
@@ -90,7 +93,7 @@ describe('AppBar', () => {
     render(
       <WishlistProvider>
         <AppBar />
-      </WishlistProvider>
+      </WishlistProvider>,
     )
 
     await user.click(screen.getByRole('button', { name: 'Search', expanded: false }))

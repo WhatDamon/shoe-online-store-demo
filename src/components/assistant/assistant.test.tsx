@@ -120,7 +120,12 @@ describe('assistant FAB + panel', () => {
               palette: ['#e8e6e0', '#d8d4cb'],
             },
             // 坏 item：缺 palette，渲染前应被过滤而非打崩会话
-            { handle: 'broken', title: 'Broken', price: 99, imageKind: 'local' },
+            {
+              handle: 'broken',
+              title: 'Broken',
+              price: 99,
+              imageKind: 'local',
+            },
           ],
         }),
         frame({ type: 'delta', text: 'Here is your match: the Daily Drift.' }),
@@ -136,9 +141,7 @@ describe('assistant FAB + panel', () => {
     const user = userEvent.setup()
 
     await user.click(screen.getByRole('button', { name: 'open shopping panel' }))
-    await user.click(
-      screen.getByRole('button', { name: 'Everyday sneakers under $150' }),
-    )
+    await user.click(screen.getByRole('button', { name: 'Everyday sneakers under $150' }))
 
     const link = await screen.findByRole('link', { name: /Daily Drift/i })
     expect(link).toHaveAttribute('href', '/product/daily-drift')
@@ -173,10 +176,7 @@ describe('assistant FAB + panel', () => {
     await user.clear(input)
 
     await waitFor(() => expect(send).toBeDisabled())
-    expect(screen.getByRole('textbox', { name: 'Message' })).toHaveAttribute(
-      'aria-busy',
-      'true',
-    )
+    expect(screen.getByRole('textbox', { name: 'Message' })).toHaveAttribute('aria-busy', 'true')
 
     held.push(frame({ type: 'done' }))
     held.end()
@@ -199,7 +199,10 @@ describe('assistant FAB + panel', () => {
       )
       .mockResolvedValueOnce(
         streamedResponse([
-          frame({ type: 'delta', text: 'Here is your match: the Daily Drift.' }),
+          frame({
+            type: 'delta',
+            text: 'Here is your match: the Daily Drift.',
+          }),
           frame({ type: 'done' }),
         ]),
       )
@@ -216,9 +219,7 @@ describe('assistant FAB + panel', () => {
     await user.type(input, 'comfortable everyday sneakers')
     await user.click(screen.getByRole('button', { name: 'Send' }))
 
-    expect(
-      await screen.findByText(/taking a short break/i),
-    ).toBeInTheDocument()
+    expect(await screen.findByText(/taking a short break/i)).toBeInTheDocument()
     const retry = screen.getByRole('button', { name: 'Try again' })
     await user.click(retry)
 
@@ -245,7 +246,8 @@ describe('assistant FAB + panel', () => {
             type: 'sizeFit',
             recommended: 43,
             alternatives: [42],
-            rationale: 'Daily Drift runs true to size. Based on your usual size, 43 (EU) should fit best.',
+            rationale:
+              'Daily Drift runs true to size. Based on your usual size, 43 (EU) should fit best.',
           }),
           frame({
             type: 'delta',
@@ -269,9 +271,7 @@ describe('assistant FAB + panel', () => {
     const remove = screen.getByRole('button', { name: 'Remove Daily Drift' })
 
     // 助手先问尺码
-    expect(
-      await screen.findByText(/size you usually wear/i),
-    ).toBeInTheDocument()
+    expect(await screen.findByText(/size you usually wear/i)).toBeInTheDocument()
 
     // 用户回复尺码 → 结构化推荐
     const input = screen.getByRole('textbox', { name: 'Message' })
@@ -303,7 +303,10 @@ describe('assistant FAB + panel', () => {
       )
       .mockResolvedValueOnce(
         streamedResponse([
-          frame({ type: 'delta', text: 'Try the Daily Drift with a merino crew and slim chinos.' }),
+          frame({
+            type: 'delta',
+            text: 'Try the Daily Drift with a merino crew and slim chinos.',
+          }),
           frame({ type: 'done' }),
         ]),
       )
@@ -319,14 +322,19 @@ describe('assistant FAB + panel', () => {
     await screen.findByText(/size you usually wear/i)
 
     // PDP 自动开场使消息非空 → welcome 已隐，上下文 chips 常驻面板使 outfit 可达
-    const outfitChip = await screen.findByRole('button', { name: 'Style it with' })
+    const outfitChip = await screen.findByRole('button', {
+      name: 'Style it with',
+    })
     expect(screen.getByRole('button', { name: 'Find my size' })).toBeInTheDocument()
     await user.click(outfitChip)
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
     const body = JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string)
     expect(body.mode).toBe('outfit')
-    expect(body.product).toEqual({ handle: 'daily-drift', title: 'Daily Drift' })
+    expect(body.product).toEqual({
+      handle: 'daily-drift',
+      title: 'Daily Drift',
+    })
   })
 
   it('routes a free-form follow-up to shopping after a size-fit recommendation settles', async () => {
@@ -356,7 +364,10 @@ describe('assistant FAB + panel', () => {
       )
       .mockResolvedValueOnce(
         streamedResponse([
-          frame({ type: 'delta', text: 'Here are a few everyday options in the collection.' }),
+          frame({
+            type: 'delta',
+            text: 'Here are a few everyday options in the collection.',
+          }),
           frame({ type: 'done' }),
         ]),
       )

@@ -3,7 +3,9 @@ import { parseShopParams, serializeShopParams, type ShopFilter } from './shop-se
 
 describe('parseShopParams', () => {
   it('parses multi-value size labels alongside other params', () => {
-    const sp = new URLSearchParams('size=US 9&size=US 10.5&collection=travel&minPrice=100&maxPrice=150&q=mesh&sort=price-asc')
+    const sp = new URLSearchParams(
+      'size=US 9&size=US 10.5&collection=travel&minPrice=100&maxPrice=150&q=mesh&sort=price-asc',
+    )
     expect(parseShopParams(sp)).toEqual({
       collection: 'travel',
       minPrice: 100,
@@ -19,7 +21,9 @@ describe('parseShopParams', () => {
   })
 
   it('parses an empty query to an empty filter with featured sort', () => {
-    expect(parseShopParams(new URLSearchParams(''))).toEqual({ sort: 'featured' })
+    expect(parseShopParams(new URLSearchParams(''))).toEqual({
+      sort: 'featured',
+    })
   })
 })
 
@@ -34,7 +38,9 @@ describe('serializeShopParams', () => {
         q: 'mesh',
         sort: 'price-asc',
       }),
-    ).toBe('collection=travel&size=US+9&size=US+10.5&minPrice=100&maxPrice=150&q=mesh&sort=price-asc')
+    ).toBe(
+      'collection=travel&size=US+9&size=US+10.5&minPrice=100&maxPrice=150&q=mesh&sort=price-asc',
+    )
   })
 
   it('omits unset fields and the featured default', () => {

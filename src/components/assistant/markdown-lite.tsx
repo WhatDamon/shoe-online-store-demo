@@ -25,21 +25,11 @@ function renderInline(text: string, keyBase: string): ReactNode[] {
   })
 }
 
-export function MarkdownLite({
-  text,
-  className,
-}: {
-  text: string
-  className?: string
-}) {
+export function MarkdownLite({ text, className }: { text: string; className?: string }) {
   // 项目符号行统一成 "• "（简报：• 前缀替换 -）
   const normalized = text
     .split('\n')
-    .map((line) =>
-      line.trimStart().startsWith('- ')
-        ? `• ${line.trimStart().slice(2)}`
-        : line,
-    )
+    .map((line) => (line.trimStart().startsWith('- ') ? `• ${line.trimStart().slice(2)}` : line))
     .join('\n')
 
   return (

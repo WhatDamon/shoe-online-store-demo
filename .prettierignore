@@ -1,0 +1,19 @@
+# Generated / local — never auto-format these
+/.next/
+/out/
+/build/
+/.vercel/
+/.worktrees/
+/node_modules/
+/coverage/
+/.vitest/
+/data/
+.env*
+*.tsbuildinfo
+next-env.d.ts
+
+# Archival design/plan/report docs and README are hand-maintained (long
+# markdown tables, CJK prose); keep their formatting stable and out of editor
+# format-on-save churn.
+/docs/
+*.md

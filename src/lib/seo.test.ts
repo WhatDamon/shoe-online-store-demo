@@ -13,11 +13,17 @@ describe('seo metadata helpers', () => {
     const merged = pageMetadata({})
     expect(typeof merged.title).toBe('object')
     expect(String((merged.title as { template?: string }).template)).toContain(site.name)
-    expect(merged.openGraph).toMatchObject({ images: ['/og'], siteName: site.name })
+    expect(merged.openGraph).toMatchObject({
+      images: ['/og'],
+      siteName: site.name,
+    })
   })
 
   it('pageMetadata shallow-merges a page override onto the base', () => {
-    const merged = pageMetadata({ title: 'Shop', description: 'All styles, printed to order.' })
+    const merged = pageMetadata({
+      title: 'Shop',
+      description: 'All styles, printed to order.',
+    })
     expect(merged.title).toBe('Shop')
     expect(merged.description).toBe('All styles, printed to order.')
     // openGraph from base is inherited when the page does not set its own

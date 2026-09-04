@@ -3,19 +3,24 @@ import { convert, toEU } from './size-charts'
 import { market } from '@/lib/market'
 import type { CanonicalSize, Product, ProductFilter, SizeSystem } from './types'
 
-export type ProductView = Product & { sizeOptions: { value: CanonicalSize; label: string }[] }
+export type ProductView = Product & {
+  sizeOptions: { value: CanonicalSize; label: string }[]
+}
 export type MarketFilter = ProductFilter & { sizeLabels?: string[] }
 
 const sizeLabel = (eu: CanonicalSize, system = market.sizeSystem) =>
   `${system} ${convert(eu, system)}`
 
 function toView(p: Product): ProductView {
-  return { ...p, sizeOptions: p.sizes.map(value => ({ value, label: sizeLabel(value) })) }
+  return {
+    ...p,
+    sizeOptions: p.sizes.map((value) => ({ value, label: sizeLabel(value) })),
+  }
 }
 
 function toCanonicalSizes(sizeLabels: string[]): CanonicalSize[] {
   // "US 9" / "EU 42" 标签 → canonical EU；无法解析的标签忽略
-  return sizeLabels.flatMap(l => {
+  return sizeLabels.flatMap((l) => {
     const m = l.match(/^([A-Za-z]{2})\s+([\d.]+)$/)
     if (!m) return []
     const system = m[1].toUpperCase() as SizeSystem
@@ -40,8 +45,10 @@ export async function getProductForMarket(handle: string): Promise<ProductView |
 export async function getRelatedProducts(handle: string, limit = 3): Promise<ProductView[]> {
   const current = await getProductForMarket(handle)
   if (!current) return []
-  const same = await listProductsForMarket({ collection: current.collections[0] })
+  const same = await listProductsForMarket({
+    collection: current.collections[0],
+  })
   const rest = await listProductsForMarket({})
-  const pool = [...same, ...rest].filter(p => p.handle !== handle)
-  return [...new Map(pool.map(p => [p.handle, p])).values()].slice(0, limit)
+  const pool = [...same, ...rest].filter((p) => p.handle !== handle)
+  return [...new Map(pool.map((p) => [p.handle, p])).values()].slice(0, limit)
 }

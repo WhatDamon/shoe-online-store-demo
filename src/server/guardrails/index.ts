@@ -57,7 +57,9 @@ export function createGuardrails(
       if (!(await underDailyBudget(repo, day))) deny('budget')
     },
     /** 估算 token 落库 ai_usage（匿名成本计量）。 */
-    async noteUsage(u: Parameters<ReturnType<typeof createRepository>['insertUsage']>[0]): Promise<void> {
+    async noteUsage(
+      u: Parameters<ReturnType<typeof createRepository>['insertUsage']>[0],
+    ): Promise<void> {
       await repo.insertUsage(u)
     },
   }

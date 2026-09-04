@@ -40,9 +40,7 @@ export function Hero() {
         <h1 className="mt-4 max-w-4xl font-heading text-4xl font-semibold leading-[1.08] tracking-tight text-white sm:text-5xl lg:text-6xl">
           {site.tagline}
         </h1>
-        <p className="mt-6 max-w-xl text-[15px] leading-7 text-white/75">
-          {site.hero.title}
-        </p>
+        <p className="mt-6 max-w-xl text-[15px] leading-7 text-white/75">{site.hero.title}</p>
         <div className="mt-10 flex flex-wrap items-center gap-4">
           <Link
             href="/shop"

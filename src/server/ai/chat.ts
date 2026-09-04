@@ -41,13 +41,11 @@ export const NO_MATCH_TEXT =
   "I couldn't find a style that matches that yet — try different words or browse the shop."
 
 let shared: Guardrails | null = null
-const sharedGuardrails = (): Guardrails =>
-  (shared ??= createGuardrails(createRepository(db())))
+const sharedGuardrails = (): Guardrails => (shared ??= createGuardrails(createRepository(db())))
 
 /** GuardrailError → 对应 code + 温和文案（code 1:1 透传，含 'turns'）；其余 → provider 错误。 */
 const toErrorEvent = (e: unknown): ChatEvent => {
-  if (e instanceof GuardrailError)
-    return { type: 'error', code: e.code, message: e.message }
+  if (e instanceof GuardrailError) return { type: 'error', code: e.code, message: e.message }
   return { type: 'error', code: 'provider', message: FALLBACK_ERROR_TEXT }
 }
 
@@ -60,9 +58,7 @@ const toCard = (p: Product): ProductCard => ({
 })
 
 const digestLines = (ps: Product[]): string =>
-  ps
-    .map((p) => `- ${p.title} ($${p.price.amount}, ${p.productType}): ${p.description}`)
-    .join('\n')
+  ps.map((p) => `- ${p.title} ($${p.price.amount}, ${p.productType}): ${p.description}`).join('\n')
 
 /** 检索 top-N 并取回完整商品。注意 retrieve 默认参陷阱：省略第二参（勿传 {}，会关掉语义嵌入）。 */
 async function retrieveProducts(query: string, limit = 4): Promise<Product[]> {
@@ -82,10 +78,7 @@ const productContextOf = (v: Product): string =>
 
 /** 护栏顺序（任务 15 审查裁决 B）：rate → budget → turns；
  * 被 rate/budget 拒的请求不消耗回合（assertTurn 的 claim 最后执行）。 */
-export async function* chat(
-  req: ChatRequest,
-  opts: ChatOptions = {},
-): AsyncGenerator<ChatEvent> {
+export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGenerator<ChatEvent> {
   const guardrails = opts.guardrails ?? sharedGuardrails()
   const provider = opts.provider ?? aiProvider()
   const text = truncateMessage(req.text ?? '')
@@ -113,16 +106,10 @@ export async function* chat(
   }
 
   // 护栏全过，回合已领取（claim 在 provider 调用前；失败/中止的请求同样计入一次尝试——注释见 guardrails）。
-  const record = async (
-    system: string,
-    userText: string,
-    assistantText: string,
-  ): Promise<void> => {
+  const record = async (system: string, userText: string, assistantText: string): Promise<void> => {
     guardrails.pushTurn(req.sessionKey, 'user', userText)
     guardrails.pushTurn(req.sessionKey, 'assistant', assistantText)
-    const prompt = [system, ...history.map((m) => m.content), userText]
-      .filter(Boolean)
-      .join('\n')
+    const prompt = [system, ...history.map((m) => m.content), userText].filter(Boolean).join('\n')
     try {
       await guardrails.noteUsage({
         day: today(),
@@ -209,10 +196,7 @@ export async function* chat(
     }
     const digest = digestLines(products)
     const system = systemFor(req.mode, { catalogDigest: digest })
-    const messages: AiContext['messages'] = [
-      ...history,
-      { role: 'user', content: text },
-    ]
+    const messages: AiContext['messages'] = [...history, { role: 'user', content: text }]
     if (req.mode === 'find-shoes') {
       yield { type: 'productCards', items: products.map(toCard) }
     }

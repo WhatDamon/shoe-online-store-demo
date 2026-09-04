@@ -22,14 +22,25 @@ export type ChatErrorCode = 'rate_limited' | 'budget' | 'turns' | 'provider' | '
 export type ChatEvent =
   | { type: 'delta'; text: string }
   | { type: 'productCards'; items: ProductCard[] }
-  | { type: 'sizeFit'; recommended: CanonicalSize; alternatives: CanonicalSize[]; rationale: string }
+  | {
+      type: 'sizeFit'
+      recommended: CanonicalSize
+      alternatives: CanonicalSize[]
+      rationale: string
+    }
   | { type: 'done' }
   | { type: 'error'; code: ChatErrorCode; message: string }
 
 /** 单条 SSE 帧。 */
 export const encodeEvent = (e: ChatEvent): string => `data: ${JSON.stringify(e)}\n\n`
 
-const ERROR_CODES: readonly ChatErrorCode[] = ['rate_limited', 'budget', 'turns', 'provider', 'invalid']
+const ERROR_CODES: readonly ChatErrorCode[] = [
+  'rate_limited',
+  'budget',
+  'turns',
+  'provider',
+  'invalid',
+]
 
 /** 解析单条 `data:` 帧；形状不合法返回 null（防垃圾帧/半帧进入 UI 状态）。 */
 export function parseEvent(frame: string): ChatEvent | null {

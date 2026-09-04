@@ -20,7 +20,10 @@ describe('availableSizesForSystem', () => {
     expect(opts).toHaveLength(sizeRows.length)
     expect(opts[0]).toEqual({ label: 'US 5', canonical: 36 })
     expect(opts[opts.length - 1]).toEqual({ label: 'US 12.5', canonical: 48 })
-    expect(opts.find(o => o.label === 'US 9')).toEqual({ label: 'US 9', canonical: 43 })
+    expect(opts.find((o) => o.label === 'US 9')).toEqual({
+      label: 'US 9',
+      canonical: 43,
+    })
     opts.forEach((o, i) => expect(o.canonical).toBe(sizeRows[i].systems.EU))
   })
 })

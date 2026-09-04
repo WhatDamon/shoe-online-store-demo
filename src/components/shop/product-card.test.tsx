@@ -4,9 +4,18 @@ import { ProductCard } from './product-card'
 import type { ProductView } from '@/server/catalog/service'
 
 const p: ProductView = {
-  id: 'p01', handle: 'daily-drift', title: 'Daily Drift', subtitle: 'Everyday knit-lattice sneaker',
-  description: 'x', price: { amount: 128, currencyCode: 'USD' }, productType: 'Sneaker',
-  tags: [], collections: ['everyday'], sizes: [42], features: [], fitNotes: '',
+  id: 'p01',
+  handle: 'daily-drift',
+  title: 'Daily Drift',
+  subtitle: 'Everyday knit-lattice sneaker',
+  description: 'x',
+  price: { amount: 128, currencyCode: 'USD' },
+  productType: 'Sneaker',
+  tags: [],
+  collections: ['everyday'],
+  sizes: [42],
+  features: [],
+  fitNotes: '',
   construction: { pattern: 'lattice', density: 0.75, printedUpper: true },
   visual: { palette: ['#e8e6e0', '#d8d4cb'], accent: '#b87333', views: 3 },
   createdAt: '2026-08-01T00:00:00Z',

@@ -17,7 +17,7 @@ describe('ProductBuyBar', () => {
         buyUrl="https://example.shopify.com/products/daily-drift"
         availableSoon={false}
         selectedLabel={null}
-      />
+      />,
     )
 
     const link = screen.getByRole('link', { name: 'Add to bag' })

@@ -25,7 +25,7 @@ export function ProductActions({ product, buyUrl, children }: ProductActionsProp
   const [selected, setSelected] = useState<CanonicalSize | null>(null)
   // 面板打开 + 预置 size-fit 上下文由 AssistantProvider 处理；context 为空（Provider 未挂载的孤立渲染）时静默。
   const assistant = useAssistant()
-  const selectedLabel = product.sizeOptions.find(o => o.value === selected)?.label ?? null
+  const selectedLabel = product.sizeOptions.find((o) => o.value === selected)?.label ?? null
 
   return (
     <div className="flex flex-col gap-5">

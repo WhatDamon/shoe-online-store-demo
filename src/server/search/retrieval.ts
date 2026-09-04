@@ -12,7 +12,9 @@ export interface RetrievalResult {
 }
 
 export const textualContent = (p: Product) =>
-  [p.title, p.subtitle, p.productType, ...p.tags, ...p.features, p.description].join(' ').toLowerCase()
+  [p.title, p.subtitle, p.productType, ...p.tags, ...p.features, p.description]
+    .join(' ')
+    .toLowerCase()
 export const hashText = (s: string) => {
   let h = 0
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0
@@ -36,13 +38,21 @@ export async function retrieve(
       const hit = cached.get(p.id)
       if (!hit || hit.contentHash !== h) {
         const [v] = await embed([textualContent(p)]) // 懒计算并缓存；contentHash 变则自动重算
-        await repo.upsertEmbedding({ productId: p.id, contentHash: h, model, vector: v })
+        await repo.upsertEmbedding({
+          productId: p.id,
+          contentHash: h,
+          model,
+          vector: v,
+        })
       }
     }
     const rows = await repo.allEmbeddings(model)
     const byId = new Map(products.map((p) => [p.id, p]))
     return rows
-      .map((r) => ({ handle: byId.get(r.productId)?.handle ?? r.productId, score: cosine(qVec, r.vector) }))
+      .map((r) => ({
+        handle: byId.get(r.productId)?.handle ?? r.productId,
+        score: cosine(qVec, r.vector),
+      }))
       .sort((a, b) => b.score - a.score)
   }
   return keywordSearch(query, products) // 无 embedding 能力 → 关键词降级（规格 §8.3.4）

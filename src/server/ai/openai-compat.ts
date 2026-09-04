@@ -10,9 +10,7 @@ const TIMEOUT_MS = Number(process.env.AI_REQUEST_TIMEOUT_MS ?? 20_000) // 规格
 const AI_MODEL = process.env.AI_MODEL ?? DEFAULT_AI_MODEL
 
 export class OpenAICompatProvider implements AiProvider {
-  async *stream(
-    ctx: AiContext & { system: string; maxTokens: number },
-  ): AsyncGenerator<string> {
+  async *stream(ctx: AiContext & { system: string; maxTokens: number }): AsyncGenerator<string> {
     const client = new OpenAI({
       apiKey: process.env.AI_API_KEY ?? '',
       baseURL: process.env.AI_BASE_URL || undefined,

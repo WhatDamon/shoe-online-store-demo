@@ -9,7 +9,10 @@ export async function embeddingsAvailable(): Promise<boolean> {
   }
   probe = await fetch(`${base}/embeddings`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${process.env.AI_API_KEY}` },
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${process.env.AI_API_KEY}`,
+    },
     body: JSON.stringify({ model, input: 'ping' }),
     signal: AbortSignal.timeout(3_000),
   })
@@ -21,7 +24,10 @@ export async function embeddingsAvailable(): Promise<boolean> {
 export async function embed(texts: string[]): Promise<number[][]> {
   const res = await fetch(`${base}/embeddings`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${process.env.AI_API_KEY}` },
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${process.env.AI_API_KEY}`,
+    },
     body: JSON.stringify({ model, input: texts }),
   })
   if (!res.ok) throw new Error(`embeddings ${res.status}`)

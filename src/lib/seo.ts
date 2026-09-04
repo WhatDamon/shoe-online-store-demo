@@ -8,4 +8,7 @@ export const baseMetadata: Metadata = {
   openGraph: { images: ['/og'], siteName: site.name },
 }
 
-export const pageMetadata = (o: Partial<Metadata>): Metadata => ({ ...baseMetadata, ...o })
+export const pageMetadata = (o: Partial<Metadata>): Metadata => ({
+  ...baseMetadata,
+  ...o,
+})

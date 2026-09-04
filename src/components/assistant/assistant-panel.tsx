@@ -68,7 +68,9 @@ export function AssistantPanel({
       <SheetContent side="right" className="flex h-full flex-col gap-0 p-0">
         <SheetHeader className="shrink-0 border-b border-neutral-200 pr-12">
           <SheetTitle>Need a hand?</SheetTitle>
-          <p className="text-xs text-neutral-500">Ask about sizing, styles, or what&rsquo;s in the shop.</p>
+          <p className="text-xs text-neutral-500">
+            Ask about sizing, styles, or what&rsquo;s in the shop.
+          </p>
         </SheetHeader>
 
         {product ? (

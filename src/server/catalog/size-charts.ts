@@ -3,8 +3,8 @@ import { sizeRows } from './size-fixture'
 import type { CanonicalSize, SizeSystem } from './types'
 
 type Key = 'US' | 'EU' | 'UK' | 'JP' | 'CN'
-const rowBySystem = (key: Key, value: number) => sizeRows.find(r => r.systems[key] === value)
-const rowByEU = (eu: CanonicalSize) => sizeRows.find(r => r.systems.EU === eu)
+const rowBySystem = (key: Key, value: number) => sizeRows.find((r) => r.systems[key] === value)
+const rowByEU = (eu: CanonicalSize) => sizeRows.find((r) => r.systems.EU === eu)
 
 /**
  * canonical(EU) → 目标系统数值；目标为 EU 时接受 US 市场数值做 mm 锚往返
@@ -49,8 +49,10 @@ export function parseSizeHint(text: string): CanonicalSize | null {
 }
 
 /** 当前市场体系的全部档位选项（展示标签 + canonical）：如 US → "US 5"…"US 12.5"。供 /shop 筛选栏等消费。 */
-export const availableSizesForSystem = (system: SizeSystem): { label: string; canonical: CanonicalSize }[] =>
-  sizeRows.map(r => ({
+export const availableSizesForSystem = (
+  system: SizeSystem,
+): { label: string; canonical: CanonicalSize }[] =>
+  sizeRows.map((r) => ({
     label: `${system} ${r.systems[system as 'US' | 'EU' | 'UK' | 'JP' | 'CN']}`,
     canonical: r.systems.EU as CanonicalSize,
   }))

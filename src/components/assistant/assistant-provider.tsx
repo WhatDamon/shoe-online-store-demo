@@ -75,10 +75,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     [mode, product, send, sizeFitSettled],
   )
 
-  const value = useMemo<AssistantHandle>(
-    () => ({ open, close }),
-    [open, close],
-  )
+  const value = useMemo<AssistantHandle>(() => ({ open, close }), [open, close])
 
   return (
     <AssistantContext.Provider value={value}>

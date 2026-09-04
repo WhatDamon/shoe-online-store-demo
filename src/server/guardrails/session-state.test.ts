@@ -27,7 +27,10 @@ describe('createSessionStore', () => {
     expect(allowed).toBe(true)
     expect(history).toHaveLength(HISTORY_TURNS * 2)
     expect(history[0]).toEqual({ role: 'user', content: 'm9' })
-    expect(history[history.length - 1]).toEqual({ role: 'assistant', content: 'm20' })
+    expect(history[history.length - 1]).toEqual({
+      role: 'assistant',
+      content: 'm20',
+    })
   })
 
   it('push 仅作用于既有会话；不同 key 独立', () => {

@@ -43,7 +43,10 @@ export function ProductGallery({ product }: { product: ProductView }) {
                   : 'border-neutral-200 hover:border-neutral-300'
               }`}
             >
-              <span aria-hidden="true" className="pointer-events-none block h-14 w-14 sm:h-16 sm:w-16">
+              <span
+                aria-hidden="true"
+                className="pointer-events-none block h-14 w-14 sm:h-16 sm:w-16"
+              >
                 <ProductVisual
                   visual={product.visual}
                   name={product.title}

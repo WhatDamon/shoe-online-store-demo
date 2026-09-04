@@ -28,8 +28,8 @@ export function StorySection() {
             Sized in millimetres. Built for how you actually walk.
           </h2>
           <p className="mt-6 text-[15px] leading-7 text-neutral-600">
-            Most shoes start with a number. Ours start with your foot — its length in
-            millimetres — and build from there, so the fit is precise before the first step.
+            Most shoes start with a number. Ours start with your foot — its length in millimetres —
+            and build from there, so the fit is precise before the first step.
           </p>
           <p className="mt-4 text-[15px] leading-7 text-neutral-600">
             Cushioning is tuned where your foot needs it most: softer under the heel, more
@@ -38,12 +38,8 @@ export function StorySection() {
           <dl className="mt-10 grid gap-8 text-left sm:grid-cols-3 sm:gap-6">
             {storyPoints.map((point) => (
               <div key={point.term}>
-                <dt className="font-heading text-[15px] font-semibold text-ink">
-                  {point.term}
-                </dt>
-                <dd className="mt-1.5 text-sm leading-relaxed text-neutral-600">
-                  {point.detail}
-                </dd>
+                <dt className="font-heading text-[15px] font-semibold text-ink">{point.term}</dt>
+                <dd className="mt-1.5 text-sm leading-relaxed text-neutral-600">{point.detail}</dd>
               </div>
             ))}
           </dl>

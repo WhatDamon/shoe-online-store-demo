@@ -38,10 +38,10 @@ function currentPriceBand(f: ShopFilter): string {
 function hasActiveFilters(f: ShopFilter): boolean {
   return Boolean(
     f.collection ||
-      (f.sizeLabels?.length ?? 0) > 0 ||
-      currentPriceBand(f) !== '' ||
-      (f.sort != null && f.sort !== 'featured') ||
-      f.q,
+    (f.sizeLabels?.length ?? 0) > 0 ||
+    currentPriceBand(f) !== '' ||
+    (f.sort != null && f.sort !== 'featured') ||
+    f.q,
   )
 }
 
@@ -82,8 +82,7 @@ export function ProductFilterBar({
   })
 
   /** 当前组合基底：最近一次发出的筛选；若已提交状态取代了在途意图则由上面的效果回退。 */
-  const effectiveBase = (): ShopFilter =>
-    parseShopParams(new URLSearchParams(baseRef.current))
+  const effectiveBase = (): ShopFilter => parseShopParams(new URLSearchParams(baseRef.current))
 
   const update = (patch: Partial<ShopFilter>) => {
     const qs = serializeShopParams({ ...effectiveBase(), ...patch })
@@ -142,11 +141,11 @@ export function ProductFilterBar({
         <select
           aria-label="Collection"
           value={initial.collection ?? ''}
-          onChange={e => update({ collection: e.target.value || undefined })}
+          onChange={(e) => update({ collection: e.target.value || undefined })}
           className={selectClass}
         >
           <option value="">All styles</option>
-          {collectionOptions.map(o => (
+          {collectionOptions.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
             </option>
@@ -155,7 +154,7 @@ export function ProductFilterBar({
         <select
           aria-label="Price"
           value={currentPriceBand(initial)}
-          onChange={e => update(applyPriceRange(e.target.value))}
+          onChange={(e) => update(applyPriceRange(e.target.value))}
           className={selectClass}
         >
           <option value="">Any price</option>
@@ -166,10 +165,10 @@ export function ProductFilterBar({
         <select
           aria-label="Sort"
           value={initial.sort ?? 'featured'}
-          onChange={e => update({ sort: e.target.value as ShopFilter['sort'] })}
+          onChange={(e) => update({ sort: e.target.value as ShopFilter['sort'] })}
           className={selectClass}
         >
-          {SORT_OPTIONS.map(o => (
+          {SORT_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
             </option>
@@ -189,7 +188,7 @@ export function ProductFilterBar({
                   name="size"
                   value={label}
                   checked={checked}
-                  onChange={e => toggleSize(label, e.target.checked)}
+                  onChange={(e) => toggleSize(label, e.target.checked)}
                   className="peer sr-only"
                 />
                 <span className="inline-flex items-center rounded-full border border-neutral-200 px-3 py-1 text-xs text-neutral-700 transition-colors peer-checked:border-neutral-900 peer-checked:bg-neutral-900 peer-checked:text-white">

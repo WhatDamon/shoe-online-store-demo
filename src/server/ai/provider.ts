@@ -5,9 +5,7 @@ export interface AiContext {
 }
 
 export interface AiProvider {
-  stream(
-    ctx: AiContext & { system: string; maxTokens: number },
-  ): AsyncGenerator<string> // text deltas only
+  stream(ctx: AiContext & { system: string; maxTokens: number }): AsyncGenerator<string> // text deltas only
 }
 
 // 工厂按调用时 env 决策（测试可 vi.stubEnv 后再调 chat）。
@@ -24,4 +22,4 @@ export const aiProvider = (): AiProvider =>
 
 // 实际生效的模型（规格：记账与流式必须同源）：Mock → 'mock'；真实 → AI_MODEL ?? 缺省。
 export const aiModel = (): string =>
-  realEnabled() ? process.env.AI_MODEL ?? DEFAULT_AI_MODEL : 'mock'
+  realEnabled() ? (process.env.AI_MODEL ?? DEFAULT_AI_MODEL) : 'mock'

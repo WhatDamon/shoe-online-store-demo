@@ -95,8 +95,20 @@ function buildPattern(
         : `M0 ${y0 - a} Q ${S / 4} ${y0 + a} ${S / 2} ${y0 - a} T ${S} ${y0 - a}`
     return (
       <pattern id={id} width={S} height={S} patternUnits="userSpaceOnUse">
-        <path d={wave(y(0), false)} fill="none" stroke={palette[1]} strokeWidth={0.7} opacity={0.85} />
-        <path d={wave(y(-S / 2), true)} fill="none" stroke={accent} strokeWidth={0.5} opacity={0.55} />
+        <path
+          d={wave(y(0), false)}
+          fill="none"
+          stroke={palette[1]}
+          strokeWidth={0.7}
+          opacity={0.85}
+        />
+        <path
+          d={wave(y(-S / 2), true)}
+          fill="none"
+          stroke={accent}
+          strokeWidth={0.5}
+          opacity={0.55}
+        />
       </pattern>
     )
   }
@@ -114,12 +126,21 @@ const SIDE_UPPER =
   'M38 100 C34 78 44 58 62 50 C84 40 108 44 120 58 C130 70 148 78 168 82 C186 86 202 84 212 74 ' +
   'C220 66 224 56 224 48 C226 68 226 84 220 96 L214 100 L40 100 Z'
 
-export function ProductVisual({ visual, name, view = 'side', className, construction, idSalt }: ProductVisualProps) {
+export function ProductVisual({
+  visual,
+  name,
+  view = 'side',
+  className,
+  construction,
+  idSalt,
+}: ProductVisualProps) {
   const pattern = construction?.pattern ?? 'lattice'
   const density = construction?.density ?? 0.75
   const base = view === 'detail' ? 16 : 13
   const S = cellSize(base, density, view)
-  const pid = hashSeed(`${idSalt ? `${idSalt}|` : ''}${name}|${view}|${pattern}|${density}|${visual.palette[0]}|${visual.palette[1]}|${visual.accent}`)
+  const pid = hashSeed(
+    `${idSalt ? `${idSalt}|` : ''}${name}|${view}|${pattern}|${density}|${visual.palette[0]}|${visual.palette[1]}|${visual.accent}`,
+  )
 
   const patternFill = `url(#${pid})`
 
@@ -147,10 +168,27 @@ export function ProductVisual({ visual, name, view = 'side', className, construc
             fill={visual.accent}
             opacity={0.9}
           />
-          <path d="M38 116 a14 14 0 0 1 14 -14 h146 a14 14 0 0 1 14 14" fill="none" stroke={visual.palette[1]} strokeWidth={1.5} />
+          <path
+            d="M38 116 a14 14 0 0 1 14 -14 h146 a14 14 0 0 1 14 14"
+            fill="none"
+            stroke={visual.palette[1]}
+            strokeWidth={1.5}
+          />
           {/* 极简鞋带线（accent） */}
-          <path d="M66 66 C 100 78 140 82 178 80" fill="none" stroke={visual.accent} strokeWidth={3.5} strokeLinecap="round" opacity={0.85} />
-          <path d="M78 44 a5 5 0 1 1 0.1 0" fill="none" stroke={visual.palette[1]} strokeWidth={1} />
+          <path
+            d="M66 66 C 100 78 140 82 178 80"
+            fill="none"
+            stroke={visual.accent}
+            strokeWidth={3.5}
+            strokeLinecap="round"
+            opacity={0.85}
+          />
+          <path
+            d="M78 44 a5 5 0 1 1 0.1 0"
+            fill="none"
+            stroke={visual.palette[1]}
+            strokeWidth={1}
+          />
         </g>
       )}
 
@@ -168,8 +206,26 @@ export function ProductVisual({ visual, name, view = 'side', className, construc
           {/* accent 垫层：前掌 + 后跟 */}
           <ellipse cx={158} cy={82} rx={38} ry={28} fill={visual.accent} opacity={0.85} />
           <ellipse cx={84} cy={78} rx={30} ry={22} fill={visual.accent} opacity={0.6} />
-          <ellipse cx={158} cy={82} rx={38} ry={28} fill="none" stroke={visual.palette[1]} strokeWidth={1.2} opacity={0.7} />
-          <ellipse cx={84} cy={78} rx={30} ry={22} fill="none" stroke={visual.palette[1]} strokeWidth={1} opacity={0.6} />
+          <ellipse
+            cx={158}
+            cy={82}
+            rx={38}
+            ry={28}
+            fill="none"
+            stroke={visual.palette[1]}
+            strokeWidth={1.2}
+            opacity={0.7}
+          />
+          <ellipse
+            cx={84}
+            cy={78}
+            rx={30}
+            ry={22}
+            fill="none"
+            stroke={visual.palette[1]}
+            strokeWidth={1}
+            opacity={0.6}
+          />
         </g>
       )}
 
@@ -178,8 +234,24 @@ export function ProductVisual({ visual, name, view = 'side', className, construc
           {/* 局部放大格纹（格子最大）+ 区域描边 */}
           <rect x={24} y={24} width={112} height={112} rx={14} fill={visual.palette[0]} />
           <rect x={24} y={24} width={112} height={112} rx={14} fill={patternFill} />
-          <rect x={24} y={24} width={112} height={112} rx={14} fill="none" stroke={visual.palette[1]} strokeWidth={2} />
-          <path d={SIDE_UPPER} fill="none" stroke={visual.accent} strokeWidth={1.4} opacity={0.3} transform="translate(-44 -26) scale(0.5)" />
+          <rect
+            x={24}
+            y={24}
+            width={112}
+            height={112}
+            rx={14}
+            fill="none"
+            stroke={visual.palette[1]}
+            strokeWidth={2}
+          />
+          <path
+            d={SIDE_UPPER}
+            fill="none"
+            stroke={visual.accent}
+            strokeWidth={1.4}
+            opacity={0.3}
+            transform="translate(-44 -26) scale(0.5)"
+          />
         </g>
       )}
     </svg>

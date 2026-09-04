@@ -11,7 +11,9 @@ export function parseShopParams(sp: URLSearchParams): ShopFilter {
     maxPrice: sp.get('maxPrice') ? Number(sp.get('maxPrice')) : undefined,
     q: sp.get('q') ?? undefined,
     sizeLabels: size.length ? size : undefined,
-    sort: ['featured', 'price-asc', 'price-desc', 'newest'].includes(sort as string) ? sort : 'featured',
+    sort: ['featured', 'price-asc', 'price-desc', 'newest'].includes(sort as string)
+      ? sort
+      : 'featured',
   }
 }
 

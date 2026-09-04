@@ -8,9 +8,7 @@ export default function NotFound() {
   return (
     <SiteShell>
       <div className="flex flex-1 flex-col items-center justify-center bg-canvas px-6 py-24 text-center text-ink">
-        <p className="text-sm font-medium uppercase tracking-[0.18em] text-brand">
-          {site.name}
-        </p>
+        <p className="text-sm font-medium uppercase tracking-[0.18em] text-brand">{site.name}</p>
         <h1 className="font-heading mt-4 text-4xl font-semibold tracking-tight sm:text-5xl">
           We couldn&apos;t find that page
         </h1>

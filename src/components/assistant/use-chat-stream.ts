@@ -143,9 +143,7 @@ export function useChatStream(): ChatStream {
         )
       } else if (event.type === 'productCards') {
         const items = event.items.filter(isValidCard)
-        setMessages((prev) =>
-          prev.map((m) => (m.id === id ? { ...m, cards: items } : m)),
-        )
+        setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, cards: items } : m)))
       } else if (event.type === 'sizeFit') {
         setMessages((prev) =>
           prev.map((m) =>
@@ -162,9 +160,7 @@ export function useChatStream(): ChatStream {
           ),
         )
       } else if (event.type === 'done') {
-        setMessages((prev) =>
-          prev.map((m) => (m.id === id ? { ...m, streaming: false } : m)),
-        )
+        setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, streaming: false } : m)))
       } else if (event.type === 'error') {
         const failure = { code: event.code, message: event.message }
         setMessages((prev) =>
@@ -181,7 +177,12 @@ export function useChatStream(): ChatStream {
         const res = await fetch('/api/ai/chat', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ sessionKey, mode, text: userContent, product: p }),
+          body: JSON.stringify({
+            sessionKey,
+            mode,
+            text: userContent,
+            product: p,
+          }),
           signal: controller.signal,
         })
         if (!res.ok || !res.body) throw new Error(`chat request failed: HTTP ${res.status}`)
@@ -189,7 +190,10 @@ export function useChatStream(): ChatStream {
       } catch {
         // 被新请求终止：静默（onEvent 不再有意义，新流接管）
         if (controller.signal.aborted) return
-        const failure = { code: 'provider' as ChatErrorCode, message: NETWORK_ERROR_TEXT }
+        const failure = {
+          code: 'provider' as ChatErrorCode,
+          message: NETWORK_ERROR_TEXT,
+        }
         setError(NETWORK_ERROR_TEXT)
         setErrorCode('provider')
         const id = activeIdRef.current

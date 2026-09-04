@@ -6,16 +6,16 @@ describe('catalog service', () => {
   it('lists by collection', async () => {
     const items = await listProductsForMarket({ collection: 'travel' })
     expect(items.length).toBeGreaterThan(0)
-    items.forEach(p => expect(p.collections).toContain('travel'))
+    items.forEach((p) => expect(p.collections).toContain('travel'))
   })
   it('filters by market size labels converted to canonical', async () => {
     const items = await listProductsForMarket({ sizeLabels: ['US 9'] }) // EU 43
     expect(items.length).toBeGreaterThan(0)
-    items.forEach(p => expect(p.sizes).toContain(43))
+    items.forEach((p) => expect(p.sizes).toContain(43))
   })
   it('sorts price asc', async () => {
     const items = await listProductsForMarket({ sort: 'price-asc' })
-    const amounts = items.map(p => p.price.amount)
+    const amounts = items.map((p) => p.price.amount)
     expect([...amounts].sort((a, b) => a - b)).toEqual(amounts)
   })
   it('exposes market size labels on view', async () => {
@@ -35,7 +35,7 @@ describe('catalog service', () => {
   it('related products exclude the current product', async () => {
     const related = await getRelatedProducts('daily-drift')
     expect(related.length).toBeGreaterThan(0)
-    expect(related.some(p => p.handle === 'daily-drift')).toBe(false)
+    expect(related.some((p) => p.handle === 'daily-drift')).toBe(false)
   })
   it('related products respect the limit', async () => {
     const related = await getRelatedProducts('daily-drift', 2)

@@ -1,4 +1,7 @@
-export interface Bucket { tokens: number; ts: number }
+export interface Bucket {
+  tokens: number
+  ts: number
+}
 export function tokenBucket(ratePerMin: number, burst = ratePerMin) {
   const buckets = new Map<string, Bucket>()
   const perMs = ratePerMin / 60_000

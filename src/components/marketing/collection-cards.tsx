@@ -9,7 +9,11 @@ interface SeriesCard {
   representative: {
     title: string
     visual: { palette: readonly string[]; accent: string; views: number }
-    construction: { pattern: 'lattice' | 'wave' | 'honeycomb'; density: 0.6 | 0.75 | 0.9; printedUpper: boolean }
+    construction: {
+      pattern: 'lattice' | 'wave' | 'honeycomb'
+      density: 0.6 | 0.75 | 0.9
+      printedUpper: boolean
+    }
   } | null
 }
 
@@ -18,7 +22,10 @@ export async function CollectionCards() {
 
   const cards: SeriesCard[] = await Promise.all(
     collections.map(async (collection) => {
-      const products = await catalog.getProducts({ collection: collection.handle, sort: 'featured' })
+      const products = await catalog.getProducts({
+        collection: collection.handle,
+        sort: 'featured',
+      })
       const representative = products[0] ?? null
       return {
         handle: collection.handle,
@@ -32,15 +39,13 @@ export async function CollectionCards() {
             }
           : null,
       }
-    })
+    }),
   )
 
   return (
     <section id="collections" aria-labelledby="collections-heading" className="bg-white">
       <div className="mx-auto w-full max-w-6xl px-4 py-20 md:py-28">
-        <p className="text-xs font-medium uppercase tracking-[0.18em] text-brand">
-          Shop by series
-        </p>
+        <p className="text-xs font-medium uppercase tracking-[0.18em] text-brand">Shop by series</p>
         <h2
           id="collections-heading"
           className="mt-3 font-heading text-3xl font-semibold tracking-tight text-ink sm:text-4xl"

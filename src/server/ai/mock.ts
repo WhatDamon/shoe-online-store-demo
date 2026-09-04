@@ -47,11 +47,8 @@ const productTitle = (system: string): string | null =>
   system.match(/Product:\s*([^.\n]+)/)?.[1]?.trim() ?? null
 
 export class MockProvider implements AiProvider {
-  async *stream(
-    ctx: AiContext & { system: string; maxTokens: number },
-  ): AsyncGenerator<string> {
-    const lastUser =
-      [...ctx.messages].reverse().find((m) => m.role === 'user')?.content ?? ''
+  async *stream(ctx: AiContext & { system: string; maxTokens: number }): AsyncGenerator<string> {
+    const lastUser = [...ctx.messages].reverse().find((m) => m.role === 'user')?.content ?? ''
     if (OFF_TOPIC.some((k) => lastUser.toLowerCase().includes(k))) {
       yield REDIRECT_TEXT
       return
@@ -82,7 +79,7 @@ export class MockProvider implements AiProvider {
     const [a, b] = titles
     const recommendation =
       titles.length === 0
-        ? "I could not find a style matching that in the catalog just yet."
+        ? 'I could not find a style matching that in the catalog just yet.'
         : titles.length === 1
           ? `I would start with the ${a} — it reads as a strong match for what you described.`
           : `I would start with the ${a} and the ${b} — both read as strong matches for what you described.`

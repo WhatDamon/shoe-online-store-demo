@@ -19,7 +19,7 @@ import { pageMetadata } from '@/lib/seo'
 
 export async function generateStaticParams() {
   const products = await catalog.getProducts()
-  return products.map(p => ({ handle: p.handle }))
+  return products.map((p) => ({ handle: p.handle }))
 }
 
 export async function generateMetadata({
@@ -31,17 +31,16 @@ export async function generateMetadata({
   const product = await getProductForMarket(handle)
   // 未知 handle：由页面级 notFound() 决定 404，元数据仅回退默认品牌态。
   if (!product) return {}
-  return pageMetadata({ title: product.title, description: product.description })
+  return pageMetadata({
+    title: product.title,
+    description: product.description,
+  })
 }
 
 // PDP（SSG，规格 §9）：/product/[handle] 由 generateStaticParams 预渲染。
 // 未知 handle 在 dynamicParams=true（默认）下走按需渲染 → getProductForMarket null → notFound()，
 // 实测返回品牌化 not-found 壳（HTTP 200 + robots noindex）；若将来需要真 404 再设 dynamicParams=false。
-export default async function ProductPage({
-  params,
-}: {
-  params: Promise<{ handle: string }>
-}) {
+export default async function ProductPage({ params }: { params: Promise<{ handle: string }> }) {
   const { handle } = await params
   const product = await getProductForMarket(handle)
   if (!product) notFound()
@@ -87,7 +86,7 @@ export default async function ProductPage({
                 <AccordionTrigger>Materials &amp; fit</AccordionTrigger>
                 <AccordionContent>
                   <ul className="mb-4 list-disc space-y-1 pl-4 text-neutral-600">
-                    {product.features.map(feature => (
+                    {product.features.map((feature) => (
                       <li key={feature}>{feature}</li>
                     ))}
                   </ul>

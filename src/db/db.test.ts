@@ -11,19 +11,46 @@ describe('db', () => {
     await repo.wipe() // 测试辅助：TRUNCATE 两张表
   })
   it('upserts and reads embeddings', async () => {
-    await repo.upsertEmbedding({ productId: 'p1', contentHash: 'h1', model: 'm1', vector: [1, 0, 0] })
+    await repo.upsertEmbedding({
+      productId: 'p1',
+      contentHash: 'h1',
+      model: 'm1',
+      vector: [1, 0, 0],
+    })
     const row = await repo.getEmbedding('p1')
     expect(row?.vector).toEqual([1, 0, 0])
   })
   it('content hash change invalidates via overwrite', async () => {
-    await repo.upsertEmbedding({ productId: 'p1', contentHash: 'h1', model: 'm1', vector: [1, 0, 0] })
-    await repo.upsertEmbedding({ productId: 'p1', contentHash: 'h2', model: 'm1', vector: [0, 1, 0] })
+    await repo.upsertEmbedding({
+      productId: 'p1',
+      contentHash: 'h1',
+      model: 'm1',
+      vector: [1, 0, 0],
+    })
+    await repo.upsertEmbedding({
+      productId: 'p1',
+      contentHash: 'h2',
+      model: 'm1',
+      vector: [0, 1, 0],
+    })
     const row = await repo.getEmbedding('p1')
     expect(row?.contentHash).toBe('h2')
   })
   it('logs usage and sums by day', async () => {
-    await repo.insertUsage({ day: '2026-09-04', model: 'mock', promptTokens: 10, completionTokens: 5, sessionKey: 's1' })
-    await repo.insertUsage({ day: '2026-09-04', model: 'mock', promptTokens: 20, completionTokens: 5, sessionKey: 's2' })
+    await repo.insertUsage({
+      day: '2026-09-04',
+      model: 'mock',
+      promptTokens: 10,
+      completionTokens: 5,
+      sessionKey: 's1',
+    })
+    await repo.insertUsage({
+      day: '2026-09-04',
+      model: 'mock',
+      promptTokens: 20,
+      completionTokens: 5,
+      sessionKey: 's2',
+    })
     expect(await repo.dayTokenUsage('2026-09-04')).toBe(40)
     expect(await repo.dayTokenUsage('2026-09-05')).toBe(0)
   })

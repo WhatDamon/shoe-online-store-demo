@@ -7,13 +7,7 @@ import { site } from '@/lib/site'
 import { useWishlist } from '@/components/shop/wishlist-provider'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { cn } from 'cn'
 
 /**
@@ -74,7 +68,7 @@ export function AppBar({
           ? 'border-b border-ink/10 bg-canvas/85 text-ink backdrop-blur-md'
           : tone === 'overlay'
             ? 'border-b border-transparent bg-transparent text-white'
-            : 'border-b border-ink/10 bg-canvas text-ink'
+            : 'border-b border-ink/10 bg-canvas text-ink',
       )}
     >
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4">
@@ -115,10 +109,7 @@ export function AppBar({
         </div>
 
         {/* 中：桌面导航 */}
-        <nav
-          aria-label="Main"
-          className="hidden flex-1 justify-center gap-8 md:flex"
-        >
+        <nav aria-label="Main" className="hidden flex-1 justify-center gap-8 md:flex">
           {site.nav.map((item) => (
             <Link
               key={item.href}
@@ -134,11 +125,7 @@ export function AppBar({
         <div className="flex flex-1 items-center justify-end gap-1">
           {/* 桌面内联搜索：图标以输入框为锚绝对定位，垂直水平严格居中（不再用
               relative 硬推，避免偏移）；输入框 pl-10 让文字让出图标。 */}
-          <form
-            action="/shop"
-            role="search"
-            className="relative hidden items-center lg:flex"
-          >
+          <form action="/shop" role="search" className="relative hidden items-center lg:flex">
             <SearchIcon
               aria-hidden="true"
               className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-current opacity-70"
@@ -152,7 +139,7 @@ export function AppBar({
                 'h-9 w-44 rounded-full pl-10 text-sm transition-colors',
                 searchSolid
                   ? 'border-neutral-300 bg-white text-ink placeholder:text-neutral-400'
-                  : 'border-white/25 bg-white/10 text-white placeholder:text-white/60'
+                  : 'border-white/25 bg-white/10 text-white placeholder:text-white/60',
               )}
             />
           </form>
@@ -170,11 +157,7 @@ export function AppBar({
             </button>
           </div>
 
-          <Link
-            href="/shop"
-            aria-label={wishlistLabel}
-            className={cn(iconLinkClass, 'relative')}
-          >
+          <Link href="/shop" aria-label={wishlistLabel} className={cn(iconLinkClass, 'relative')}>
             <HeartIcon className="size-5" />
             <Badge
               variant="secondary"
@@ -193,10 +176,7 @@ export function AppBar({
           onKeyDown={onMobileSearchRowKeyDown}
           className="border-t border-ink/10 bg-canvas px-4 pb-3 pt-2 text-ink lg:hidden"
         >
-          <form
-            action="/shop"
-            className="mx-auto flex w-full max-w-6xl items-center gap-2"
-          >
+          <form action="/shop" className="mx-auto flex w-full max-w-6xl items-center gap-2">
             <div className="relative min-w-0 flex-1">
               <SearchIcon
                 aria-hidden="true"

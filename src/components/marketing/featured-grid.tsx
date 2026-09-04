@@ -9,9 +9,7 @@ export async function FeaturedGrid() {
   return (
     <section aria-labelledby="featured-heading" className="bg-canvas">
       <div className="mx-auto w-full max-w-6xl px-4 py-20 md:py-28">
-        <p className="text-xs font-medium uppercase tracking-[0.18em] text-brand">
-          The lineup
-        </p>
+        <p className="text-xs font-medium uppercase tracking-[0.18em] text-brand">The lineup</p>
         <h2
           id="featured-heading"
           className="mt-3 font-heading text-3xl font-semibold tracking-tight text-ink sm:text-4xl"
