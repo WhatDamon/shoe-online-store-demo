@@ -1,36 +1,159 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Treadwell — 3D-Printed Casual Shoes (Demo)
 
-## Getting Started
+A consumer-facing storefront demo for a fictional brand of **3D-printed casual / lifestyle shoes**
+(digitally crafted, printed to order in your size). Built with **Next.js (App Router) + Bun +
+Tailwind + shadcn/ui**, with a server-side AI shopping guide that stays deliberately subtle
+(spec principle P1: consumer language only, no "AI" branding).
 
-First, run the development server:
+This is a **product prototype / frontend demo**: there is no checkout. Product detail CTAs are a
+placeholder until a Shopify storefront exists (a switchable catalog adapter is ready for it). The
+catalog is a local seed of 16 shoes; product visuals are **programmatically generated inline SVGs**
+(lattice / wave / honeycomb patterns) — no image assets, zero network image dependency.
+
+> Docs: [design spec](docs/superpowers/specs/2026-09-04-shoe-store-ai-design.md) ·
+> [implementation plan](docs/superpowers/plans/2026-09-04-shoe-store-frontend-ai.md) ·
+> [implementation report](docs/implementation-report.md)
+
+## Tech stack
+
+- **Next.js 16.3.4** (App Router, Turbopack) + React 19 + TypeScript 5
+- **Bun 1.3** as package manager and runtime (required — see below)
+- **Tailwind CSS v4** + **shadcn/ui** (Base UI preset)
+- **Drizzle ORM** over **SQLite** (`bun:sqlite`), Postgres-ready via `DATABASE_URL` swap
+- **Vitest** (unit + React Testing Library), **ESLint**, `tsc --noEmit`
+- AI: OpenAI-compatible streaming client with a deterministic **Mock mode** when no key is set
+
+## Prerequisites
+
+- **Bun ≥ 1.3** (project ships `packageManager: bun@1.3.14`). Verify with `bun --version`.
+- No API keys are required to run the demo — the AI assistant works in Mock mode.
+
+## Quick start
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+bun install
+cp .env.example .env.local      # defaults are fine — empty AI_API_KEY = Mock mode
+bun --bun run dev               # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+> **`--bun` is required.** The `next` CLI runs the Next server on the Node runtime by default;
+> this project's DB layer imports `bun:sqlite` (server-only code under `src/server`, `src/db`), so
+> the CLI process itself must run on the Bun runtime. `bun run dev` / `bun run build` will fail;
+> use `bun --bun run dev|build|start`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+First run auto-creates the SQLite file at `./data/local.db` with two tables
+(`product_embeddings`, `ai_usage`) via idempotent `CREATE TABLE IF NOT EXISTS` — no migration step.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### What you can do without any setup
 
-## Learn More
+- Landing page, `/shop` (URL-driven filters), product detail pages (SSG, 16 products)
+- Wishlist (localStorage), size picker with market conversion (US system by default)
+- Floating assistant (right-bottom "Need a hand?" FAB on non-landing pages):
+  chips `Find my size` / `Style it with` / `Help me pick` / `Everyday sneakers under $150`,
+  streamed answers, product result cards, deterministic size recommendation — all in Mock mode.
+- PDP → "Find my size" opens the assistant pre-seeded with the current shoe.
 
-To learn more about Next.js, take a look at the following resources:
+## Scripts
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Command | Meaning |
+|---|---|
+| `bun --bun run dev` | Next dev server (Turbopack). **Must be `--bun`** (see above). |
+| `bun --bun run build` | Production build. **Must be `--bun`.** |
+| `bun --bun run start` | Serve the production build. |
+| `bun run typecheck` | `tsc --noEmit` |
+| `bun run lint` | ESLint over the repo |
+| `bun run test` | Vitest (28 files, 121 tests) — runs on Node; DB tests use a `node:sqlite` test compat shim aliased in `vitest.config.mts`, production code still imports real `bun:sqlite`. |
+| `bun run test:watch` | Vitest watch mode |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The acceptance gate is **lint + typecheck + test + build**, all green on `feat/shoe-store` (HEAD).
 
-## Deploy on Vercel
+## Environment variables
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+See [`.env.example`](.env.example) for the annotated template. Summary:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Variable | Default | Meaning |
+|---|---|---|
+| `SITE_MARKET` | `US` | Market (`US\|EU\|UK\|JP\|CN`); drives the size-display system + mm-anchored conversions |
+| `AI_API_KEY` | *(empty)* | **Empty → Mock mode** (zero cost, demoable). Set to enable the real OpenAI-compatible provider. |
+| `AI_BASE_URL` | *(empty)* | OpenAI-compatible endpoint base URL (empty = official OpenAI) |
+| `AI_MODEL` | `gpt-4o-mini` | Chat model for the real provider |
+| `AI_EMBEDDING_MODEL` | `text-embedding-3-small` | Embedding model for semantic search (cached locally) |
+| `AI_MAX_TURNS` | `20` | Per-session turn cap (soft message when exceeded) |
+| `AI_MAX_OUTPUT_TOKENS` | `500` | Max output tokens per provider response |
+| `AI_REQUEST_TIMEOUT_MS` | `20000` | Provider request timeout |
+| `AI_MAX_MESSAGE_CHARS` | `800` | Max characters per incoming user message |
+| `AI_DAILY_TOKEN_CAP` | `1000000` | Daily token budget (SUM over `ai_usage` per UTC day) |
+| `AI_DISABLE_REAL` | `0` | `1` forces Mock mode even with a key (abuse kill switch) |
+| `DATABASE_URL` | `./data/local.db` | SQLite file; swap to a `pg://…` URL for Postgres |
+| `SHOPIFY_DOMAIN`, `SHOPIFY_STOREFRONT_TOKEN` | *(empty)* | Reserved. Catalog adapter switches seed → Shopify only when **both** are set (not yet active). |
+
+### Enabling real AI
+
+1. Put a real key in `AI_API_KEY` (optionally `AI_BASE_URL` for a gateway / custom endpoint).
+2. Set `AI_EMBEDDING_MODEL` + `AI_BASE_URL` to activate semantic retrieval; without them the
+   assistant transparently uses keyword search over the catalog.
+3. Restart. Guardrails (rate limit, turn cap, daily budget) apply to real and Mock alike.
+   `AI_DISABLE_REAL=1` is the one-switch rollback to Mock.
+
+### Switching market / sizes
+
+`SITE_MARKET` is a **deployment-level, single-market** setting (no runtime market switching):
+sizes are stored once in a canonical EU system and converted to the market's system
+(US/EU/UK/JP/CN, foot-length-mm anchored) for display, filtering and "Find my size". Currency and
+copy stay English/USD.
+
+## Directory map
+
+```
+src/
+  app/                     # App Router pages & routes
+    page.tsx               # Landing (zero AI presence by design)
+    shop/page.tsx          # /shop — SSR list, URL-state filters (collection/size/price/sort/q)
+    product/[handle]/page.tsx  # PDP — SSG (generateStaticParams), buy CTA placeholder
+    api/ai/chat/route.ts   # POST SSE endpoint (delta|productCards|sizeFit|done|error frames)
+    og/route.tsx           # Local OpenGraph image (ImageResponse, no network)
+  components/
+    marketing/             # AppBar, Footer, Hero, CollectionCards, Story, ...
+    shop/                  # ProductCard/Grid, ProductVisual (SVG), size selector, wishlist, PDP cluster
+    assistant/             # FAB + Sheet chat panel, SSE hook, chips, message list
+    ui/                    # shadcn/ui primitives
+  server/                  # Server-only layers (never imported by client code except `type`)
+    catalog/               # Seed/Shopify adapter + market-aware service (conversions, related)
+    search/                # embedder, keyword search, retrieval (embedding cache + cosine), vector
+    ai/                    # providers (Mock/OpenAI-compatible), chat orchestration, SSE events, prompts
+    guardrails/            # rate limit, session state (turns/TTL/trim), token budget, soft copy
+  db/                      # Drizzle schema (2 tables), bun:sqlite client (sync, idempotent)
+  lib/                     # shared pure helpers (site, market, wishlist, size charts, formats, SEO)
+  test/                    # bun:sqlite → node:sqlite test compat shim (test-only)
+```
+
+## Architecture notes
+
+- **Catalog**: the seed adapter serves 16 products across 4 collections
+  (Everyday/Comfort/Travel/Minimal) with SVG-generated visuals. The Shopify adapter mirrors the
+  Storefront API shape and activates when `SHOPIFY_*` is configured — no other code changes.
+- **AI**: RAG-lite, zero tool-calling — every real/gateway model only needs chat completions.
+  Retrieved product cards are injected into the system prompt; the model must answer from that
+  injected content only. Modes: `shopping`, `size-fit` (deterministic), `outfit`, `find-shoes`.
+- **Guardrails** (all anonymous, no PII): in-memory token bucket rate limit (IP + session),
+  per-session turn cap + history trim + idle TTL, output-token cap + timeout, and a **persisted**
+  daily token budget on `ai_usage`. Soft copy everywhere ("taking a short break"), never
+  "rate limited". Runs entirely in-process (single-instance assumption, spec P7).
+- **Search**: embedding vectors cached in `product_embeddings` (contentHash-validated), cosine in
+  app code (fine below ~2k products — beyond that, move to a native vector backend).
+
+## Known limitations (see `docs/implementation-report.md` for the full list)
+
+- Checkout is not implemented; the detail CTA is an "Available soon" placeholder driven by a
+  `getBuyUrl` adapter contract (returns `null` until the Shopify store exists).
+- Unknown product handles return the not-found UI with **HTTP 200 + `noindex`** under the current
+  `dynamicParams` SSG setting (a deliberate, documented tradeoff; revisit if SEO on 404s matters).
+- `/shop` has no persistent AppBar/Footer shell (per-page shells by design; see report).
+- Compliance: no cookies, no tracking, no personal data sent to AI providers. Anonymous `ai_usage`
+  token counts are stored locally for budget enforcement only.
+
+## Disclaimer
+
+Demo / prototype. Brand ("Treadwell"), product names and copy are placeholder. Product images are
+programmatically generated placeholders (remote lifestyle shots may load from Unsplash at runtime
+with a graceful fallback). No real purchase flow is connected.
