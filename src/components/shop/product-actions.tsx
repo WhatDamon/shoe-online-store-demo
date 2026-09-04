@@ -7,10 +7,6 @@ import { useAssistant } from '@/components/assistant/assistant-provider'
 import { SizeSelector } from './size-selector'
 import { ProductBuyBar } from './product-buy-bar'
 
-// 任务 17 填充 AssistantProvider 后提供 open(mode, product?)；此处先引用契约：
-// 当前 context 为 null → 空守卫（占位入口，无对话逻辑）；任务 17 可换用 provider 导出的真实类型。
-type AssistantHandle = { open: (mode: 'size-fit', product: ProductView) => void }
-
 interface ProductActionsProps {
   product: ProductView
   /** 服务端已算好的结算 URL（无 store → null） */
@@ -27,7 +23,8 @@ interface ProductActionsProps {
 // 持有所选尺码状态，供购买条在无 store 阶段做 aria-live 说明。
 export function ProductActions({ product, buyUrl, children }: ProductActionsProps) {
   const [selected, setSelected] = useState<CanonicalSize | null>(null)
-  const assistant = useAssistant() as AssistantHandle | null
+  // 面板打开 + 预置 size-fit 上下文由 AssistantProvider 处理；context 为空（Provider 未挂载的孤立渲染）时静默。
+  const assistant = useAssistant()
   const selectedLabel = product.sizeOptions.find(o => o.value === selected)?.label ?? null
 
   return (
