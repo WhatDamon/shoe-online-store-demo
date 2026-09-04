@@ -33,13 +33,13 @@ catalog is a local seed of 16 shoes; product visuals are **programmatically gene
 ```bash
 bun install
 cp .env.example .env.local      # defaults are fine — empty AI_API_KEY = Mock mode
-bun --bun run dev               # http://localhost:3000
+bun run dev               # http://localhost:3000
 ```
 
-> **`--bun` is required.** The `next` CLI runs the Next server on the Node runtime by default;
-> this project's DB layer imports `bun:sqlite` (server-only code under `src/server`, `src/db`), so
-> the CLI process itself must run on the Bun runtime. `bun run dev` / `bun run build` will fail;
-> use `bun --bun run dev|build|start`.
+> **Bun runtime required for dev/build/start.** The `next` CLI normally runs on the Node runtime,
+> but this project's DB layer imports `bun:sqlite` (server-only code under `src/server`, `src/db`),
+> so the npm scripts bake in `bun --bun next …` — plain `bun run dev|build|start` already runs the
+> CLI on the Bun runtime. (No `--bun` prefix needed anymore; the scripts do it.)
 
 First run auto-creates the SQLite file at `./data/local.db` with two tables
 (`product_embeddings`, `ai_usage`) via idempotent `CREATE TABLE IF NOT EXISTS` — no migration step.
@@ -57,9 +57,9 @@ First run auto-creates the SQLite file at `./data/local.db` with two tables
 
 | Command | Meaning |
 |---|---|
-| `bun --bun run dev` | Next dev server (Turbopack). **Must be `--bun`** (see above). |
-| `bun --bun run build` | Production build. **Must be `--bun`.** |
-| `bun --bun run start` | Serve the production build. |
+| `bun run dev` | Next dev server (Turbopack) on the Bun runtime (script bakes in `bun --bun`). |
+| `bun run build` | Production build on the Bun runtime. |
+| `bun run start` | Serve the production build on the Bun runtime. |
 | `bun run typecheck` | `tsc --noEmit` |
 | `bun run lint` | ESLint over the repo |
 | `bun run test` | Vitest (28 files, 121 tests) — runs on Node; DB tests use a `node:sqlite` test compat shim aliased in `vitest.config.mts`, production code still imports real `bun:sqlite`. |

@@ -12,10 +12,16 @@ export interface AiProvider {
 
 // 工厂按调用时 env 决策（测试可 vi.stubEnv 后再调 chat）。
 // mock/openai-compat 仅 type-import 本模块（运行时不回环），故此处顶层运行时 import 安全。
-import { OpenAICompatProvider } from './openai-compat'
+import { OpenAICompatProvider, DEFAULT_AI_MODEL } from './openai-compat'
 import { MockProvider } from './mock'
 
+/** 是否命中真实 provider（与 aiProvider() 同一判定）。 */
+const realEnabled = (): boolean =>
+  Boolean(process.env.AI_API_KEY) && process.env.AI_DISABLE_REAL !== '1'
+
 export const aiProvider = (): AiProvider =>
-  process.env.AI_API_KEY && process.env.AI_DISABLE_REAL !== '1'
-    ? new OpenAICompatProvider()
-    : new MockProvider()
+  realEnabled() ? new OpenAICompatProvider() : new MockProvider()
+
+// 实际生效的模型（规格：记账与流式必须同源）：Mock → 'mock'；真实 → AI_MODEL ?? 缺省。
+export const aiModel = (): string =>
+  realEnabled() ? process.env.AI_MODEL ?? DEFAULT_AI_MODEL : 'mock'

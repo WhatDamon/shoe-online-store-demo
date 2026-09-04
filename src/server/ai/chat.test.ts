@@ -1,11 +1,12 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { chat, type ChatRequest } from './chat'
+import { chat, NO_MATCH_TEXT, type ChatRequest } from './chat'
 import { createDb } from '@/db/client'
 import { createRepository } from '@/server/search/repository'
 import { createGuardrails, GUARDRAIL_MESSAGE, type Guardrails } from '@/server/guardrails'
 import { encodeEvent, parseEvent, type ChatEvent } from './events'
 import { REDIRECT_TEXT } from './mock'
+import * as retrievalModule from '@/server/search/retrieval'
 
 // 屏蔽真实 embedder（含网络探测）：chat 内部 retrieve 一律走关键词降级。
 const { mockEmbed, mockEmbeddingsAvailable } = vi.hoisted(() => ({
@@ -123,6 +124,27 @@ describe('chat mock 编排', () => {
     expect((deltas[0] as ChatEvent & { type: 'delta' }).text).toBe(REDIRECT_TEXT)
     expect(evs[evs.length - 1]).toEqual({ type: 'done' })
     expect(evs.some((e) => e.type === 'error')).toBe(false)
+  })
+
+  it('语义命中全为余弦≤0 → NO_MATCH（相关性下限闭合嵌入模式零命中分支）', async () => {
+    const g = fresh()
+    const spy = vi
+      .spyOn(retrievalModule, 'retrieve')
+      .mockResolvedValue([
+        { handle: 'daily-drift', score: 0 },
+        { handle: 'cloudwalk-slip', score: -0.12 },
+      ])
+    try {
+      const evs = await collect(chat(req({ mode: 'find-shoes', text: 'zzz nonsense' }), { guardrails: g }))
+      expect(evs.some((e) => e.type === 'productCards')).toBe(false)
+      const deltas = evs.filter((e) => e.type === 'delta')
+      expect(deltas).toHaveLength(1)
+      expect((deltas[0] as ChatEvent & { type: 'delta' }).text).toBe(NO_MATCH_TEXT)
+      expect(evs[evs.length - 1]).toEqual({ type: 'done' })
+      expect(evs.some((e) => e.type === 'error')).toBe(false)
+    } finally {
+      spy.mockRestore()
+    }
   })
 
   it('护栏顺序：turns 超限（假时钟第 21 次）→ error code=turns + 温和文案，非 rate_limited', async () => {

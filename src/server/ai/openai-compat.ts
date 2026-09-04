@@ -3,8 +3,11 @@
 import OpenAI from 'openai'
 import type { AiContext, AiProvider } from './provider'
 
+// 单一事实源：真实 provider 的缺省模型（chat 记账与流式调用共用，见 provider.ts aiModel()）。
+export const DEFAULT_AI_MODEL = 'gpt-4o-mini'
+
 const TIMEOUT_MS = Number(process.env.AI_REQUEST_TIMEOUT_MS ?? 20_000) // 规格 §8.5.2 默认 20s
-const AI_MODEL = process.env.AI_MODEL ?? 'gpt-4o-mini'
+const AI_MODEL = process.env.AI_MODEL ?? DEFAULT_AI_MODEL
 
 export class OpenAICompatProvider implements AiProvider {
   async *stream(

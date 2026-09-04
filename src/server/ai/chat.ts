@@ -15,7 +15,7 @@ import { db } from '@/db/client'
 import { createSizeFitEvent } from './events'
 import type { AiContext, AiProvider } from './provider'
 import type { ChatEvent, Mode, ProductCard } from './events'
-import { aiProvider } from './provider'
+import { aiProvider, aiModel } from './provider'
 import { systemFor } from './prompts'
 import { adviceFor } from './size-input'
 
@@ -34,10 +34,11 @@ export interface ChatOptions {
   provider?: AiProvider
 }
 
-const NO_MATCH_TEXT =
-  "I couldn't find a style that matches that yet — try different words or browse the shop."
 const PRODUCT_REQUIRED_TEXT = 'Pick a product first, then I can help with that.'
 const FALLBACK_ERROR_TEXT = 'Something went wrong — please try again.'
+/** 消费端文案（导出供测试断言；克制措辞——不出现 "AI"）。 */
+export const NO_MATCH_TEXT =
+  "I couldn't find a style that matches that yet — try different words or browse the shop."
 
 let shared: Guardrails | null = null
 const sharedGuardrails = (): Guardrails =>
@@ -66,8 +67,12 @@ const digestLines = (ps: Product[]): string =>
 /** 检索 top-N 并取回完整商品。注意 retrieve 默认参陷阱：省略第二参（勿传 {}，会关掉语义嵌入）。 */
 async function retrieveProducts(query: string, limit = 4): Promise<Product[]> {
   const hits = await retrieve(query)
+  // 相关性下限：语义路径对全目录做余弦后按分排序、不过滤，余弦≈0/负分的无关行会占满 top-N，
+  // 使 NO_MATCH 分支不可达。此处消费侧过滤（检索契约不变），阈值取 >0（嵌入尺度随模型而异，
+  // 保守下限只剔除正交/负分噪声；更严格截断待引入原生向量后端时按已知模型标定）。
+  const relevant = hits.filter((h) => h.score > 0)
   const ps = await Promise.all(
-    hits.slice(0, limit).map((h) => catalog.getProductByHandle(h.handle)),
+    relevant.slice(0, limit).map((h) => catalog.getProductByHandle(h.handle)),
   )
   return ps.filter((p): p is Product => p !== null)
 }
@@ -84,7 +89,8 @@ export async function* chat(
   const guardrails = opts.guardrails ?? sharedGuardrails()
   const provider = opts.provider ?? aiProvider()
   const text = truncateMessage(req.text ?? '')
-  const model = process.env.AI_MODEL ?? 'mock'
+  // 记账模型与实际选中的 provider 同源（修复：勿用 AI_MODEL ?? 'mock'，会把真实调用记成 mock）。
+  const model = aiModel()
 
   try {
     guardrails.assertRate(req.ip, req.sessionKey)

@@ -23,6 +23,7 @@ export function ProductGallery({ product }: { product: ProductView }) {
           name={product.title}
           construction={product.construction}
           view={active}
+          idSalt="gallery-main"
           className="mx-auto aspect-square w-full max-w-xl"
         />
       </div>
@@ -48,6 +49,7 @@ export function ProductGallery({ product }: { product: ProductView }) {
                   name={product.title}
                   construction={product.construction}
                   view={view}
+                  idSalt={`gallery-thumb-${view}`}
                   className="h-full w-full"
                 />
               </span>

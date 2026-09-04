@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { listProductsForMarket, getProductForMarket, getRelatedProducts } from './service'
+import { seedAdapter } from './seed-adapter'
 
 describe('catalog service', () => {
   it('lists by collection', async () => {
@@ -23,8 +24,10 @@ describe('catalog service', () => {
     expect(items[0].sizeOptions[0].label).toMatch(/^(US|EU|UK|JP|CN) /)
   })
   it('getBuyUrl null when no store configured', async () => {
-    const p = await getProductForMarket('daily-drift')
+    // 无 Shopify 凭证 → seed 适配器生效，getBuyUrl 恒 null（占位 + 适配器就绪）。
+    const p = await seedAdapter.getProductByHandle('daily-drift')
     expect(p).not.toBeNull()
+    if (p) expect(await seedAdapter.getBuyUrl(p)).toBeNull()
   })
   it('product missing -> null', async () => {
     expect(await getProductForMarket('nope')).toBeNull()

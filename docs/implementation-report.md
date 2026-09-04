@@ -1,6 +1,6 @@
 # Implementation Report — Treadwell 3D-Printed Shoe Storefront (feat/shoe-store)
 
-Status: **all 18 plan tasks implemented and reviewed; acceptance gates green at HEAD `6c7bfdd` (+ task 18 docs commit).**
+Status: **all 18 plan tasks implemented and reviewed; acceptance gates green at HEAD `83fd694`; a pre-merge hardening commit follows (scripts bake in `bun --bun`, ai_usage model attribution single-source, retrieval relevance floor, SVG pattern-id instance salt, buyUrl test assertion, doc quirks — see G2/G4/G5/G7 and "documented quirks" below).**
 Branch: `feat/shoe-store` (isolated worktree under `.worktrees/shoe-store`). Base `4cc9494`.
 
 ## 1. What was built (做了什么)
@@ -46,9 +46,9 @@ Automated gates — all green at HEAD:
 | Typecheck | `bun run typecheck` | ✅ exit 0 |
 | Lint | `bun run lint` | ✅ exit 0 |
 | Test | `bun run test` | ✅ 28 files / **121 tests** passed |
-| Build | `bun --bun run build` | ✅ 22/22 static routes (16 PDP SSG + landing + shells) |
+| Build | `bun run build` (scripts bake in `bun --bun`) | ✅ 22/22 static routes (16 PDP SSG + landing + shells) |
 
-Production-server smoke (`bun --bun run start`, built output) — all recorded from real curls:
+Production-server smoke (`bun run start`, built output) — all recorded from real curls:
 
 - `/` 200 · `/shop` 200 · `/shop?collection=everyday` 200 · `/shop?size=US 9&sort=price-asc` 200
   (also verifies the runtime `/shop` title composition `Shop — Treadwell`, closing a deferred note)
@@ -71,16 +71,22 @@ Owned by the whole-branch review / human decision. Headless runs could not cover
 | # | Item | Status now | Recommendation |
 |---|---|---|---|
 | G1 | Unknown product handle → HTTP 200 + `noindex` (Next 16 SSG, `dynamicParams=true`, `notFound()`) | Confirmed live (see smoke) | Acceptable for a seed demo because the not-found shell is `noindex`ed, so search engines won't index soft-404s. If true 404s become a hard SEO requirement, set `dynamicParams = false` (all 16 known handles still SSG; new products then require rebuild). |
-| G2 | Package scripts run `next` on Node; `bun:sqlite` requires the Bun runtime ⇒ plain `bun run dev|build` fails | Documented in README (`bun --bun …`) | Recommended: keep scripts as-is for portability and document `--bun` (done), OR change scripts to `"dev": "bun --bun next dev"` for ergonomics. Tradeoff: the latter makes the scripts Bun-locked and hides the seam. Deploy must run Bun. |
+| G2 | Package scripts run `next` on Node; `bun:sqlite` requires the Bun runtime ⇒ plain `bun run dev|build` failed | **Fixed in hardening** | Scripts now bake in `bun --bun next dev|build|start`; plain `bun run dev|build|start` works. Deploy must still run Bun. |
 | G3 | `/shop` (and PDP) have no persistent AppBar/Footer shell; `/shop` is a nav dead-end except the browser back button | As-designed per-page shells (task 11 note) | For this 3-page demo the browse flow is Landing → Shop → PDP and back-navigation suffices. If a persistent shell is wanted, move AppBar/Footer (and Assistant FAB already global) into the root layout and remove per-page duplicates — cheap retrofit. |
-| G4 | Embedding-mode zero-hit branch unreachable: semantic retrieval ranks all catalog rows without a score floor, so NO_MATCH never fires when embeddings are configured | Default (keyword) path correct | Add a relevance floor (cosine > ~0) or top-K cutoff in the retrieval semantic path before semantic mode is relied on. Low urgency: default config has no embeddings. |
-| G5 | `ai_usage.model` logs `AI_MODEL ?? 'mock'` while the real provider defaults to `gpt-4o-mini` → real calls with a key but no `AI_MODEL` would be billed as `mock` | Open, small | Derive the logged model from the actually-selected provider default (one shared constant). |
+| G4 | Embedding-mode zero-hit branch unreachable: semantic retrieval ranks all catalog rows without a score floor, so NO_MATCH never fires when embeddings are configured | **Fixed in hardening** | Chat-side relevance floor (`score > 0`, conservative because embedding scale is model-dependent) filters orthogonal/negative rows before top-4; regression test asserts low/zero-score hits → NO_MATCH. Retrieval contract unchanged. |
+| G5 | `ai_usage.model` logging is detached from the actually-selected provider in both directions: `AI_MODEL ?? 'mock'` mislabels real calls when `AI_MODEL` is unset, and `.env.example` pre-setting `AI_MODEL` mislabels out-of-box Mock calls as the real model | **Fixed in hardening** | `provider.aiModel()` derives the model from the actually-selected provider (Mock → `'mock'`; real → `AI_MODEL ?? DEFAULT_AI_MODEL`, shared single source with the streaming client); `chat` records that same value. |
 | G6 | Size table authoritativeness: fixture is internally consistent; the mandated Zappos/REI spot-check (incl. EU42/US8.5, EU45/US10.5) was not network-verifiable | Deferred (Task 3) | Human spot-check against a public size chart before going live in a new market. Known tensions to eyeball: golden `27 cm → EU43` vs `EU43@280 mm`, and JP column approximating foot cm. |
-| G7 | Small deferred code items | Open | (a) `sizeRangeLabel` malformed output (`"US 9-5"`) when a range spans adjacent half sizes — not triggered by the current seed; (b) `service.test.ts` test #5 is an empty shell named "getBuyUrl null" — either add `seedAdapter.getBuyUrl(product) === null` or rename; (c) duplicate SVG `pattern` id between PDP main image and same-view thumbnail — needs an instance-level id salt in `ProductVisual`; (d) `metadataBase` hard-coded to `localhost:3000` — needs an env override before deploy; (e) guardrail in-memory maps never evict (single-process assumption, spec P7). |
+| G7 | Small deferred code items | Partially fixed | (a) `sizeRangeLabel` malformed output (`"US 9-5"`) when a range spans adjacent half sizes — not triggered by the current seed; (b) ~~`service.test.ts` test #5 empty shell~~ **fixed** — asserts `seedAdapter.getBuyUrl(product) === null`; (c) ~~duplicate SVG `pattern` id between PDP main image and same-view thumbnail~~ **fixed** — `ProductVisual` gains an optional `idSalt` instance salt used by the gallery (`gallery-main` / `gallery-thumb-*`); (d) `metadataBase` hard-coded to `localhost:3000` — needs an env override before deploy; (e) guardrail in-memory maps never evict (single-process assumption, spec P7). |
 | G8 | Real-browser visual acceptance | **Not performed** (headless environment) | Human checklist in README/report §4. |
 
 No Critical findings remain open from any task review; all fix rounds (tasks 7, 10, 11, 12, 13,
 17) closed clean at R1/R2 and were re-reviewed.
+
+**Documented size-input quirks** (inherited from the plan brief; safe with the current seed, watch
+in future size work): `convert()` is semantically widened beyond its literal signature — for an
+out-of-table input it falls back to interpreting the value as a US size when the target system is
+EU (and returns `null` otherwise); `parseSizeHint`'s US regex `\b(?:…|m)\s*(\d…)` misjudges an
+apostrophe-`m` + digits such as `"I'm 42"` as a US size label.
 
 ## 4. Manual browser acceptance checklist (真实浏览器验收清单)
 

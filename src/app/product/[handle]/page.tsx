@@ -33,8 +33,9 @@ export async function generateMetadata({
   return pageMetadata({ title: product.title, description: product.description })
 }
 
-// PDP（SSG，规格 §9）：/product/[handle] 由 generateStaticParams 预渲染；
-// 未知 handle 走动态渲染 → getProductForMarket null → notFound() 404。
+// PDP（SSG，规格 §9）：/product/[handle] 由 generateStaticParams 预渲染。
+// 未知 handle 在 dynamicParams=true（默认）下走按需渲染 → getProductForMarket null → notFound()，
+// 实测返回品牌化 not-found 壳（HTTP 200 + robots noindex）；若将来需要真 404 再设 dynamicParams=false。
 export default async function ProductPage({
   params,
 }: {

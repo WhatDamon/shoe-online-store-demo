@@ -28,6 +28,10 @@ export class SeedAdapter implements CatalogAdapter {
     return seedProducts.find(p => p.handle === handle) ?? null
   }
   async getCollections() { return collections }
-  async getBuyUrl(): Promise<null> { return null } // 无 store → null（占位 + 适配器就绪）
+  // 无 store → null（占位 + 适配器就绪）；_product 仅为符合 CatalogAdapter 契约（Shopify 实现在用）。
+  async getBuyUrl(_product?: Product): Promise<null> {
+    void _product
+    return null
+  }
 }
 export const seedAdapter = new SeedAdapter()

@@ -13,6 +13,8 @@ export interface ProductVisualProps {
   view?: ProductVisualView
   className?: string
   construction?: Product['construction']
+  /** 实例盐：同一 DOM 内出现多份相同输入的实例（如 PDP 主图 + 同 view 缩略图）时消除重复 pattern id。 */
+  idSalt?: string
 }
 
 const VIEW_BOX: Record<ProductVisualView, string> = {
@@ -112,12 +114,12 @@ const SIDE_UPPER =
   'M38 100 C34 78 44 58 62 50 C84 40 108 44 120 58 C130 70 148 78 168 82 C186 86 202 84 212 74 ' +
   'C220 66 224 56 224 48 C226 68 226 84 220 96 L214 100 L40 100 Z'
 
-export function ProductVisual({ visual, name, view = 'side', className, construction }: ProductVisualProps) {
+export function ProductVisual({ visual, name, view = 'side', className, construction, idSalt }: ProductVisualProps) {
   const pattern = construction?.pattern ?? 'lattice'
   const density = construction?.density ?? 0.75
   const base = view === 'detail' ? 16 : 13
   const S = cellSize(base, density, view)
-  const pid = hashSeed(`${name}|${view}|${pattern}|${density}|${visual.palette[0]}|${visual.palette[1]}|${visual.accent}`)
+  const pid = hashSeed(`${idSalt ? `${idSalt}|` : ''}${name}|${view}|${pattern}|${density}|${visual.palette[0]}|${visual.palette[1]}|${visual.accent}`)
 
   const patternFill = `url(#${pid})`
 
