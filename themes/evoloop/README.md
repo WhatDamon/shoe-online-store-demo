@@ -36,12 +36,14 @@ unzip -o ~/Downloads/horizon-product-carousel-v2-images-20260905-3d-shoes.zip \
 
 ## 与上游的差异（增量清单）
 
-| 变更                                                                            | 位置                                                                                                                                                |
-| ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| theme_info 更名 Evoloop；品牌入口都在 Shopify 后台/`shop.name` 与主题编辑器设置 | `config/settings_schema.json`                                                                                                                       |
-| 二进制图剥离 + 首页 hero 引用置空（占位 svg 兜底）                              | `templates/index.json`                                                                                                                              |
-| **Evoloop 3D 视觉兜底**（能力 1，见下）                                         | `snippets/evoloop-product-visual.liquid`、`assets/evoloop-product-visual.js`、`sections/main-3d-shoes-custom.liquid`                                |
-| **Evoloop AI 助手插槽**（能力 2，见下）                                         | `config/settings_schema.json`（设置组）、`snippets/evoloop-assistant.liquid`、`assets/evoloop-assistant.js`、`sections/main-3d-shoes-custom.liquid` |
+| 变更                                                                                                                                           | 位置                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| theme_info 更名 Evoloop；品牌入口都在 Shopify 后台/`shop.name` 与主题编辑器设置                                                                | `config/settings_schema.json`                                                                                                                               |
+| 二进制图剥离 + 首页 hero 引用置空（占位 svg 兜底）                                                                                              | `templates/index.json`                                                                                                                                      |
+| **语言仅保留英文**：57 个 locale → 仅 `en.default.json` + `en.default.schema.json`                                                              | `locales/`（55 个非英文语言包已删除）                                                                                                                       |
+| **内容剥离（设计之外）**：删除 blog/article/gift_card 模板及其家族与死代码（main-blog/main-blog-post/header-announcements、blog-comment-form、_blog-post-*/死 blocks、gift-card css、account/orders 图标、Horizon JS 开发脚手架）；库存见 README 下段 | 全树 |
+| **Evoloop 3D 视觉兜底**（能力 1，见下）                                                                                                          | `snippets/evoloop-product-visual.liquid`、`assets/evoloop-product-visual.js`、`sections/main-3d-shoes-custom.liquid`                                        |
+| **Evoloop AI 助手插槽**（能力 2，见下）                                                                                                          | `config/settings_schema.json`（设置组）、`snippets/evoloop-assistant.liquid`、`assets/evoloop-assistant.js`、`sections/main-3d-shoes-custom.liquid`        |
 
 ## PDP 模板
 
@@ -108,4 +110,14 @@ honeycomb），几何与 Next 应用里的 ProductVisual 完全一致。渲染�
 - `shopify theme check` 静态校验（需 Shopify CLI）。
 - 开发店导入后的实机验证：3D 视觉三图案×三视图、尺码 variant 联动与售罄禁用、
   加购→抽屉/结账、推荐位、助手插槽懒加载与 widget 契约握手。
-- Horizon 未改动上游页面的回归（cart/collection/blog/customers 等）。
+- Horizon 未改动上游页面的回归（cart/collection/customers/search/password 等）。
+
+## 已剥离内容（可从上游 zip 找回）
+
+本次裁剪删除的文件在上游 zip（`horizon-product-carousel-v2-images-…-3d-shoes.zip`）中均有原件，需要时可单独解压找回：
+
+- 非英文语言包：`locales/{ar,bg,cs,…,zh-CN,zh-TW}*.json`（55 个）。
+- 内容型模板与家族：`templates/{blog,article}.json`、`templates/gift_card.liquid`、`sections/{main-blog,main-blog-post,header-announcements}.liquid`、`snippets/blog-comment-form.liquid`、`blocks/_blog-post-*` 等。
+- 死代码与脚手架：`assets/template-giftcard.css`、`assets/icon-{account,orders,double-chevron}.svg`、`assets/{package.json,jsconfig.json,*.d.ts}`。
+
+恢复示例：`unzip -o ~/Downloads/<原始zip> 'locales/*' -d themes/evoloop`。
