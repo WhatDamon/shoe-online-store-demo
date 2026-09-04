@@ -36,3 +36,12 @@ export async function getProductForMarket(handle: string): Promise<ProductView |
   const p = await catalog.getProductByHandle(handle)
   return p ? toView(p) : null
 }
+
+export async function getRelatedProducts(handle: string, limit = 3): Promise<ProductView[]> {
+  const current = await getProductForMarket(handle)
+  if (!current) return []
+  const same = await listProductsForMarket({ collection: current.collections[0] })
+  const rest = await listProductsForMarket({})
+  const pool = [...same, ...rest].filter(p => p.handle !== handle)
+  return [...new Map(pool.map(p => [p.handle, p])).values()].slice(0, limit)
+}

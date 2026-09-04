@@ -1,0 +1,113 @@
+import Link from 'next/link'
+import { notFound } from 'next/navigation'
+import { catalog } from '@/server/catalog/adapter'
+import { getProductForMarket, getRelatedProducts } from '@/server/catalog/service'
+import { ProductGallery } from '@/components/shop/product-gallery'
+import { ProductActions } from '@/components/shop/product-actions'
+import { ProductGrid } from '@/components/shop/product-grid'
+import { WishlistButton } from '@/components/shop/wishlist-button'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion'
+import { formatPrice } from '@/lib/format'
+
+export async function generateStaticParams() {
+  const products = await catalog.getProducts()
+  return products.map(p => ({ handle: p.handle }))
+}
+
+// PDP（SSG，规格 §9）：/product/[handle] 由 generateStaticParams 预渲染；
+// 未知 handle 走动态渲染 → getProductForMarket null → notFound() 404。
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ handle: string }>
+}) {
+  const { handle } = await params
+  const product = await getProductForMarket(handle)
+  if (!product) notFound()
+
+  const [buyUrl, related] = await Promise.all([
+    catalog.getBuyUrl(product),
+    getRelatedProducts(product.handle, 3),
+  ])
+
+  return (
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:py-8">
+      <Link
+        href="/shop"
+        className="inline-flex text-sm text-neutral-500 transition-colors hover:text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
+      >
+        ← All shoes
+      </Link>
+
+      <div className="mt-4 grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-14">
+        <ProductGallery product={product} />
+
+        <div className="flex flex-col gap-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="font-heading text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
+                {product.title}
+              </h1>
+              {product.subtitle ? (
+                <p className="mt-1.5 text-[15px] text-neutral-600">{product.subtitle}</p>
+              ) : null}
+            </div>
+            <WishlistButton handle={product.handle} />
+          </div>
+
+          <p className="text-2xl font-semibold text-ink">{formatPrice(product.price.amount)}</p>
+
+          <p className="text-[15px] leading-7 text-neutral-600">{product.description}</p>
+
+          <ProductActions product={product} buyUrl={buyUrl} />
+
+          <Accordion className="border-t border-neutral-200">
+            <AccordionItem value="materials-fit">
+              <AccordionTrigger>Materials &amp; fit</AccordionTrigger>
+              <AccordionContent>
+                <ul className="mb-4 list-disc space-y-1 pl-4 text-neutral-600">
+                  {product.features.map(feature => (
+                    <li key={feature}>{feature}</li>
+                  ))}
+                </ul>
+                <p className="text-neutral-600">{product.fitNotes}</p>
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="shipping">
+              <AccordionTrigger>Shipping &amp; returns</AccordionTrigger>
+              <AccordionContent>
+                <p className="mb-3 text-neutral-600">
+                  Every pair is printed to order in our studio, so nothing sits in a warehouse —
+                  we only print what you buy.
+                </p>
+                <p className="text-neutral-600">
+                  Orders ship in recycled packaging once your pair is printed. Free returns within
+                  30 days.
+                </p>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </div>
+      </div>
+
+      {related.length > 0 ? (
+        <section aria-labelledby="related-heading" className="mt-16 sm:mt-20">
+          <h2
+            id="related-heading"
+            className="font-heading text-2xl font-semibold tracking-tight text-ink"
+          >
+            You may also like
+          </h2>
+          <div className="mt-5">
+            <ProductGrid products={related} />
+          </div>
+        </section>
+      ) : null}
+    </div>
+  )
+}

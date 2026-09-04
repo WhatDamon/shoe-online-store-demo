@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { listProductsForMarket, getProductForMarket } from './service'
+import { listProductsForMarket, getProductForMarket, getRelatedProducts } from './service'
 
 describe('catalog service', () => {
   it('lists by collection', async () => {
@@ -28,5 +28,18 @@ describe('catalog service', () => {
   })
   it('product missing -> null', async () => {
     expect(await getProductForMarket('nope')).toBeNull()
+  })
+  it('related products exclude the current product', async () => {
+    const related = await getRelatedProducts('daily-drift')
+    expect(related.length).toBeGreaterThan(0)
+    expect(related.some(p => p.handle === 'daily-drift')).toBe(false)
+  })
+  it('related products respect the limit', async () => {
+    const related = await getRelatedProducts('daily-drift', 2)
+    expect(related.length).toBeLessThanOrEqual(2)
+    expect(related.length).toBeGreaterThan(0)
+  })
+  it('related products for an unknown handle are empty', async () => {
+    expect(await getRelatedProducts('nope')).toEqual([])
   })
 })
