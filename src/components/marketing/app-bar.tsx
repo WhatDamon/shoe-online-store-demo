@@ -17,10 +17,15 @@ import {
 import { cn } from 'cn'
 
 /**
- * 固定头部：顶部透明覆盖 hero，滚动 > 8px 后变为磨砂底（backdrop-blur）。
- * 纯交互客户端组件：数据来自 site 配置与 WishlistProvider，无自有状态数据源。
+ * 固定头部（规格 §9 全局导航）：位于每个路由组的 SiteShell 顶部。
+ *
+ * tone 决定未滚动时的表现：
+ * - overlay：顶部透明 + 白色文字，压在深色 Hero 全出血图上（Landing 专用）；
+ * - solid（默认）：canvas 实底 + ink 文字，用于普通内容页。
+ * 滚动 > 8px 后统一变为磨砂底。纯交互客户端组件，数据来自 site 配置与
+ * WishlistProvider，无自有状态数据源。
  */
-export function AppBar() {
+export function AppBar({ tone = 'solid' }: { tone?: 'overlay' | 'solid' } = {}) {
   const { items } = useWishlist()
   const count = items.length
   const [scrolled, setScrolled] = useState(false)
@@ -41,6 +46,7 @@ export function AppBar() {
     }
   }, [])
 
+  const searchSolid = scrolled || tone === 'solid'
   const wishlistLabel = `Wishlist, ${count} ${count === 1 ? 'item' : 'items'}`
   const iconLinkClass =
     'inline-flex h-9 w-9 items-center justify-center rounded-full text-current transition-opacity hover:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current'
@@ -51,7 +57,9 @@ export function AppBar() {
         'fixed inset-x-0 top-0 z-40 transition-colors',
         scrolled
           ? 'border-b border-ink/10 bg-canvas/85 text-ink backdrop-blur-md'
-          : 'border-b border-transparent bg-transparent text-white'
+          : tone === 'overlay'
+            ? 'border-b border-transparent bg-transparent text-white'
+            : 'border-b border-ink/10 bg-canvas text-ink'
       )}
     >
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4">
@@ -118,7 +126,7 @@ export function AppBar() {
               aria-label="Search products"
               className={cn(
                 'h-9 w-44 rounded-full pl-8 text-sm transition-colors',
-                scrolled
+                searchSolid
                   ? 'border-neutral-300 bg-white text-ink placeholder:text-neutral-400'
                   : 'border-white/25 bg-white/10 text-white placeholder:text-white/60'
               )}

@@ -1,0 +1,44 @@
+import { describe, expect, it } from 'vitest'
+import { render, screen, within } from '@testing-library/react'
+import { SiteShell } from './site-shell'
+import { WishlistProvider } from '@/components/shop/wishlist-provider'
+
+// 全局壳组合：AppBar（banner + 导航）与 Footer 恒在，内容进 main；
+// tone 只改头部初始底色类，不影响结构。
+describe('SiteShell', () => {
+  it('renders app bar, children in main, and footer for solid tone', () => {
+    render(
+      <WishlistProvider>
+        <SiteShell>
+          <h1>Page content</h1>
+        </SiteShell>
+      </WishlistProvider>
+    )
+
+    // AppBar banner 存在于 main 之外（全站头）
+    const banner = screen.getByRole('banner')
+    expect(within(banner).getByRole('link', { name: 'Treadwell' })).toHaveAttribute('href', '/')
+
+    const main = screen.getByRole('main')
+    expect(within(main).getByRole('heading', { name: 'Page content' })).toBeInTheDocument()
+    expect(main).not.toContainElement(screen.getByRole('banner'))
+
+    // Footer 底部导航
+    const footer = screen.getByRole('contentinfo')
+    expect(within(footer).getByRole('link', { name: 'Shop' })).toHaveAttribute('href', '/shop')
+  })
+
+  it('keeps the same structure for the overlay tone (landing)', () => {
+    render(
+      <WishlistProvider>
+        <SiteShell tone="overlay">
+          <p>Hero content</p>
+        </SiteShell>
+      </WishlistProvider>
+    )
+
+    expect(screen.getByRole('banner')).toBeInTheDocument()
+    expect(screen.getByRole('main')).toHaveTextContent('Hero content')
+    expect(screen.getByRole('contentinfo')).toBeInTheDocument()
+  })
+})
