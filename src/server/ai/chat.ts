@@ -1,0 +1,228 @@
+// chat() 编排（规格 §8：护栏 → 模式分发 → 检索/上下文 → 流 → 事件行）。
+// RAG-lite 零工具调用：检索命中经 digest/system 注入，模型只能基于注入内容作答（§8.2/§8.5.4）。
+// 会话回合计数 + 历史裁剪由护栏实例持有；生产用模块级共享单例，测试注入内存库实例。
+import { createGuardrails, type Guardrails } from '@/server/guardrails'
+import { GuardrailError } from '@/server/guardrails'
+import type { SessionMessage } from '@/server/guardrails/session-state'
+import { MAX_OUTPUT_TOKENS, estTokens, truncateMessage } from '@/server/guardrails/text'
+import { today } from '@/server/guardrails/budget'
+import { catalog } from '@/server/catalog/adapter'
+import type { Product } from '@/server/catalog/types'
+import { getProductForMarket } from '@/server/catalog/service'
+import { retrieve } from '@/server/search/retrieval'
+import { createRepository } from '@/server/search/repository'
+import { db } from '@/db/client'
+import { createSizeFitEvent } from './events'
+import type { AiContext, AiProvider } from './provider'
+import type { ChatEvent, Mode, ProductCard } from './events'
+import { aiProvider } from './provider'
+import { systemFor } from './prompts'
+import { adviceFor } from './size-input'
+
+export interface ChatRequest {
+  sessionKey: string
+  ip: string
+  mode: Mode
+  product?: { handle: string; title: string } | null
+  text: string
+}
+
+export interface ChatOptions {
+  /** 测试注入：内存库护栏实例；生产省略 → 模块级共享单例（跨请求计数才有意义）。 */
+  guardrails?: Guardrails
+  /** 测试注入：固定 provider；默认按 env 工厂选 Mock/真实。 */
+  provider?: AiProvider
+}
+
+const NO_MATCH_TEXT =
+  "I couldn't find a style that matches that yet — try different words or browse the shop."
+const PRODUCT_REQUIRED_TEXT = 'Pick a product first, then I can help with that.'
+const FALLBACK_ERROR_TEXT = 'Something went wrong — please try again.'
+
+let shared: Guardrails | null = null
+const sharedGuardrails = (): Guardrails =>
+  (shared ??= createGuardrails(createRepository(db())))
+
+/** GuardrailError → 对应 code + 温和文案（code 1:1 透传，含 'turns'）；其余 → provider 错误。 */
+const toErrorEvent = (e: unknown): ChatEvent => {
+  if (e instanceof GuardrailError)
+    return { type: 'error', code: e.code, message: e.message }
+  return { type: 'error', code: 'provider', message: FALLBACK_ERROR_TEXT }
+}
+
+const toCard = (p: Product): ProductCard => ({
+  handle: p.handle,
+  title: p.title,
+  price: p.price.amount,
+  imageKind: 'local',
+  palette: p.visual.palette,
+})
+
+const digestLines = (ps: Product[]): string =>
+  ps
+    .map((p) => `- ${p.title} ($${p.price.amount}, ${p.productType}): ${p.description}`)
+    .join('\n')
+
+/** 检索 top-N 并取回完整商品。注意 retrieve 默认参陷阱：省略第二参（勿传 {}，会关掉语义嵌入）。 */
+async function retrieveProducts(query: string, limit = 4): Promise<Product[]> {
+  const hits = await retrieve(query)
+  const ps = await Promise.all(
+    hits.slice(0, limit).map((h) => catalog.getProductByHandle(h.handle)),
+  )
+  return ps.filter((p): p is Product => p !== null)
+}
+
+const productContextOf = (v: Product): string =>
+  `Product: ${v.title}. ${v.description} Upper palette: ${v.visual.palette[0]} and ${v.visual.palette[1]}; accent: ${v.visual.accent}.`
+
+/** 护栏顺序（任务 15 审查裁决 B）：rate → budget → turns；
+ * 被 rate/budget 拒的请求不消耗回合（assertTurn 的 claim 最后执行）。 */
+export async function* chat(
+  req: ChatRequest,
+  opts: ChatOptions = {},
+): AsyncGenerator<ChatEvent> {
+  const guardrails = opts.guardrails ?? sharedGuardrails()
+  const provider = opts.provider ?? aiProvider()
+  const text = truncateMessage(req.text ?? '')
+  const model = process.env.AI_MODEL ?? 'mock'
+
+  try {
+    guardrails.assertRate(req.ip, req.sessionKey)
+  } catch (e) {
+    yield toErrorEvent(e)
+    return
+  }
+  try {
+    await guardrails.assertBudget()
+  } catch (e) {
+    yield toErrorEvent(e)
+    return
+  }
+  let history: SessionMessage[]
+  try {
+    history = guardrails.assertTurn(req.sessionKey)
+  } catch (e) {
+    yield toErrorEvent(e)
+    return
+  }
+
+  // 护栏全过，回合已领取（claim 在 provider 调用前；失败/中止的请求同样计入一次尝试——注释见 guardrails）。
+  const record = async (
+    system: string,
+    userText: string,
+    assistantText: string,
+  ): Promise<void> => {
+    guardrails.pushTurn(req.sessionKey, 'user', userText)
+    guardrails.pushTurn(req.sessionKey, 'assistant', assistantText)
+    const prompt = [system, ...history.map((m) => m.content), userText]
+      .filter(Boolean)
+      .join('\n')
+    try {
+      await guardrails.noteUsage({
+        day: today(),
+        model,
+        promptTokens: estTokens(prompt),
+        completionTokens: estTokens(assistantText),
+        sessionKey: req.sessionKey,
+      })
+    } catch (err) {
+      // 用量记账失败不打断用户回复（仅影响成本审计，属于内部路径）。
+      console.error('[chat] noteUsage failed', err)
+    }
+  }
+
+  try {
+    // ---- size-fit：确定性建议（不调 provider；推荐/追问/无货三分支）----
+    if (req.mode === 'size-fit') {
+      if (!req.product?.handle) {
+        yield { type: 'error', code: 'invalid', message: PRODUCT_REQUIRED_TEXT }
+        return
+      }
+      const view = await getProductForMarket(req.product.handle)
+      if (!view) {
+        yield { type: 'error', code: 'invalid', message: PRODUCT_REQUIRED_TEXT }
+        return
+      }
+      const system = systemFor('size-fit', { product: productContextOf(view) })
+      const advice = adviceFor(view, text)
+      if (advice.askedForInput || advice.recommended === null) {
+        // 追问问题 / 附近无在库——都只回文本
+        yield { type: 'delta', text: advice.rationale }
+        await record(system, text, advice.rationale)
+      } else {
+        const sizeFit = createSizeFitEvent({
+          recommended: advice.recommended,
+          alternatives: advice.alternatives,
+          rationale: advice.rationale,
+        })
+        yield sizeFit
+        yield { type: 'delta', text: advice.rationale }
+        await record(system, text, advice.rationale)
+      }
+      yield { type: 'done' }
+      return
+    }
+
+    // ---- outfit：以当前商品为主角的搭配建议（流式；mock = 固定 3 条）----
+    if (req.mode === 'outfit') {
+      if (!req.product?.handle) {
+        yield { type: 'error', code: 'invalid', message: PRODUCT_REQUIRED_TEXT }
+        return
+      }
+      const view = await getProductForMarket(req.product.handle)
+      if (!view) {
+        yield { type: 'error', code: 'invalid', message: PRODUCT_REQUIRED_TEXT }
+        return
+      }
+      const system = systemFor('outfit', { product: productContextOf(view) })
+      const messages: AiContext['messages'] = [
+        ...history,
+        { role: 'user', content: text || 'Give me outfit ideas.' },
+      ]
+      let assistant = ''
+      for await (const delta of provider.stream({
+        system,
+        maxTokens: MAX_OUTPUT_TOKENS,
+        messages,
+      })) {
+        assistant += delta
+        yield { type: 'delta', text: delta }
+      }
+      await record(system, messages[messages.length - 1].content, assistant)
+      yield { type: 'done' }
+      return
+    }
+
+    // ---- find-shoes / shopping：显式检索 → 注入 → 流式 ----
+    const products = await retrieveProducts(text)
+    if (products.length === 0) {
+      yield { type: 'delta', text: NO_MATCH_TEXT }
+      await record(systemFor(req.mode, {}), text, NO_MATCH_TEXT)
+      yield { type: 'done' }
+      return
+    }
+    const digest = digestLines(products)
+    const system = systemFor(req.mode, { catalogDigest: digest })
+    const messages: AiContext['messages'] = [
+      ...history,
+      { role: 'user', content: text },
+    ]
+    if (req.mode === 'find-shoes') {
+      yield { type: 'productCards', items: products.map(toCard) }
+    }
+    let assistant = ''
+    for await (const delta of provider.stream({
+      system,
+      maxTokens: MAX_OUTPUT_TOKENS,
+      messages,
+    })) {
+      assistant += delta
+      yield { type: 'delta', text: delta }
+    }
+    await record(system, text, assistant)
+    yield { type: 'done' }
+  } catch (e) {
+    // provider 运行期失败 → 显式 error + UI 重试（P3：绝不静默降级到 Mock）
+    yield toErrorEvent(e)
+  }
+}

@@ -22,8 +22,12 @@ export class GuardrailError extends Error {
  * 组装护栏决策。注意：内存令牌桶与会话计数都存活在实例内，
  * 必须单例复用（chat 模块级一次 createGuardrails(repo)），跨请求共享才有意义。
  */
-export function createGuardrails(repo: ReturnType<typeof createRepository>) {
-  const sessions = createSessionStore()
+export function createGuardrails(
+  repo: ReturnType<typeof createRepository>,
+  options?: { now?: () => number }, // 可注入时钟：测试用假时钟驱动超回合/限流边界，不碰真实时间
+) {
+  const nowMs = () => options?.now?.() ?? Date.now()
+  const sessions = createSessionStore(nowMs)
   const ipBuckets = tokenBucket(RATE_PER_MIN)
   const sessionBuckets = tokenBucket(RATE_PER_MIN)
 
@@ -34,7 +38,7 @@ export function createGuardrails(repo: ReturnType<typeof createRepository>) {
   return {
     /** 领取一个回合；超限抛 code='turns'，否则返回裁剪后的会话历史供上下文注入。 */
     assertTurn(sessionKey: string): SessionMessage[] {
-      const { allowed, history } = sessions.claim(sessionKey)
+      const { allowed, history } = sessions.claim(sessionKey, nowMs())
       if (!allowed) deny('turns')
       return history
     },
@@ -44,8 +48,8 @@ export function createGuardrails(repo: ReturnType<typeof createRepository>) {
     },
     /** IP+session 双维令牌桶；任一维度超限抛 code='rate_limited'。 */
     assertRate(ip: string, sessionKey: string): void {
-      const ipOk = ipBuckets.allow(`ip:${ip}`)
-      const sessionOk = sessionBuckets.allow(`session:${sessionKey}`)
+      const ipOk = ipBuckets.allow(`ip:${ip}`, nowMs())
+      const sessionOk = sessionBuckets.allow(`session:${sessionKey}`, nowMs())
       if (!ipOk || !sessionOk) deny('rate_limited')
     },
     /** 当日用量达到 AI_DAILY_TOKEN_CAP 后抛 code='budget'。 */
