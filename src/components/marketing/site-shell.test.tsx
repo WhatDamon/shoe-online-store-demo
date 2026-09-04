@@ -17,7 +17,7 @@ describe('SiteShell', () => {
 
     // AppBar banner 存在于 main 之外（全站头）
     const banner = screen.getByRole('banner')
-    expect(within(banner).getByRole('link', { name: 'Treadwell' })).toHaveAttribute('href', '/')
+    expect(within(banner).getByRole('link', { name: 'Evoloop' })).toHaveAttribute('href', '/')
 
     const main = screen.getByRole('main')
     expect(within(main).getByRole('heading', { name: 'Page content' })).toBeInTheDocument()

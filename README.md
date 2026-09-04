@@ -1,4 +1,4 @@
-# Treadwell — 3D-Printed Casual Shoes (Demo)
+# Evoloop — 3D-Printed Casual Shoes (Demo)
 
 A consumer-facing storefront demo for a fictional brand of **3D-printed casual / lifestyle shoes**
 (digitally crafted, printed to order in your size). Built with **Next.js (App Router) + Bun +
@@ -154,6 +154,6 @@ src/
 
 ## Disclaimer
 
-Demo / prototype. Brand ("Treadwell"), product names and copy are placeholder. Product images are
-programmatically generated placeholders (remote lifestyle shots may load from Unsplash at runtime
-with a graceful fallback). No real purchase flow is connected.
+Demo / prototype. Brand: **Evoloop** (decided). Product names, the size conversion table and copy are
+demo data; product images are programmatically generated placeholders (remote lifestyle shots may
+load from Unsplash at runtime with a graceful fallback). No real purchase flow is connected.

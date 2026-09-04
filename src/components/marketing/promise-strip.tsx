@@ -15,7 +15,7 @@ const promises = [
 
 export function PromiseStrip() {
   return (
-    <section aria-label="Why Treadwell" className="bg-canvas">
+    <section aria-label="Why Evoloop" className="bg-canvas">
       <div className="mx-auto grid w-full max-w-6xl gap-10 px-4 py-16 sm:grid-cols-3 md:py-20">
         {promises.map((item) => (
           <div key={item.title} className="flex flex-col gap-2">

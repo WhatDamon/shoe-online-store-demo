@@ -1,11 +1,11 @@
-# Implementation Report — Treadwell 3D-Printed Shoe Storefront (feat/shoe-store)
+# Implementation Report — Evoloop 3D-Printed Shoe Storefront (feat/shoe-store)
 
 Status: **all 18 plan tasks implemented and reviewed; acceptance gates green at HEAD `83fd694`; a pre-merge hardening commit follows (scripts bake in `bun --bun`, ai_usage model attribution single-source, retrieval relevance floor, SVG pattern-id instance salt, buyUrl test assertion, doc quirks — see G2/G4/G5/G7 and "documented quirks" below).**
 Branch: `feat/shoe-store` (isolated worktree under `.worktrees/shoe-store`). Base `4cc9494`.
 
 ## 1. What was built (做了什么)
 
-A consumer-facing Next.js 16 (App Router) storefront demo for the fictional brand "Treadwell",
+A consumer-facing Next.js 16 (App Router) storefront demo for the fictional brand "Evoloop",
 selling 3D-printed casual shoes, with a deliberately subtle server-side AI shopping guide
 (spec principle P1: consumer wording only — "Need a hand?" / "Find my size" / "Style it with";
 the word "AI" never appears in UI copy; the Landing page has zero AI presence).
@@ -51,7 +51,7 @@ Automated gates — all green at HEAD:
 Production-server smoke (`bun run start`, built output) — all recorded from real curls:
 
 - `/` 200 · `/shop` 200 · `/shop?collection=everyday` 200 · `/shop?size=US 9&sort=price-asc` 200
-  (also verifies the runtime `/shop` title composition `Shop — Treadwell`, closing a deferred note)
+  (also verifies the runtime `/shop` title composition `Shop — Evoloop`, closing a deferred note)
 - `/product/daily-drift` 200, `/product/sage-lite` 200 (SSG pages with branded titles)
 - `/product/nope` → **HTTP 200** soft 404; body is the not-found shell and carries
   `<meta name="robots" content="noindex"/>` (see open item G1)

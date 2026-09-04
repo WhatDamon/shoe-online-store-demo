@@ -22,7 +22,7 @@ describe('AppBar', () => {
       </WishlistProvider>
     )
 
-    expect(screen.getByRole('link', { name: 'Treadwell' })).toHaveAttribute('href', '/')
+    expect(screen.getByRole('link', { name: 'Evoloop' })).toHaveAttribute('href', '/')
 
     const shop = screen.getByRole('link', { name: 'Shop' })
     expect(shop).toHaveAttribute('href', '/shop')

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
+import { ArrowLeft } from 'lucide-react'
 import { catalog } from '@/server/catalog/adapter'
 import { getProductForMarket, getRelatedProducts } from '@/server/catalog/service'
 import { ProductGallery } from '@/components/shop/product-gallery'
@@ -54,9 +55,10 @@ export default async function ProductPage({
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:py-8">
       <Link
         href="/shop"
-        className="inline-flex text-sm text-neutral-500 transition-colors hover:text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
+        className="inline-flex items-center gap-1.5 text-sm text-neutral-500 transition-colors hover:text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
       >
-        ← All shoes
+        <ArrowLeft aria-hidden="true" className="size-4 shrink-0" />
+        All shoes
       </Link>
 
       <div className="mt-4 grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-14">

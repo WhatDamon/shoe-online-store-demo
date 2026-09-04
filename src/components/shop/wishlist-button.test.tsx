@@ -11,6 +11,6 @@ describe('WishlistButton', () => {
     const btn = screen.getByRole('button', { name: /add to wishlist/i })
     await user.click(btn)
     expect(screen.getByRole('button', { name: /remove from wishlist/i })).toHaveAttribute('aria-pressed', 'true')
-    expect(JSON.parse(window.localStorage.getItem('treadwell:wishlist') ?? '[]')).toEqual(['daily-drift'])
+    expect(JSON.parse(window.localStorage.getItem('evoloop:wishlist') ?? '[]')).toEqual(['daily-drift'])
   })
 })

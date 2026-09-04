@@ -1,5 +1,5 @@
 export const site = {
-  name: 'Treadwell', // 品牌占位，单点替换
+  name: 'Evoloop', // 品牌名（全站引用点：导航/标题/SEO 均读 site.name）
   nav: [
     { label: 'Shop', href: '/shop' },
     { label: 'Collections', href: '/#collections' },
