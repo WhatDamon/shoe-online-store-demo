@@ -38,6 +38,7 @@
 | P4 | 单一事实源 | 商品实时从 CatalogAdapter 拉取（现为 Seed），本地库只存派生缓存（embedding 快照） |
 | P5 | 面向隔离 | server-only 边界、适配器契约、类型化数据流；改实现不改调用方 |
 | P6 | 隐私最小 | 无 cookie、无埋点、无个人信息进 AI 上下文；仅当次会话记忆 |
+| P7 | **成本护栏** | 开放无鉴权端点必须自带多层限流与预算（回合/令牌/日预算），防脚本刷量与"免费聊天室"式滥用（§8.5） |
 
 ## 4. 技术栈（经版本调研确认的组合）
 
@@ -64,7 +65,7 @@
 │        │                                      │
 │  server/search    embedder + keyword + 仓储    │
 │        │                                      │
-│  db（Drizzle）SQLite⇄Postgres：product_embeddings│
+│  db（Drizzle）SQLite⇄Postgres：embeddings+usage   │
 └─────────────────────────────────────────────┘
 收藏夹 → localStorage（无登录） · 购买 CTA → 占位适配器
 ```
@@ -95,7 +96,7 @@ type CatalogAdapter = {
 
 ## 7. 本地数据库（Drizzle，跨 SQL）
 
-单表，职责单一：
+两表，各司其职：
 
 ```ts
 product_embeddings: {
@@ -104,9 +105,19 @@ product_embeddings: {
   model: text,         // embedding 模型标识，换模型即整表重算
   vector: json,        // 不透明存储，应用层余弦
 }
+
+ai_usage: {           // 匿名成本计量（§8.5），无个人信息
+  id: integer PK autoincrement,
+  day: text,           // YYYY-MM-DD，日预算聚合键
+  model: text,
+  promptTokens: integer,
+  completionTokens: integer,
+  sessionKey: text,    // 匿名会话指纹
+  createdAt: integer,
+}
 ```
 
-- 不做收藏表（localStorage，P6）、不做 AI 会话表（仅会话内记忆）。
+- 不做收藏表（localStorage，P6）、不做 AI 会话表（仅会话内记忆；回合计数走内存，见 §8.5）。
 - SQLite 文件默认；Postgres 仅换 `DATABASE_URL` + drizzle 方言配置。
 
 ## 8. AI 助手设计
@@ -146,6 +157,20 @@ product_embeddings: {
 
 客户端 AbortController 中断即停流。不采集个人信息进上下文。
 
+### 8.5 成本与滥用防护（多层护栏，P7）
+
+**威胁模型**：无鉴权开放 API 可被脚本刷量 · 会话回合/上下文无上限使单次调用成本递增 · 被当通用闲聊只烧钱 · 超长输出与无限流 · 多实例/重启使内存计数失效。
+
+护栏逐层收紧（全部在无登录前提下成立）：
+
+1. **会话层**：客户端 uuid 会话（页面刷新即轮换）；每会话回合上限 `AI_MAX_TURNS`（默认 20，超限温和提示并建议开启新对话）；历史仅保留最近 6 轮；闲置 30 分钟过期（内存 TTL）。上下文有界 ⇒ 单次成本有上界。
+2. **请求层**：输出 token 上限 `AI_MAX_OUTPUT_TOKENS`（默认 500）；请求超时 `AI_REQUEST_TIMEOUT_MS`（默认 20s，AbortController 硬中断）；消息长度上限（服务端校验）；IP 与会话双维度**内存令牌桶**限流（默认 10 次/分/IP）。单进程假设明示：多实例部署须迁移边缘限流或 Redis（见未来项）。
+3. **用量与预算（诚实兜底）**：匿名表 `ai_usage`（§7）记录每次调用估算 token；请求前按 `AI_DAILY_TOKEN_CAP`（默认 ~1M token/日）对当日 SUM 校验，超额返回温和拒答（"The assistant is taking a short break — try again later."）。SQLite 落盘 ⇒ 重启与多实例间口径一致。
+4. **产品引导（治本）**：system prompt 限定购物话题；离题 → ≤2 句礼貌转回 + 2 个建议 chip，不写长文；回答仅基于注入的商品上下文，无工具调用、不接外部（§8.2 RAG-lite 即最低安全面）。
+5. **Mock 默认 + 总开关**：无 key = Mock（零成本）；真实 API 需显式填 key；env `AI_DISABLE_REAL=1` 遇滥用一键切回 Mock。
+6. **文案守则**：限流/超限消息一律消费者化人话（"taking a short break"），不暴露 "rate limited" 等工程措辞（P1）。
+7. **未来项（记录不实现）**：部署后加边缘/WAF 限流与 Turnstile；若引入账户再按账号配额、用户级计量与告警。
+
 ## 9. 前端页面与组件
 
 **设计语言**：暖白 `#FAFAF8` 底 / 墨色 `#111` / 单一强调色；展示型衬线标题（Newsreader/Fraunces 类）+ 几何无衬线正文；Tailwind v4 token；全站英文；`next/image` + remotePatterns；SSG（Landing/详情）+ SSR（列表，searchParams 驱动）。
@@ -184,13 +209,16 @@ docs/superpowers/specs/  本规格
 | `AI_API_KEY` | 空 → Mock 模式（默认可演示） |
 | `AI_BASE_URL` / `AI_MODEL` | OpenAI 兼容端点与模型 |
 | `AI_EMBEDDING_MODEL` | 缓存行标记 + 切换时整表重算 |
+| `AI_MAX_TURNS` / `AI_MAX_OUTPUT_TOKENS` / `AI_REQUEST_TIMEOUT_MS` | 护栏默认 20 回合 / 500 token / 20s（§8.5） |
+| `AI_DAILY_TOKEN_CAP` | 每日 token 预算，超限温和拒答（默认 ~1M/日） |
+| `AI_DISABLE_REAL` | 强制 Mock 总开关（遇滥用一键止血） |
 | `DATABASE_URL` | 默认 `file:./data/local.db`；上线换 Postgres |
 | `SHOPIFY_*` | 预留（本期忽略） |
 
 ## 12. 工程 / 测试 / 可靠性
 
 - **脚本**（Bun）：`dev / build / start`、`db:generate / db:push`、`test`、`typecheck`、`lint`；门禁 = lint + typecheck + test + build。
-- **测试（v1）**：Vitest —— seed 筛选、检索排序（余弦/关键词 golden cases）、Mock provider 输出契约（§8.4 行格式）、意图路由、美元格式化；RTL —— 助手流式渲染（mock SSE）、尺码选择器、筛选与 URL 同步、愿望单切换。
+- **测试（v1）**：Vitest —— seed 筛选、检索排序（余弦/关键词 golden cases）、Mock provider 输出契约（§8.4 行格式）、意图路由、美元格式化；护栏 —— IP/会话令牌桶限流、回合上限与历史裁剪、日预算强制（内存 SQLite）、离题 redirect 与限流温和文案 golden；RTL —— 助手流式渲染（mock SSE）、尺码选择器、筛选与 URL 同步、愿望单切换、发送中禁发与超时中止。
 - **错误处理**：路由层 try/catch → SSE `error` + UI 重试；商品缺失 `notFound()`；全局 `error.tsx / not-found.tsx / loading.tsx`。
 - **性能/SEO**：`generateMetadata` + OG；图片全部 `next/image`（remotePatterns + 本地兜底）；markdown 用轻量渲染（不引重型依赖）。
 - **合规**：无 cookie、无埋点；不存个人信息。
@@ -205,6 +233,7 @@ docs/superpowers/specs/  本规格
 5. 消费端 AI 克制呈现 → 面向真实消费者，不把技术当卖点（用户明确要求）
 6. 有 key 失败不静默降级 → 演示诚实性
 7. 无登录/无本站购物/收藏 localStorage/AI 仅会话记忆 → 隐私最小 + 范围控制
+8. 多层护栏防 AI 滥用/烧钱 → 开放无鉴权端点必须自带上限与预算；护栏文案同样克制化（用户补充的硬约束）
 
 ## 14. 待办下一步
 
