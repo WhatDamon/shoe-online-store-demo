@@ -23,7 +23,7 @@ const options = {
 const emptyFilter = () => parseShopParams(new URLSearchParams(''))
 
 function renderBar(initial = emptyFilter()) {
-  render(<ProductFilterBar initial={initial} {...options} />)
+  return render(<ProductFilterBar initial={initial} {...options} />)
 }
 
 describe('ProductFilterBar', () => {
@@ -88,5 +88,31 @@ describe('ProductFilterBar', () => {
     fireEvent.click(screen.getByLabelText('US 9'))
     fireEvent.click(screen.getByLabelText('US 8.5'))
     expect(replaceMock).toHaveBeenLastCalledWith('/shop?size=US+9&size=US+8.5')
+  })
+
+  it('rebases onto the restored committed URL after Back cancels an in-flight clear-all', () => {
+    // 挂载 /shop?collection=travel 后点 Clear all 发出在途 /shop（router mock 不回传，
+    // 无中间提交渲染）；随后路由器提交 Back 后的状态：URL 回到 /shop?collection=travel
+    // （committed 与挂载时同值，baseRef 却仍停留在被取消的在途 /shop 上）。
+    const travel = parseShopParams(new URLSearchParams('collection=travel'))
+    const { rerender } = render(<ProductFilterBar initial={travel} {...options} />)
+    fireEvent.click(screen.getByRole('button', { name: /clear all/i }))
+    expect(replaceMock).toHaveBeenLastCalledWith('/shop')
+    rerender(<ProductFilterBar initial={travel} {...options} />)
+    // 后续变更应基于已提交的 collection=travel 合成，而不是被 Back 放弃的 /shop。
+    fireEvent.change(screen.getByLabelText('Sort'), { target: { value: 'newest' } })
+    expect(replaceMock).toHaveBeenLastCalledWith('/shop?collection=travel&sort=newest')
+  })
+
+  it('does not resurrect a sort that Back abandoned before it committed', () => {
+    // 挂载 /shop（空）后发出 sort=price-asc；路由器随后提交 Back 回 /shop（空）。
+    // committed 与挂载时同值，baseRef 却仍停在在途 sort 上——选择 collection 时不应复活它。
+    const empty = emptyFilter()
+    const { rerender } = render(<ProductFilterBar initial={empty} {...options} />)
+    fireEvent.change(screen.getByLabelText('Sort'), { target: { value: 'price-asc' } })
+    expect(replaceMock).toHaveBeenLastCalledWith('/shop?sort=price-asc')
+    rerender(<ProductFilterBar initial={empty} {...options} />)
+    fireEvent.change(screen.getByLabelText('Collection'), { target: { value: 'travel' } })
+    expect(replaceMock).toHaveBeenLastCalledWith('/shop?collection=travel')
   })
 })

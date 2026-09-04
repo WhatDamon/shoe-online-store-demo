@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, type FormEvent } from 'react'
+import { useEffect, useRef, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { parseShopParams, serializeShopParams } from '@/lib/shop-search-params'
 import type { ShopFilter } from '@/lib/shop-search-params'
@@ -61,23 +61,29 @@ export function ProductFilterBar({
   const selectedSizes = new Set(initial.sizeLabels ?? [])
   const showClear = hasActiveFilters(initial)
 
-  // 受控 replace 模式下，服务端尚未提交新一轮筛选前 `initial` 是过期的：若每次变更
-  // 都以 `initial` 为基底重新合并，一次 RSC 往返内连续变更（如快速连勾两个尺码）会
-  // 丢弃前一次的参数。因此以 baseRef 累积「最后一次已发出」的筛选状态作为组合基底，
-  // 仅当服务端提交了本地尚未见过的状态（初次进入/浏览器 Back/外部改 URL）时回退到
-  // 已提交的 initial——连续变更在本地合成，导航最终收敛。
+  // 受控 replace 模式下，服务端尚未提交新一轮筛选前 `initial` 是过期快照：若每次
+  // 变更都以 `initial` 为基底重新合并，一次 RSC 往返内的连续变更（如快速连勾两个
+  // 尺码）会丢弃前一次的参数。因此以 baseRef 累积「最后一次已发出」的查询串作为
+  // 组合基底，无中间提交渲染的连续变更在本地合成、导航最终收敛。
+  //
+  // 路由器提交的 URL 才是权威：每当本组件收到一次新的提交渲染（包括 Back/外部改
+  // URL 把状态带回先前见过的值——此时 committedQs 与上一渲染相同，但 baseRef 仍
+  // 停留在已被取消的在途意图上），只要提交状态 ≠ 在途意图，就把基底回退到已提交
+  // 状态，避免后续变更把已放弃的参数复活或丢掉刚被恢复的参数。本页面为 RSC，没有
+  // 其它会触发本组件无关重渲染的客户端状态，因此「组件发生渲染」即可视为「路由器
+  // 提交了状态」；效果在每次渲染后运行，早于下一次用户事件。
   const committedQs = serializeShopParams(initial)
   const baseRef = useRef(committedQs)
-  const lastCommittedRef = useRef(committedQs)
 
-  /** 当前组合基底：最近一次发出的筛选；若 `initial` 已变为未见过的新状态则回退到它。 */
-  const effectiveBase = (): ShopFilter => {
-    if (committedQs !== lastCommittedRef.current) {
-      lastCommittedRef.current = committedQs
+  useEffect(() => {
+    if (committedQs !== baseRef.current) {
       baseRef.current = committedQs
     }
-    return parseShopParams(new URLSearchParams(baseRef.current))
-  }
+  })
+
+  /** 当前组合基底：最近一次发出的筛选；若已提交状态取代了在途意图则由上面的效果回退。 */
+  const effectiveBase = (): ShopFilter =>
+    parseShopParams(new URLSearchParams(baseRef.current))
 
   const update = (patch: Partial<ShopFilter>) => {
     const qs = serializeShopParams({ ...effectiveBase(), ...patch })
