@@ -31,7 +31,14 @@ export function AppBar() {
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8)
     window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
+    // 滚动恢复/bfcache 返回时初始态恒 false 会使白字叠在浅底上不可见：
+    // 挂载后异步自检一次（rAF 回调内 setState，不在 effect 同步体，规避
+    // react-hooks/set-state-in-effect）。
+    const frame = requestAnimationFrame(() => setScrolled(window.scrollY > 8))
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      cancelAnimationFrame(frame)
+    }
   }, [])
 
   const wishlistLabel = `Wishlist, ${count} ${count === 1 ? 'item' : 'items'}`

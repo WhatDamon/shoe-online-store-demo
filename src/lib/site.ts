@@ -2,6 +2,7 @@ export const site = {
   name: 'Treadwell', // 品牌占位，单点替换
   nav: [
     { label: 'Shop', href: '/shop' },
+    { label: 'Collections', href: '/#collections' },
     { label: 'Our Story', href: '/#story' },
   ],
   hero: {

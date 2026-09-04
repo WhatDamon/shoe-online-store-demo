@@ -27,6 +27,9 @@ describe('AppBar', () => {
     const shop = screen.getByRole('link', { name: 'Shop' })
     expect(shop).toHaveAttribute('href', '/shop')
 
+    const collections = screen.getByRole('link', { name: 'Collections' })
+    expect(collections).toHaveAttribute('href', '/#collections')
+
     const story = screen.getByRole('link', { name: 'Our Story' })
     expect(story).toHaveAttribute('href', '/#story')
 
