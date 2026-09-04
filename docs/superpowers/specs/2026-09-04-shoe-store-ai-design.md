@@ -251,3 +251,4 @@ docs/superpowers/specs/  本规格
 ## 14. 待办下一步
 
 规格经用户审阅后 → **writing-plans** 产出分阶段实现计划（含脚手架锁定版本、seed 内容清单、SSE 契约落地顺序、测试顺序、验收清单）。
+15. **Shopify 购物接入改为 Buy Button（放弃 PDP 主题迁移）**：themes/evoloop（Horizon fork）二开后导入观感仍不达预期，用户决定**删除主题**、PDP 继续用本站自定义页。交易接入 = **Shopify Buy Button 渠道嵌入**（v3，admin 生成：含 domain + storefront token + 商品 numeric id），不做目录级 Storefront 适配器。本站目录维持 seed 演示；新增与店铺同 handle 的演示商品 `3d-shoes` 承载 PDP；Buy Button 仅在 env 配置 `SHOPIFY_BUY_BUTTON` JSON（handle/domain/productId/token）且 handle 匹配时替换 PDP 购买条（Buy Button 自带尺码/加购/结账 UI），未配置时维持 “Available soon” 占位与零购买 UI（克制 P1）。`SHOPIFY_DOMAIN=03zrk0-2u.myshopify.com` 备查。备注：Buy Button 内嵌 token 日后亦可复用于真 Storefront 读取（决策 #14 仍为远期选项）（用户决策 2026-09-05）
