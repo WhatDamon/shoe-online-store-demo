@@ -34,14 +34,14 @@ unzip -o ~/Downloads/horizon-product-carousel-v2-images-20260905-3d-shoes.zip \
 
 主题默认观感 = Evoloop 品牌（与 Next 网站一致），改四层：
 
-| 层 | 文件 | 说明 |
-|---|---|---|
-| 色板 | `config/settings_data.json` | `color_palette`（current + Horizon preset）已改为 Evoloop：background `#fafaf8`（canvas）、foreground `#111111`（ink）、color1 `#525252`（次级文本）、color2 `#e5e5e5`（描边）；主按钮默认 ink 黑底白字 |
-| 字体 | `assets/evoloop-brand.css` + `snippets/evoloop-brand.liquid` | 标题用 Google Fonts Newsreader（`var(--font-heading--family)` 覆盖，离线回退 serif）；正文/子标题/按钮用系统无衬线栈；加载顺序保证在 Horizon 变量之后（`layout/theme.liquid` head 尾部 `{% render 'evoloop-brand' %}`） |
-| 首页 | `templates/index.json` + `sections/evoloop-hero.liquid` | 品牌 Hero（kicker/标语/描述/CTA，无图无 AI）+ 品牌词 marquee（Horizon marquee 区块）+ 精选商品列表（product-list，空店自动降级为占位骨架；接 collection 后展示商品） |
+| 层          | 文件                                                                                                                                                                                                      | 说明                                                                                                                                                                                                                    |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 色板        | `config/settings_data.json`                                                                                                                                                                               | `color_palette`（current + Horizon preset）已改为 Evoloop：background `#fafaf8`（canvas）、foreground `#111111`（ink）、color1 `#525252`（次级文本）、color2 `#e5e5e5`（描边）；主按钮默认 ink 黑底白字                 |
+| 字体        | `assets/evoloop-brand.css` + `snippets/evoloop-brand.liquid`                                                                                                                                              | 标题用 Google Fonts Newsreader（`var(--font-heading--family)` 覆盖，离线回退 serif）；正文/子标题/按钮用系统无衬线栈；加载顺序保证在 Horizon 变量之后（`layout/theme.liquid` head 尾部 `{% render 'evoloop-brand' %}`） |
+| 首页 | `templates/index.liquid` + 主题设置 **Evoloop redirect** | **无营销主页**：`/` 打开即 `location.replace`（+noscript meta refresh）跳转到「主打商品 PDP」；设置留空自动落到 `/collections/all`，根域永不死链。品牌 Hero/marquee section 文件保留，日后要营销首页可按模板顶部注释重建 `index.json` |
 | 页脚/商品页 | `sections/evoloop-brand-strip.liquid`（已加入 footer 静态组尾部，每页显示 slogan 条）；`sections/main-3d-shoes-custom.liquid` 与 `snippets/evoloop-assistant.liquid` 硬编码色值已对齐 canvas/ink/hairline |
 
-**自定义入口**：改色改 `settings_data.json` 的 `color_palette` 或主题编辑器 Color；改字改 `assets/evoloop-brand.css` 顶部的变量（或编辑器 Fonts，注意运行时由 brand.css 覆盖，编辑器的字体选择为兼容占位）；改首页文案改主题编辑器首页的 Evoloop hero / Marquee 区块文本。
+**自定义入口**：改色改 `settings_data.json` 的 `color_palette` 或主题编辑器 Color；改字改 `assets/evoloop-brand.css` 顶部的变量（或编辑器 Fonts，注意运行时由 brand.css 覆盖，编辑器的字体选择为兼容占位）；改跳转目标改主题编辑器 → Evoloop redirect。
 
 > 注意：标题字体依赖 Google Fonts 外链；无法访问 fonts.googleapis.com 的环境会自动落到 `ui-serif / Georgia` 回退，不破版。
 
@@ -50,11 +50,29 @@ unzip -o ~/Downloads/horizon-product-carousel-v2-images-20260905-3d-shoes.zip \
 | 变更                                                                                                                                                                                                                                                  | 位置                                                                                                                                                |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | theme_info 更名 Evoloop；品牌入口都在 Shopify 后台/`shop.name` 与主题编辑器设置                                                                                                                                                                       | `config/settings_schema.json`                                                                                                                       |
-| 二进制图剥离 + 首页 hero 引用置空（占位 svg 兜底）                                                                                                                                                                                                    | `templates/index.json`                                                                                                                              |
+| 二进制图剥离（hero-slide jpgs 出库）；首页改为**无营销主页重定向**（见上）                                                                                                                                                                              | `templates/`、`config/settings_schema.json`                                                                                                                              |
 | **语言仅保留英文**：57 个 locale → 仅 `en.default.json` + `en.default.schema.json`                                                                                                                                                                    | `locales/`（55 个非英文语言包已删除）                                                                                                               |
 | **内容剥离（设计之外）**：删除 blog/article/gift_card 模板及其家族与死代码（main-blog/main-blog-post/header-announcements、blog-comment-form、_blog-post-*/死 blocks、gift-card css、account/orders 图标、Horizon JS 开发脚手架）；库存见 README 下段 | 全树                                                                                                                                                |
 | **Evoloop 3D 视觉兜底**（能力 1，见下）                                                                                                                                                                                                               | `snippets/evoloop-product-visual.liquid`、`assets/evoloop-product-visual.js`、`sections/main-3d-shoes-custom.liquid`                                |
 | **Evoloop AI 助手插槽**（能力 2，见下）                                                                                                                                                                                                               | `config/settings_schema.json`（设置组）、`snippets/evoloop-assistant.liquid`、`assets/evoloop-assistant.js`、`sections/main-3d-shoes-custom.liquid` |
+
+## 无营销主页（根域名直达商品 PDP）
+
+**决策（2026-09-05）**：Shopify 店铺不做营销主页——只有商品详情页。营销职责在
+Next.js 落地页；`/shop` 与推广链接把买家直接深链进 Shopify 商品页。
+
+平台约束：Shopify 根域名永远由首页模板（`templates/index`）渲染，无法删除；
+实现方式是把首页变成**即时重定向**——打开店铺根域名时立刻跳到主打商品 PDP，
+用户实际看不到任何主页。
+
+- 换主打商品：主题编辑器 → **Evoloop redirect → Redirect homepage to**，选任意
+  商品/集合页（URL picker）。留空 = 自动落 `/collections/all`（未上架也不死链）。
+- 闭环页全部保留：集合页 `/collections/all`、购物车 `/cart`、结账（Shopify 托管）、
+  政策页、搜索、404、customers 登录均按 URL 直达可用；主题导航不含 Home 引导
+  （header/footer 的店名/Logo 链接指向 `/`，即回到主打商品）。
+- 恢复营销首页（日后可选）：按 `templates/index.liquid` 顶部注释重建
+  `templates/index.json`，拼 `evoloop-hero` / `marquee` / `product-list` 等
+  section 即可，无需改动其余文件。
 
 ## PDP 模板
 

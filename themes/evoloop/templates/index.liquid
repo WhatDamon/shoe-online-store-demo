@@ -1,0 +1,34 @@
+{%- comment -%}
+  Evoloop — homepage is intentionally NOT a marketing page.
+
+  Decision (2026-09-05): the Shopify storefront has no homepage — only product
+  detail pages. Marketing lives on the Next.js site, which deep-links straight
+  into Shopify PDPs. Shopify still serves the store root URL from the index
+  template, so this template immediately redirects '/' to the featured product
+  chosen in Theme settings > "Evoloop redirect" > "Redirect homepage to".
+  When the setting is blank the store falls back to /collections/all so the
+  root never dead-ends.
+
+  To bring back a marketing homepage later: re-create templates/index.json and
+  drop in sections such as 'evoloop-hero' / 'marquee' / 'product-list'.
+{%- endcomment -%}
+{%- liquid
+  assign redirect_target = settings.home_redirect_target
+  if redirect_target == blank
+    assign redirect_target = '/collections/all'
+  endif
+-%}
+<script>
+  window.location.replace({{ redirect_target | json }});
+</script>
+<noscript>
+  <meta http-equiv="refresh" content="0; url={{ redirect_target | escape }}">
+</noscript>
+<div
+  class="evo-home-redirect"
+  style="min-height: 60vh; display: grid; place-items: center; padding: 2rem; text-align: center;"
+>
+  <p style="margin: 0">
+    <a href="{{ redirect_target }}">Continue to {{ redirect_target }}</a>
+  </p>
+</div>

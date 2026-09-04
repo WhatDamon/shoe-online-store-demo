@@ -2127,5 +2127,17 @@
         "info": "Optional. URL of the Evoloop assistant backend (for example the Next.js app, https://shop.example.com). When set, the product page shows a 'Find my size' link and lazy-loads <backend>/assistant-widget.js into the slot. When blank no assistant UI is rendered at all."
       }
     ]
+  },
+  {
+    "name": "Evoloop redirect",
+    "settings": [
+      {
+        "type": "url",
+        "id": "home_redirect_target",
+        "label": "Redirect homepage to",
+        "default": "",
+        "info": "The store root (/) immediately redirects to this page. Pick your featured product (or any product/collection page). Leave blank to send the root to /collections/all."
+      }
+    ]
   }
 ]

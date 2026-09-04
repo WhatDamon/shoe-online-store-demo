@@ -8,7 +8,9 @@
   /* Heading serif first, system serif fallback if fonts fail to load */
   --font-heading--family: 'Newsreader', ui-serif, Georgia, 'Times New Roman', serif;
   /* Body/subheading/accent: clean system sans stack (no webfont download) */
-  --font-body--family: ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-body--family:
+    ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
   --font-subheading--family: var(--font-body--family);
   --font-accent--family: var(--font-body--family);
 
@@ -92,7 +94,9 @@ body {
   letter-spacing: 0.01em;
   text-decoration: none;
   cursor: pointer;
-  transition: opacity 160ms ease, transform 160ms ease;
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
 }
 
 .evo-btn:hover {
