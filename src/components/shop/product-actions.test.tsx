@@ -51,4 +51,22 @@ describe('ProductActions layout order (spec §9)', () => {
     // children 是 flex 容器的直接子节点之一（而非被隔离渲染），保持在同一文档流。
     expect(container.firstElementChild?.contains(slot)).toBe(true)
   })
+
+  it('renders the buySlot in the CTA position instead of the BuyBar when provided', () => {
+    const { container } = render(
+      <ProductActions product={p} buyUrl={null} buySlot={<div data-testid="buy-slot">Buy on Shopify</div>}>
+        <div data-testid="accordion-slot">Materials &amp; fit</div>
+      </ProductActions>,
+    )
+
+    const slot = screen.getByTestId('accordion-slot')
+    const buySlot = screen.getByTestId('buy-slot')
+    // BuyBar 占位被替代：页面上不再有 "Available soon"
+    expect(screen.queryByRole('button', { name: 'Available soon' })).toBeNull()
+
+    const before = (a: Element, b: Element) =>
+      (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+    expect(before(slot, buySlot)).toBe(true)
+    expect(container.firstElementChild?.contains(buySlot)).toBe(true)
+  })
 })

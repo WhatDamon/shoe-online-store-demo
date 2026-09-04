@@ -6,6 +6,8 @@ import { catalog } from '@/server/catalog/adapter'
 import { getProductForMarket, getRelatedProducts } from '@/server/catalog/service'
 import { ProductGallery } from '@/components/shop/product-gallery'
 import { ProductActions } from '@/components/shop/product-actions'
+import { ShopifyBuyButton } from '@/components/shop/shopify-buy-button'
+import { shopifyBuyButtonForHandle } from '@/lib/shopify-buy'
 import { ProductGrid } from '@/components/shop/product-grid'
 import { WishlistButton } from '@/components/shop/wishlist-button'
 import {
@@ -45,6 +47,9 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
   const product = await getProductForMarket(handle)
   if (!product) notFound()
 
+  // spec 决策 #15：env 配置的 Shopify Buy Button 仅匹配 handle 时替换购买条；未配置 → null（不替换）
+  const buyButton = shopifyBuyButtonForHandle(product.handle)
+
   const [buyUrl, related] = await Promise.all([
     catalog.getBuyUrl(product),
     getRelatedProducts(product.handle, 3),
@@ -80,7 +85,7 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
 
           <p className="text-[15px] leading-7 text-neutral-600">{product.description}</p>
 
-          <ProductActions product={product} buyUrl={buyUrl}>
+          <ProductActions product={product} buyUrl={buyUrl} buySlot={buyButton ? <ShopifyBuyButton config={buyButton} /> : undefined}>
             <Accordion className="border-t border-neutral-200">
               <AccordionItem value="materials-fit">
                 <AccordionTrigger>Materials &amp; fit</AccordionTrigger>

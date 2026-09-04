@@ -16,12 +16,14 @@ interface ProductActionsProps {
    * （材质/合脚手风琴，无尺码依赖）。
    */
   children?: ReactNode
+  /** 可选购买替代槽（如 Shopify Buy Button）：存在时替换 ProductBuyBar，保持 §9 CTA 位序。 */
+  buySlot?: ReactNode
 }
 
 // PDP 购买群集（规格 §9 顺序）：尺码选择（受控）→ "Find my size" → 手风琴（children 插槽）→ 购买条。
 // children 插槽让本集群保持单一 'use client' 边界共享 selected 状态，同时允许页面以 RSC 注入中间内容；
 // 持有所选尺码状态，供购买条在无 store 阶段做 aria-live 说明。
-export function ProductActions({ product, buyUrl, children }: ProductActionsProps) {
+export function ProductActions({ product, buyUrl, children, buySlot }: ProductActionsProps) {
   const [selected, setSelected] = useState<CanonicalSize | null>(null)
   // 面板打开 + 预置 size-fit 上下文由 AssistantProvider 处理；context 为空（Provider 未挂载的孤立渲染）时静默。
   const assistant = useAssistant()
@@ -40,7 +42,9 @@ export function ProductActions({ product, buyUrl, children }: ProductActionsProp
         </button>
       </div>
       {children}
-      <ProductBuyBar buyUrl={buyUrl} availableSoon={buyUrl == null} selectedLabel={selectedLabel} />
+      {buySlot ?? (
+        <ProductBuyBar buyUrl={buyUrl} availableSoon={buyUrl == null} selectedLabel={selectedLabel} />
+      )}
     </div>
   )
 }

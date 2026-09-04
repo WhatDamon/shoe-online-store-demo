@@ -328,4 +328,27 @@ export const seedProducts: Product[] = [
     visual: { palette: ['#e4e2dd', '#d2cfc8'], accent: '#7c8a99', views: 3 },
     createdAt: '2026-09-12T00:00:00Z',
   },
+  {
+    id: 'p17',
+    handle: '3d-shoes',
+    title: '3D Shoes',
+    subtitle: 'The Evoloop pair — printed as one piece',
+    description:
+      'Our signature 3D-printed shoe: the upper and sole print as a single closed-loop piece, so nothing is cut away and nothing is wasted. Printed only when you order it, in your exact size.',
+    price: { amount: 138, currencyCode: 'USD' },
+    productType: 'Sneaker',
+    tags: ['everyday', 'printed-to-order'],
+    collections: ['everyday'],
+    sizes: [40, 41, 42, 43, 44, 45],
+    features: [
+      'Single-piece printed construction',
+      'Printed to order — zero warehouse stock',
+      'Closed-loop recycled material',
+      'Machine washable',
+    ],
+    fitNotes: 'True to size with a medium width. If between sizes, we recommend sizing up.',
+    construction: { pattern: 'lattice', density: 0.75, printedUpper: true },
+    visual: { palette: ['#e6e4de', '#d6d3ca'], accent: '#0f766e', views: 3 },
+    createdAt: '2026-09-14T00:00:00Z',
+  },
 ]
