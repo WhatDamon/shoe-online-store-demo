@@ -17,4 +17,3 @@ next-env.d.ts
 # format-on-save churn.
 /docs/
 *.md
-/themes
