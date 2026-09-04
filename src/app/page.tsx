@@ -6,9 +6,12 @@ import { FeaturedGrid } from '@/components/marketing/featured-grid'
 import { StorySection } from '@/components/marketing/story-section'
 import { Footer } from '@/components/marketing/footer'
 import { pageMetadata } from '@/lib/seo'
+import { site } from '@/lib/site'
 
+// 根页只有 [root layout, page] 两项，Next 的 accumulateMetadata 不会把 title
+// template 应用到叶子 page，故此处显式携带品牌后缀，保持与嵌套页标题一致。
 export const metadata = pageMetadata({
-  title: 'Casual shoes, printed to order in your size',
+  title: `Casual shoes, printed to order in your size — ${site.name}`,
 })
 
 // Landing（规格 §9 顺序）：AppBar / Hero / PromiseStrip / CollectionCards /
