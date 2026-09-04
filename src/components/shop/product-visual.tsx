@@ -53,19 +53,23 @@ function buildPattern(
   S: number,
 ): ReactElement {
   if (pattern === 'honeycomb') {
-    // 点阵蜂窝：列间距 √3R，行间距 1.5R，奇数列下移 0.75R；矩形重复单元宽 2√3R、高 1.5R
+    // 真蜂窝（正六边形密铺，尖顶朝上下）：同行中心距 √3R（对边宽），行距 1.5R 且隔行错开 √3R/2，
+    // 任意相邻两中心距离均为 √3R（六邻居）。矩形重复单元宽 colX=√3R、高 2·rowY=3R，含 5 个中心：
+    // 上/下边界行 y=0/3R 各 2 个（x=0 与 x=colX，与相邻单元共享——SVG pattern 按单元裁剪，
+    // 每个单元只画落在自己范围内的部分，跨边界的正六边形由两侧单元各自补齐一半）；
+    // 中行 y=1.5R 的 1 个（x=colX/2，恰好完整落在单元内）。
     const R = S / (2 * Math.sqrt(3))
     const colX = Math.sqrt(3) * R
     const rowY = 1.5 * R
     const hexes = [
       [0, 0],
-      [colX, rowY / 2],
-      [colX * 2, 0],
-      [0, rowY],
-      [colX * 2, rowY],
+      [colX, 0],
+      [colX / 2, rowY],
+      [0, rowY * 2],
+      [colX, rowY * 2],
     ]
     return (
-      <pattern id={id} width={colX * 2} height={rowY} patternUnits="userSpaceOnUse">
+      <pattern id={id} width={colX} height={rowY * 2} patternUnits="userSpaceOnUse">
         {hexes.map(([cx, cy], i) => (
           <path
             key={i}
