@@ -11,9 +11,7 @@
  * tabs). Reads data-pattern / data-density / data-palette (JSON array) /
  * data-accent / data-name. Every value falls back to an Evoloop default.
  */
-(() => {
-  
-
+;(() => {
   var SVGNS = 'http://www.w3.org/2000/svg'
   var DEFAULTS = {
     palette: ['#f3f1ea', '#9ca3af'],
@@ -70,7 +68,15 @@
         [colX, rowY * 2],
       ]
       for (i = 0; i < centers.length; i++) {
-        pat.appendChild(el('path', { d: hexPath(centers[i][0], centers[i][1], R), fill: 'none', stroke: p1, 'stroke-width': 0.6, opacity: 0.9 }))
+        pat.appendChild(
+          el('path', {
+            d: hexPath(centers[i][0], centers[i][1], R),
+            fill: 'none',
+            stroke: p1,
+            'stroke-width': 0.6,
+            opacity: 0.9,
+          }),
+        )
       }
       return pat
     }
@@ -79,18 +85,64 @@
       var y0 = S * 0.62
       function wavePath(yy, flip) {
         return flip
-          ? 'M0 ' + (yy + a) + ' Q ' + S / 4 + ' ' + (yy - a) + ' ' + S / 2 + ' ' + (yy + a) + ' T ' + S + ' ' + (yy + a)
-          : 'M0 ' + (yy - a) + ' Q ' + S / 4 + ' ' + (yy + a) + ' ' + S / 2 + ' ' + (yy - a) + ' T ' + S + ' ' + (yy - a)
+          ? 'M0 ' +
+              (yy + a) +
+              ' Q ' +
+              S / 4 +
+              ' ' +
+              (yy - a) +
+              ' ' +
+              S / 2 +
+              ' ' +
+              (yy + a) +
+              ' T ' +
+              S +
+              ' ' +
+              (yy + a)
+          : 'M0 ' +
+              (yy - a) +
+              ' Q ' +
+              S / 4 +
+              ' ' +
+              (yy + a) +
+              ' ' +
+              S / 2 +
+              ' ' +
+              (yy - a) +
+              ' T ' +
+              S +
+              ' ' +
+              (yy - a)
       }
       pat = el('pattern', { id: id, width: S, height: S, patternUnits: 'userSpaceOnUse' })
-      pat.appendChild(el('path', { d: wavePath(y0, false), fill: 'none', stroke: p1, 'stroke-width': 0.7, opacity: 0.85 }))
-      pat.appendChild(el('path', { d: wavePath(y0 - S / 2, true), fill: 'none', stroke: accent, 'stroke-width': 0.5, opacity: 0.55 }))
+      pat.appendChild(
+        el('path', {
+          d: wavePath(y0, false),
+          fill: 'none',
+          stroke: p1,
+          'stroke-width': 0.7,
+          opacity: 0.85,
+        }),
+      )
+      pat.appendChild(
+        el('path', {
+          d: wavePath(y0 - S / 2, true),
+          fill: 'none',
+          stroke: accent,
+          'stroke-width': 0.5,
+          opacity: 0.55,
+        }),
+      )
       return pat
     }
     // lattice: crossed diagonals + accent dot
     pat = el('pattern', { id: id, width: S, height: S, patternUnits: 'userSpaceOnUse' })
-    pat.appendChild(el('line', { x1: S, y1: 0, x2: 0, y2: S, stroke: p1, 'stroke-width': 0.7, opacity: 0.9 }))
-    pat.appendChild(el('line', { x1: 0, y1: 0, x2: S, y2: S, stroke: p1, 'stroke-width': 0.7, opacity: 0.9 }))
+    pat.appendChild(
+      el('line', { x1: S, y1: 0, x2: 0, y2: S, stroke: p1, 'stroke-width': 0.7, opacity: 0.9 }),
+    )
+    pat.appendChild(
+      el('line', { x1: 0, y1: 0, x2: S, y2: S, stroke: p1, 'stroke-width': 0.7, opacity: 0.9 }),
+    )
     pat.appendChild(el('circle', { cx: 0, cy: 0, r: S * 0.08, fill: accent, opacity: 0.85 }))
     return pat
   }
@@ -107,7 +159,9 @@
     var vb = view === 'detail' ? '0 0 160 160' : '0 0 240 150'
     var svg = el('svg', { viewBox: vb, role: 'img', class: 'evo-visual__svg', focusable: 'false' })
     svg.setAttribute('aria-label', cfg.name + ' — printed shoe')
-    svg.appendChild(el('defs', null)).appendChild(patternNode(id, cfg.pattern, cfg.palette, cfg.accent, S))
+    svg
+      .appendChild(el('defs', null))
+      .appendChild(patternNode(id, cfg.pattern, cfg.palette, cfg.accent, S))
     var g = el('g', null)
     var fill = 'url(#' + id + ')'
 
@@ -122,23 +176,81 @@
         }),
       )
       g.appendChild(
-        el('path', { d: 'M38 116 a14 14 0 0 1 14 -14 h146 a14 14 0 0 1 14 14', fill: 'none', stroke: cfg.palette[1], 'stroke-width': 1.5 }),
+        el('path', {
+          d: 'M38 116 a14 14 0 0 1 14 -14 h146 a14 14 0 0 1 14 14',
+          fill: 'none',
+          stroke: cfg.palette[1],
+          'stroke-width': 1.5,
+        }),
       )
       g.appendChild(
-        el('path', { d: 'M66 66 C 100 78 140 82 178 80', fill: 'none', stroke: cfg.accent, 'stroke-width': 3.5, 'stroke-linecap': 'round', opacity: 0.85 }),
+        el('path', {
+          d: 'M66 66 C 100 78 140 82 178 80',
+          fill: 'none',
+          stroke: cfg.accent,
+          'stroke-width': 3.5,
+          'stroke-linecap': 'round',
+          opacity: 0.85,
+        }),
       )
-      g.appendChild(el('path', { d: 'M78 44 a5 5 0 1 1 0.1 0', fill: 'none', stroke: cfg.palette[1], 'stroke-width': 1 }))
+      g.appendChild(
+        el('path', {
+          d: 'M78 44 a5 5 0 1 1 0.1 0',
+          fill: 'none',
+          stroke: cfg.palette[1],
+          'stroke-width': 1,
+        }),
+      )
     } else if (view === 'sole') {
       g.appendChild(el('path', { d: SOLE_OUTER, fill: cfg.palette[0] }))
       g.appendChild(el('path', { d: SOLE_OUTER, fill: fill }))
-      g.appendChild(el('ellipse', { cx: 158, cy: 82, rx: 38, ry: 28, fill: cfg.accent, opacity: 0.85 }))
-      g.appendChild(el('ellipse', { cx: 84, cy: 78, rx: 30, ry: 22, fill: cfg.accent, opacity: 0.6 }))
-      g.appendChild(el('ellipse', { cx: 158, cy: 82, rx: 38, ry: 28, fill: 'none', stroke: cfg.palette[1], 'stroke-width': 1.2, opacity: 0.7 }))
-      g.appendChild(el('ellipse', { cx: 84, cy: 78, rx: 30, ry: 22, fill: 'none', stroke: cfg.palette[1], 'stroke-width': 1, opacity: 0.6 }))
+      g.appendChild(
+        el('ellipse', { cx: 158, cy: 82, rx: 38, ry: 28, fill: cfg.accent, opacity: 0.85 }),
+      )
+      g.appendChild(
+        el('ellipse', { cx: 84, cy: 78, rx: 30, ry: 22, fill: cfg.accent, opacity: 0.6 }),
+      )
+      g.appendChild(
+        el('ellipse', {
+          cx: 158,
+          cy: 82,
+          rx: 38,
+          ry: 28,
+          fill: 'none',
+          stroke: cfg.palette[1],
+          'stroke-width': 1.2,
+          opacity: 0.7,
+        }),
+      )
+      g.appendChild(
+        el('ellipse', {
+          cx: 84,
+          cy: 78,
+          rx: 30,
+          ry: 22,
+          fill: 'none',
+          stroke: cfg.palette[1],
+          'stroke-width': 1,
+          opacity: 0.6,
+        }),
+      )
     } else {
-      g.appendChild(el('rect', { x: 24, y: 24, width: 112, height: 112, rx: 14, fill: cfg.palette[0] }))
+      g.appendChild(
+        el('rect', { x: 24, y: 24, width: 112, height: 112, rx: 14, fill: cfg.palette[0] }),
+      )
       g.appendChild(el('rect', { x: 24, y: 24, width: 112, height: 112, rx: 14, fill: fill }))
-      g.appendChild(el('rect', { x: 24, y: 24, width: 112, height: 112, rx: 14, fill: 'none', stroke: cfg.palette[1], 'stroke-width': 2 }))
+      g.appendChild(
+        el('rect', {
+          x: 24,
+          y: 24,
+          width: 112,
+          height: 112,
+          rx: 14,
+          fill: 'none',
+          stroke: cfg.palette[1],
+          'stroke-width': 2,
+        }),
+      )
       g.appendChild(
         el('path', {
           d: SIDE_UPPER,
@@ -235,7 +347,7 @@
 
   // Theme asset exposes a global consumed by other theme scripts; this app's
   // TS lib window declaration does not know it.
-  // @ts-ignore
+  // @ts-expect-error
   window.EvoloopVisual = { mount: mount }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {

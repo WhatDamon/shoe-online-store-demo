@@ -36,21 +36,21 @@ unzip -o ~/Downloads/horizon-product-carousel-v2-images-20260905-3d-shoes.zip \
 
 ## 与上游的差异（增量清单）
 
-| 变更 | 位置 |
-|---|---|
-| theme_info 更名 Evoloop；品牌入口都在 Shopify 后台/`shop.name` 与主题编辑器设置 | `config/settings_schema.json` |
-| 二进制图剥离 + 首页 hero 引用置空（占位 svg 兜底） | `templates/index.json` |
-| **Evoloop 3D 视觉兜底**（能力 1，见下） | `snippets/evoloop-product-visual.liquid`、`assets/evoloop-product-visual.js`、`sections/main-3d-shoes-custom.liquid` |
-| **Evoloop AI 助手插槽**（能力 2，见下） | `config/settings_schema.json`（设置组）、`snippets/evoloop-assistant.liquid`、`assets/evoloop-assistant.js`、`sections/main-3d-shoes-custom.liquid` |
+| 变更                                                                            | 位置                                                                                                                                                |
+| ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| theme_info 更名 Evoloop；品牌入口都在 Shopify 后台/`shop.name` 与主题编辑器设置 | `config/settings_schema.json`                                                                                                                       |
+| 二进制图剥离 + 首页 hero 引用置空（占位 svg 兜底）                              | `templates/index.json`                                                                                                                              |
+| **Evoloop 3D 视觉兜底**（能力 1，见下）                                         | `snippets/evoloop-product-visual.liquid`、`assets/evoloop-product-visual.js`、`sections/main-3d-shoes-custom.liquid`                                |
+| **Evoloop AI 助手插槽**（能力 2，见下）                                         | `config/settings_schema.json`（设置组）、`snippets/evoloop-assistant.liquid`、`assets/evoloop-assistant.js`、`sections/main-3d-shoes-custom.liquid` |
 
 ## PDP 模板
 
 Horizon 自带两套商品模板，本主题保留并按需二开：
 
-| 模板 | 区块系统 | 说明 |
-|---|---|---|
-| `product.3d-shoes.json`（`main-3d-shoes-custom`） | 单区段定制页 | **Evoloop 3D 打印鞋的旗舰商品页**：图廊（多图缩略图 / 3D 视觉兜底）、尺码 chips→variant（售罄/缺货禁用联动）、数量、加入购物车→抽屉、加速结账、Materials and process / Shipping 手风琴、AI 助手槽。已二开接线 |
-| `product.json`（`product-information`） | 富块（标题/价格/媒体 gallery/variant picker/buy buttons/disclosures 等） | 通用商品页。需要 3D 视觉或助手时，在主题编辑器里向详情区加一个 Custom Liquid 块，粘贴 snippet 渲染：<br>`{% render 'evoloop-product-visual', product: product %}` 或<br>`{% render 'evoloop-assistant', product: product %}`（注意手动页面需自行补 asset include：`<script src="{{ 'evoloop-product-visual.js' | asset_url }}" defer></script>`） |
+| 模板                                              | 区块系统                                                                 | 说明                                                                                                                                                                                                                                                                                                           |
+| ------------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `product.3d-shoes.json`（`main-3d-shoes-custom`） | 单区段定制页                                                             | **Evoloop 3D 打印鞋的旗舰商品页**：图廊（多图缩略图 / 3D 视觉兜底）、尺码 chips→variant（售罄/缺货禁用联动）、数量、加入购物车→抽屉、加速结账、Materials and process / Shipping 手风琴、AI 助手槽。已二开接线                                                                                                  |
+| `product.json`（`product-information`）           | 富块（标题/价格/媒体 gallery/variant picker/buy buttons/disclosures 等） | 通用商品页。需要 3D 视觉或助手时，在主题编辑器里向详情区加一个 Custom Liquid 块，粘贴 snippet 渲染：<br>`{% render 'evoloop-product-visual', product: product %}` 或<br>`{% render 'evoloop-assistant', product: product %}`（注意手动页面需自行补 asset include：`<script src="{{ 'evoloop-product-visual.js' | asset_url }}" defer></script>`） |
 
 ## 能力 1：3D 纹理视觉兜底（克制呈现）
 
@@ -72,7 +72,7 @@ honeycomb），几何与 Next 应用里的 ProductVisual 完全一致。渲染�
   主题留下的 `[data-evo-assistant-root]` 节点）。助手脚本就绪后暴露
   `window.EvoloopAssistant.open(mode, product)`。
 - 事件桥：点击「Find my size」先派发冒泡 `CustomEvent('evoloop:assistant-open',
-  { detail: { mode: 'size-fit', product } })`，widget 既可挂事件也可直接注册 API。
+{ detail: { mode: 'size-fit', product } })`，widget 既可挂事件也可直接注册 API。
 - 商品上下文经 data 属性传递：title / handle / url（Next 侧目录可用
   `evoloop.assistant_product_id` handle 做跨目录映射）。
 - 文案克制：全主题无 “AI / Powered by AI” 字样，只有消费者语言。
@@ -83,17 +83,17 @@ honeycomb），几何与 Next 应用里的 ProductVisual 完全一致。渲染�
 
 ## Metafields 契约（命名空间 `evoloop`）
 
-| Key | Type | 取值 |
-|---|---|---|
-| subtitle | single_line_text_field | 副标题（可选） |
-| construction_pattern | single_line_text_field | lattice / wave / honeycomb（默认 lattice） |
-| construction_density | number | 0.6 / 0.75 / 0.9（默认 0.75） |
-| construction_printed_upper | true_false | true |
-| visual_palette | json | `["#hex1","#hex2"]`（两色数组） |
-| visual_accent | single_line_text_field | 强调色 hex |
-| features | list.single_line_text_field | 特性条目（Materials & fit 列表） |
-| fit_notes | multi_line_text_field | 合脚说明 |
-| assistant_product_id | single_line_text_field | 与 Next 目录映射的本地 handle |
+| Key                        | Type                        | 取值                                       |
+| -------------------------- | --------------------------- | ------------------------------------------ |
+| subtitle                   | single_line_text_field      | 副标题（可选）                             |
+| construction_pattern       | single_line_text_field      | lattice / wave / honeycomb（默认 lattice） |
+| construction_density       | number                      | 0.6 / 0.75 / 0.9（默认 0.75）              |
+| construction_printed_upper | true_false                  | true                                       |
+| visual_palette             | json                        | `["#hex1","#hex2"]`（两色数组）            |
+| visual_accent              | single_line_text_field      | 强调色 hex                                 |
+| features                   | list.single_line_text_field | 特性条目（Materials & fit 列表）           |
+| fit_notes                  | multi_line_text_field       | 合脚说明                                   |
+| assistant_product_id       | single_line_text_field      | 与 Next 目录映射的本地 handle              |
 
 ## 相关文档
 

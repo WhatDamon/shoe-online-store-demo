@@ -11,9 +11,7 @@
  *    'evoloop:assistant-open' with { mode: 'size-fit', product }
  *  - if the widget exposes window.EvoloopAssistant.open it is called too
  */
-(() => {
-  
-
+;(() => {
   function init() {
     var root = document.querySelector('[data-evo-assistant-root]')
     if (!root) return
