@@ -1,0 +1,18 @@
+{%- comment -%}
+  Renders Evoloop product details from metafields (list + fit notes).
+  Metafields contract: themes/evoloop/README.md.
+{%- endcomment -%}
+{%- liquid
+  assign evo_features = product.metafields.evoloop.features.value
+  assign evo_fit_notes = product.metafields.evoloop.fit_notes.value
+-%}
+{%- if evo_features != blank -%}
+  <ul class="evo-list">
+    {%- for feature in evo_features -%}
+      <li>{{ feature }}</li>
+    {%- endfor -%}
+  </ul>
+{%- endif -%}
+{%- if evo_fit_notes != blank -%}
+  <p>{{ evo_fit_notes }}</p>
+{%- endif -%}

@@ -1,0 +1,15 @@
+{
+  "current": {
+    "brand_name": "Evoloop",
+    "tagline": "3D Printed. Closed-Loop. A New Footwear Phenomenon.",
+    "color_canvas": "#fafaf8",
+    "color_ink": "#111111",
+    "color_brand": "#0f766e",
+    "color_neutral": "#525252",
+    "color_border": "#e5e5e5",
+    "color_tile": "#f3f1ea",
+    "font_heading": "Georgia, 'Times New Roman', serif",
+    "font_body": "'Helvetica Neue', Helvetica, Arial, sans-serif",
+    "assistant_backend_url": ""
+  }
+}

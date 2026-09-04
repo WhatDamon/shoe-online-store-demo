@@ -1,0 +1,53 @@
+{
+  "sections": {
+    "main": {
+      "type": "main-product",
+      "blocks": {
+        "media": {
+          "type": "media"
+        },
+        "title": {
+          "type": "title"
+        },
+        "price": {
+          "type": "price"
+        },
+        "description": {
+          "type": "description"
+        },
+        "variant_picker": {
+          "type": "variant_picker"
+        },
+        "assistant": {
+          "type": "assistant_slot"
+        },
+        "collapsible-materials": {
+          "type": "collapsible_tab",
+          "settings": {
+            "heading": "Materials & fit",
+            "content": "",
+            "use_product_details": true
+          }
+        },
+        "collapsible-shipping": {
+          "type": "collapsible_tab",
+          "settings": {
+            "heading": "Shipping & returns",
+            "content": "<p>Every pair is printed to order in our studio, so nothing sits in a warehouse — we only print what you buy. Orders ship in recycled packaging once your pair is printed. Free returns within 30 days.</p>"
+          }
+        },
+        "buy_buttons": {
+          "type": "buy_buttons"
+        }
+      }
+    },
+    "recommendations": {
+      "type": "product-recommendations",
+      "settings": {
+        "heading": "You may also like",
+        "products_per_page": 4
+      }
+    }
+  },
+  "order": ["main", "recommendations"]
+}

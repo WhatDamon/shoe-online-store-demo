@@ -1,0 +1,89 @@
+[
+  {
+    "name": "Brand",
+    "settings": [
+      {
+        "type": "text",
+        "id": "brand_name",
+        "label": "Brand name",
+        "default": "Evoloop"
+      },
+      {
+        "type": "text",
+        "id": "tagline",
+        "label": "Core slogan (footer strip)",
+        "default": "3D Printed. Closed-Loop. A New Footwear Phenomenon."
+      }
+    ]
+  },
+  {
+    "name": "Colors",
+    "settings": [
+      {
+        "type": "color",
+        "id": "color_canvas",
+        "label": "Canvas (page background)",
+        "default": "#fafaf8"
+      },
+      {
+        "type": "color",
+        "id": "color_ink",
+        "label": "Ink (text & primary)",
+        "default": "#111111"
+      },
+      {
+        "type": "color",
+        "id": "color_brand",
+        "label": "Brand accent",
+        "default": "#0f766e"
+      },
+      {
+        "type": "color",
+        "id": "color_neutral",
+        "label": "Muted text",
+        "default": "#525252"
+      },
+      {
+        "type": "color",
+        "id": "color_border",
+        "label": "Border",
+        "default": "#e5e5e5"
+      },
+      {
+        "type": "color",
+        "id": "color_tile",
+        "label": "Gallery tile",
+        "default": "#f3f1ea"
+      }
+    ]
+  },
+  {
+    "name": "Typography",
+    "settings": [
+      {
+        "type": "text",
+        "id": "font_heading",
+        "label": "Heading font stack",
+        "default": "Georgia, 'Times New Roman', serif",
+        "info": "Next demo self-hosts Newsreader; swap the stack here (e.g. after adding Newsreader via Shopify font loader) without touching templates."
+      },
+      {
+        "type": "text",
+        "id": "font_body",
+        "label": "Body font stack",
+        "default": "'Helvetica Neue', Helvetica, Arial, sans-serif"
+      }
+    ]
+  },
+  {
+    "name": "Assistant (Evoloop backend)",
+    "settings": [
+      {
+        "type": "text",
+        "id": "assistant_backend_url",
+        "label": "Backend URL",
+        "info": "Deployed Next backend origin (e.g. https://demo.evoloop.example). When blank the product page shows no AI at all (克制 P1). When set, the assistant_slot block mounts <backend>/assistant-widget.js and wires 'Find my size'. Contract in themes/evoloop/README.md."
+      }
+    ]
+  }
+]

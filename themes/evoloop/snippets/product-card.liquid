@@ -1,0 +1,35 @@
+{%- comment -%}
+  Product card (used by recommendations grid). Mirrors Next ProductCard:
+  image (or 3D visual), title, price.
+{%- endcomment -%}
+{%- liquid
+  assign card = card_product
+  assign price = card.price | default: 0
+-%}
+<a class="evo-card" href="{{ card.url }}">
+  {%- if card.featured_image -%}
+    <img
+      class="evo-card__media"
+      src="{{ card.featured_image | image_url: width: 600 }}"
+      alt="{{ card.featured_image.alt | escape | default: card.title | escape }}"
+      width="600"
+      height="600"
+      loading="lazy"
+    >
+  {%- else -%}
+    <div
+      class="evo-card__media evo-visual"
+      data-evo-visual
+      data-pattern="{{ card.metafields.evoloop.construction_pattern.value | default: 'lattice' | escape }}"
+      data-density="{{ card.metafields.evoloop.construction_density.value | default: '0.75' | escape }}"
+      data-palette="{{ card.metafields.evoloop.visual_palette.value | default: '["#f3f1ea","#9ca3af"]' | escape }}"
+      data-accent="{{ card.metafields.evoloop.visual_accent.value | default: '#0f766e' | escape }}"
+      data-name="{{ card.title | escape }}"
+      data-view="side"
+    ></div>
+  {%- endif -%}
+  <div class="evo-card__body">
+    <h3 class="evo-card__title">{{ card.title | escape }}</h3>
+    <p class="evo-card__price">{{ price | money }}</p>
+  </div>
+</a>

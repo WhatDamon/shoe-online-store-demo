@@ -1,0 +1,22 @@
+{%- comment -%}
+  Evoloop header: minimal storefront chrome — brand mark + optional nav.
+  P1 克制：产品页主导航由 Shopify linklists 控制；无菜单时只显示品牌。
+{%- endcomment -%}
+<div class="evo-shell evo-header">
+  <a class="evo-header__brand font-heading" href="{{ routes.root_url }}" aria-label="{{ shop.name }}">
+    {{ settings.brand_name | default: shop.name }}
+  </a>
+  <nav class="evo-header__nav" aria-label="Main menu">
+    <a href="{{ routes.all_products_collection_url }}">Shop</a>
+    {%- for link in linklists['main-menu'].links limit: 3 -%}
+      <a href="{{ link.url }}">{{ link.title | escape }}</a>
+    {%- endfor -%}
+  </nav>
+</div>
+
+{% schema %}
+{
+  "name": "Header",
+  "settings": []
+}
+{% endschema %}

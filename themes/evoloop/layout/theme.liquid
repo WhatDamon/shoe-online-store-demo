@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="{{ request.locale.iso_code }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>
+    {{- page_title -}}
+    {%- if current_tags %} &ndash; {{ current_tags | join: ', ' }}{% endif -%}
+    {%- unless page_title contains shop.name %} &ndash; {{ shop.name }}{% endunless -%}
+  </title>
+  {%- if page_description -%}
+    <meta name="description" content="{{ page_description | escape }}">
+  {%- endif -%}
+  {{ content_for_header }}
+  <style>
+    :root {
+      --color-canvas: {{ settings.color_canvas }};
+      --color-ink: {{ settings.color_ink }};
+      --color-brand: {{ settings.color_brand }};
+      --color-neutral: {{ settings.color_neutral }};
+      --color-border: {{ settings.color_border }};
+      --color-tile: {{ settings.color_tile }};
+      --font-heading: {{ settings.font_heading }};
+      --font-body: {{ settings.font_body }};
+    }
+  </style>
+  {{ 'base.css' | asset_url | stylesheet_tag }}
+  <script src="{{ 'theme.js' | asset_url }}" defer></script>
+</head>
+<body class="evo-body">
+  {% section 'header' %}
+  <main id="MainContent" class="evo-main" role="main">
+    {{ content_for_layout }}
+  </main>
+  {% section 'footer' %}
+</body>
+</html>

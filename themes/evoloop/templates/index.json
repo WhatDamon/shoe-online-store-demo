@@ -1,0 +1,14 @@
+{
+  "sections": {
+    "hero": {
+      "type": "text",
+      "settings": {
+        "heading": "3D Printed. Closed-Loop. A New Footwear Phenomenon.",
+        "body": "<p>Casual shoes, printed to order in your size.</p>",
+        "button_label": "Shop the collection",
+        "button_link": ""
+      }
+    }
+  },
+  "order": ["hero"]
+}

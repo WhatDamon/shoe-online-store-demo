@@ -1,0 +1,18 @@
+{%- comment -%}
+  Evoloop footer: dark strip + bordered core-slogan bottom line (mirrors
+  Next footer.tsx: brand block then bordered tagline strip).
+{%- endcomment -%}
+<footer class="evo-footer">
+  <div class="evo-shell evo-footer__inner">
+    <p class="evo-footer__name font-heading">{{ settings.brand_name | default: shop.name }}</p>
+    <p class="evo-footer__copy">&copy; {{ 'now' | date: '%Y' }} {{ settings.brand_name | default: shop.name }}</p>
+  </div>
+  <p class="evo-footer__slogan">{{ settings.tagline }}</p>
+</footer>
+
+{% schema %}
+{
+  "name": "Footer",
+  "settings": []
+}
+{% endschema %}
