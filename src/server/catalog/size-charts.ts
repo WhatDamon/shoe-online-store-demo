@@ -48,6 +48,13 @@ export function parseSizeHint(text: string): CanonicalSize | null {
   return null
 }
 
+/** 当前市场体系的全部档位选项（展示标签 + canonical）：如 US → "US 5"…"US 12.5"。供 /shop 筛选栏等消费。 */
+export const availableSizesForSystem = (system: SizeSystem): { label: string; canonical: CanonicalSize }[] =>
+  sizeRows.map(r => ({
+    label: `${system} ${r.systems[system as 'US' | 'EU' | 'UK' | 'JP' | 'CN']}`,
+    canonical: r.systems.EU as CanonicalSize,
+  }))
+
 // cm 脚长 → EU 近似：EU = (cm+2)×1.5，取整到整档（.5 向下靠 fixture 整档，27cm → 43）；
 // 随后由调用方 nearestCanonical 收口到实际 in-stock EU。
 function euFromCm(cm: number): CanonicalSize {

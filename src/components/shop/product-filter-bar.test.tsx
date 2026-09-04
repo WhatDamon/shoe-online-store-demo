@@ -1,0 +1,77 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { parseShopParams } from '@/lib/shop-search-params'
+
+const { replaceMock } = vi.hoisted(() => ({ replaceMock: vi.fn() }))
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: replaceMock, push: vi.fn() }),
+}))
+
+import { ProductFilterBar } from './product-filter-bar'
+
+const options = {
+  collectionOptions: [
+    { value: 'everyday', label: 'Everyday' },
+    { value: 'travel', label: 'Travel' },
+  ],
+  sizeOptions: [
+    { label: 'US 8.5', canonical: 42 },
+    { label: 'US 9', canonical: 43 },
+  ],
+}
+
+const emptyFilter = () => parseShopParams(new URLSearchParams(''))
+
+function renderBar(initial = emptyFilter()) {
+  render(<ProductFilterBar initial={initial} {...options} />)
+}
+
+describe('ProductFilterBar', () => {
+  beforeEach(() => replaceMock.mockReset())
+  afterEach(() => cleanup())
+
+  it('pushes sort=price-asc to the URL when sorting changes', () => {
+    renderBar()
+    fireEvent.change(screen.getByLabelText('Sort'), { target: { value: 'price-asc' } })
+    expect(replaceMock).toHaveBeenCalledWith('/shop?sort=price-asc')
+  })
+
+  it('sets the collection param when a collection is chosen', () => {
+    renderBar()
+    fireEvent.change(screen.getByLabelText('Collection'), { target: { value: 'travel' } })
+    expect(replaceMock).toHaveBeenCalledWith('/shop?collection=travel')
+  })
+
+  it('keeps existing params when applying a new filter', () => {
+    renderBar(parseShopParams(new URLSearchParams('collection=travel')))
+    fireEvent.change(screen.getByLabelText('Sort'), { target: { value: 'newest' } })
+    expect(replaceMock).toHaveBeenCalledWith('/shop?collection=travel&sort=newest')
+  })
+
+  it('maps a price band to minPrice/maxPrice params', () => {
+    renderBar()
+    fireEvent.change(screen.getByLabelText('Price'), { target: { value: '100-150' } })
+    expect(replaceMock).toHaveBeenCalledWith('/shop?minPrice=100&maxPrice=150')
+  })
+
+  it('toggles a size label in and out of the URL', () => {
+    renderBar(parseShopParams(new URLSearchParams('size=US+9')))
+    const size9 = screen.getByLabelText('US 9') as HTMLInputElement
+    expect(size9.checked).toBe(true)
+    fireEvent.click(size9)
+    expect(replaceMock).toHaveBeenCalledWith('/shop')
+  })
+
+  it('submits the keyword search as q', () => {
+    renderBar()
+    fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'slip-on' } })
+    fireEvent.submit(screen.getByRole('search'))
+    expect(replaceMock).toHaveBeenCalledWith('/shop?q=slip-on')
+  })
+
+  it('clears all active filters', () => {
+    renderBar(parseShopParams(new URLSearchParams('collection=travel&sort=price-desc')))
+    fireEvent.click(screen.getByRole('button', { name: /clear all/i }))
+    expect(replaceMock).toHaveBeenCalledWith('/shop')
+  })
+})

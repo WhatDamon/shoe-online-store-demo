@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { convert, nearestCanonical, parseSizeHint } from './size-charts'
+import { availableSizesForSystem, convert, nearestCanonical, parseSizeHint } from './size-charts'
+import { sizeRows } from './size-fixture'
 
 describe('convert', () => {
   it('converts EU 42 to US 8.5 (unisex basis)', () => expect(convert(42, 'US')).toBe(8.5))
@@ -12,6 +13,16 @@ describe('nearestCanonical', () => {
     expect(nearestCanonical(40, [40, 42])).toBe(40)
   })
   it('clamps when out of range', () => expect(nearestCanonical(50, [40, 42])).toBe(42))
+})
+describe('availableSizesForSystem', () => {
+  it('lists every fixture row with a market label and its canonical EU', () => {
+    const opts = availableSizesForSystem('US')
+    expect(opts).toHaveLength(sizeRows.length)
+    expect(opts[0]).toEqual({ label: 'US 5', canonical: 36 })
+    expect(opts[opts.length - 1]).toEqual({ label: 'US 12.5', canonical: 48 })
+    expect(opts.find(o => o.label === 'US 9')).toEqual({ label: 'US 9', canonical: 43 })
+    opts.forEach((o, i) => expect(o.canonical).toBe(sizeRows[i].systems.EU))
+  })
 })
 describe('parseSizeHint', () => {
   it('parses US label', () => expect(parseSizeHint('I usually wear US 9')).toBe(43)) // EU 43
