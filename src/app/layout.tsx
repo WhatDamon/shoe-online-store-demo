@@ -1,5 +1,5 @@
-import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
+import { baseMetadata } from '@/lib/seo'
 import { Geist, Geist_Mono, Newsreader } from 'next/font/google'
 import './globals.css'
 import { WishlistProvider } from '@/components/shop/wishlist-provider'
@@ -20,11 +20,8 @@ const newsreader = Newsreader({
   subsets: ['latin'],
 })
 
-export const metadata: Metadata = {
-  title: 'Treadwell — casual shoes, printed to order in your size',
-  description:
-    'Casual shoes designed around your foot. Printed to order in your size, with free returns.',
-}
+// SEO 基座集中在 src/lib/seo.ts（brand 模板 / metadataBase / OG），单点维护。
+export const metadata = baseMetadata
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (

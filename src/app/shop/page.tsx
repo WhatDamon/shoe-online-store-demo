@@ -6,8 +6,14 @@ import { parseShopParams } from '@/lib/shop-search-params'
 import { ProductFilterBar } from '@/components/shop/product-filter-bar'
 import { ProductGrid } from '@/components/shop/product-grid'
 import { EmptyState } from './empty-state'
+import { pageMetadata } from '@/lib/seo'
 
 export const dynamic = 'force-dynamic'
+
+export const metadata = pageMetadata({
+  title: 'Shop',
+  description: 'Shop all styles — every pair is printed to order around your size.',
+})
 
 type ShopSearchParams = { [key: string]: string | string[] | undefined }
 

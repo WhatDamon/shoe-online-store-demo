@@ -5,6 +5,11 @@ import { CollectionCards } from '@/components/marketing/collection-cards'
 import { FeaturedGrid } from '@/components/marketing/featured-grid'
 import { StorySection } from '@/components/marketing/story-section'
 import { Footer } from '@/components/marketing/footer'
+import { pageMetadata } from '@/lib/seo'
+
+export const metadata = pageMetadata({
+  title: 'Casual shoes, printed to order in your size',
+})
 
 // Landing（规格 §9 顺序）：AppBar / Hero / PromiseStrip / CollectionCards /
 // FeaturedGrid / StorySection / Footer。整页零 AI 痕迹（P1：助手入口不在此页）。

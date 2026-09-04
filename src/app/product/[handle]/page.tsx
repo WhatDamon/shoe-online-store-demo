@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import type { Metadata } from 'next'
 import { catalog } from '@/server/catalog/adapter'
 import { getProductForMarket, getRelatedProducts } from '@/server/catalog/service'
 import { ProductGallery } from '@/components/shop/product-gallery'
@@ -13,10 +14,23 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion'
 import { formatPrice } from '@/lib/format'
+import { pageMetadata } from '@/lib/seo'
 
 export async function generateStaticParams() {
   const products = await catalog.getProducts()
   return products.map(p => ({ handle: p.handle }))
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ handle: string }>
+}): Promise<Metadata> {
+  const { handle } = await params
+  const product = await getProductForMarket(handle)
+  // 未知 handle：由页面级 notFound() 决定 404，元数据仅回退默认品牌态。
+  if (!product) return {}
+  return pageMetadata({ title: product.title, description: product.description })
 }
 
 // PDP（SSG，规格 §9）：/product/[handle] 由 generateStaticParams 预渲染；
