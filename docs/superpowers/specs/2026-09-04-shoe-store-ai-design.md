@@ -9,7 +9,7 @@
 1. **落地页 / 选购页**（品牌门面 + 商品浏览与详情）
 2. **克制的 AI 辅助**（导购 / 尺码 / 搭配 / 自然语言找鞋），以消费者友好、非"AI 炫耀"的方式呈现
 
-**品类聚焦**：休闲日常鞋（casual / lifestyle，Allbirds 气质），单性别向 unisex + 美码体系。
+**品类聚焦**：3D 打印休闲日常鞋（3D-printed casual / lifestyle，数字制造气质），单性别向 unisex。**鞋码市场适配**：尺码体系由市场配置（`SITE_MARKET`，默认 US）驱动，经脚长 mm 锚定换算表支持 US / EU / UK / JP / CN 等切换（§6）。
 
 ## 2. 目标与非目标
 
@@ -33,7 +33,7 @@
 | # | 原则 | 落地 |
 |---|------|------|
 | P1 | **AI 克制呈现（消费端）** | 助手入口用消费者语言（"Need a hand?" / "Find my size" / "Style ideas"），不出现 "AI" 字样；Landing 页零 AI 痕迹，卖产品与舒适 |
-| P2 | 无凭证可演示 | 默认 env 即全功能 Mock：无 key → Mock AI、无 Shopify → Seed 商品、图加载失败 → 本地兜底 |
+| P2 | 无凭证可演示 | 默认 env 即全功能 Mock：无 key → Mock AI、无 Shopify → Seed 商品、主图本地程序化生成（离线自洽） |
 | P3 | 诚实失败 | 有 key 但调用失败 → 明确报错 + 重试，**不静默降级**为 Mock（防"假成功"演示） |
 | P4 | 单一事实源 | 商品实时从 CatalogAdapter 拉取（现为 Seed），本地库只存派生缓存（embedding 快照） |
 | P5 | 面向隔离 | server-only 边界、适配器契约、类型化数据流；改实现不改调用方 |
@@ -88,11 +88,13 @@ type CatalogAdapter = {
 ```
 
 `Product` 贴近 Shopify Storefront 形状，避免将来映射改写：
-`id / handle / title / description / price{amount,currencyCode} / productType / tags / collections[] / image{remote?, localFallback} / sizes: US[] / features[] / fitNotes / material`。
+`id / handle / title / description / price{amount,currencyCode} / productType / tags / collections[] / image{localGenerated, remote?} / sizes: canonical[] / features[] / fitNotes / material / construction（打印结构参数）`。
 
-**Seed**：16–20 双休闲日常鞋，4 个子系列（Everyday / Comfort / Travel / Minimal 等材质向分组）；USD 计价；图片 = 远程精选（Unsplash/Pexels）+ 本地 SVG 兜底（`next/image` 失败回退，adapter 层双保险）。
+**尺码模型（多市场）**：商品可用范围以**单一规范体系**录入（建议 EU 整档，如 36–48）；`sizeCharts.ts` 以**脚长 mm 为锚**提供 US / EU / UK / JP / CN 双向换算表；渲染、筛选与"Find my size"均先换算到 `SITE_MARKET` 指定体系再展示。单一事实源不漂移；进入新市场只需补一张换算表 + 改配置。
 
-**筛选维度**：Collection / Size(US) / Price range / Sort；搜索框支持自然语言 → 走后端检索（见 §8）。
+**Seed**：16–20 双 **3D 打印**休闲日常鞋，4 个子系列（Everyday / Comfort / Travel / Minimal）；描述/特性/构造体现打印制造（格纹结构、按单生产、零废料）；USD 计价；主图 = **本地程序化生成的 3D 打印鞋 SVG**（组件化参数渲染：格纹/网格外观、多视角、离线一致、零图床依赖），每商品保留 `remote` 字段供未来真实素材/Shopify 图替换，远程图仅作 lifestyle 场景补充（失败静默回退主图）。
+
+**筛选维度**：Collection / Size（当前市场体系）/ Price range / Sort；搜索框支持自然语言 → 走后端检索（见 §8）。
 
 ## 7. 本地数据库（Drizzle，跨 SQL）
 
@@ -131,7 +133,7 @@ ai_usage: {           // 匿名成本计量（§8.5），无个人信息
 | 消费端措辞 | 内部 | 流程 |
 |---|---|---|
 | 找鞋帮助 / Help me pick | shopping | 用户提问 → 检索注入上下文 → 模型仅基于注入内容回答并引用商品 |
-| Find my size | size-fit | 附该鞋美码尺码表 + fitNotes，引导式问脚型/习惯码 → 推荐 + 解释 |
+| Find my size | size-fit | 附该鞋在当前市场体系尺码表（canonical → 换算）+ fitNotes，引导式问脚型/习惯码 → 推荐 + 解释 |
 | Style ideas / Style it with | outfit | 以当前商品为主角的搭配建议 |
 | 搜索框自然语言 / 浏览找鞋 | find-shoes | 显式检索 → 商品卡网格 + 一句总结 |
 
@@ -173,7 +175,7 @@ ai_usage: {           // 匿名成本计量（§8.5），无个人信息
 
 ## 9. 前端页面与组件
 
-**设计语言**：暖白 `#FAFAF8` 底 / 墨色 `#111` / 单一强调色；展示型衬线标题（Newsreader/Fraunces 类）+ 几何无衬线正文；Tailwind v4 token；全站英文；`next/image` + remotePatterns；SSG（Landing/详情）+ SSR（列表，searchParams 驱动）。
+**设计语言**：暖白 `#FAFAF8` 底 / 墨色 `#111` / 单一强调色；展示型衬线标题（Newsreader/Fraunces 类）+ 几何无衬线正文；Tailwind v4 token；全站英文；主图由组件化参数渲染 inline SVG（无网络请求），可选 lifestyle 远程图走 `next/image` remotePatterns + 静默兜底；SSG（Landing/详情）+ SSR（列表，searchParams 驱动）。
 
 **AppBar**（sticky）：Hero 上透明 → 滚动毛玻璃实底；Logo（品牌占位名，`lib/site.ts` 单点配置，可替换）+ 导航（Shop / Collections / Our Story）+ 搜索入口 + 愿望单计数（localStorage）+ 移动 Sheet 菜单。
 
@@ -181,7 +183,7 @@ ai_usage: {           // 匿名成本计量（§8.5），无个人信息
 
 **列表 `/shop`**：URL 状态筛选（`?collection&size&minPrice&maxPrice&sort&q`）服务端渲染；商品卡（图/名/价/愿望单心形）；骨架屏 + 空状态；无分页。
 
-**详情 `/product/[handle]`**：图片廊 → 信息区 → 美码尺码选择器 → "Find my size" 内嵌入口 → 材质/合脚手风琴 → 主 CTA → 相关推荐。
+**详情 `/product/[handle]`**：图片廊（本地生成图多视角）→ 信息区 → 尺码选择器（当前市场体系）→ "Find my size" 内嵌入口 → 材质/合脚手风琴 → 主 CTA → 相关推荐。
 CTA 占位阶段文案："Available soon — checkout lands on our Shopify store."；无 store 时 `getBuyUrl → null` → 按钮禁用态 + toast；有凭证/URL 后代码路径直接生效。
 
 **助手**：FAB → Sheet（a11y：focus trap / aria / 键盘可达），消息流式渲染，建议 chips，会话重置。
@@ -192,8 +194,8 @@ CTA 占位阶段文案："Available soon — checkout lands on our Shopify store
 src/
   app/  layout, page(landing), shop/page, product/[handle]/page,
         api/ai/chat/route, (not-found/error/loading)
-  components/  ui(shadcn) · marketing · shop · assistant
-  server/  catalog/(adapter,seed,shopify-stub,types,data) · ai/(provider,openai-compat,mock,chat,prompts) · search/(embedder,keyword,repository)
+  components/  ui(shadcn) · marketing · shop · assistant · product(视觉生成)
+  server/  catalog/(adapter,seed,shopify-stub,types,sizeCharts) · ai/(provider,openai-compat,mock,chat,prompts) · search/(embedder,keyword,repository)
   db/      schema, client, migrations
   lib/     site.ts, utils
 data/seed/    商品图片引用等外置资源
@@ -212,15 +214,16 @@ docs/superpowers/specs/  本规格
 | `AI_MAX_TURNS` / `AI_MAX_OUTPUT_TOKENS` / `AI_REQUEST_TIMEOUT_MS` | 护栏默认 20 回合 / 500 token / 20s（§8.5） |
 | `AI_DAILY_TOKEN_CAP` | 每日 token 预算，超限温和拒答（默认 ~1M/日） |
 | `AI_DISABLE_REAL` | 强制 Mock 总开关（遇滥用一键止血） |
+| `SITE_MARKET` | 市场配置（默认 `US`），决定尺码展示体系（US/EU/UK/JP/CN，§6 换算） |
 | `DATABASE_URL` | 默认 `file:./data/local.db`；上线换 Postgres |
 | `SHOPIFY_*` | 预留（本期忽略） |
 
 ## 12. 工程 / 测试 / 可靠性
 
 - **脚本**（Bun）：`dev / build / start`、`db:generate / db:push`、`test`、`typecheck`、`lint`；门禁 = lint + typecheck + test + build。
-- **测试（v1）**：Vitest —— seed 筛选、检索排序（余弦/关键词 golden cases）、Mock provider 输出契约（§8.4 行格式）、意图路由、美元格式化；护栏 —— IP/会话令牌桶限流、回合上限与历史裁剪、日预算强制（内存 SQLite）、离题 redirect 与限流温和文案 golden；RTL —— 助手流式渲染（mock SSE）、尺码选择器、筛选与 URL 同步、愿望单切换、发送中禁发与超时中止。
+- **测试（v1）**：Vitest —— seed 筛选、检索排序（余弦/关键词 golden cases）、Mock provider 输出契约（§8.4 行格式）、意图路由、美元格式化；尺码 —— 换算表 golden（US/EU/UK/JP/CN ↔ mm）、市场筛选与展示换算；护栏 —— IP/会话令牌桶限流、回合上限与历史裁剪、日预算强制（内存 SQLite）、离题 redirect 与限流温和文案 golden；RTL —— 助手流式渲染（mock SSE）、尺码选择器、筛选与 URL 同步、愿望单切换、发送中禁发与超时中止。
 - **错误处理**：路由层 try/catch → SSE `error` + UI 重试；商品缺失 `notFound()`；全局 `error.tsx / not-found.tsx / loading.tsx`。
-- **性能/SEO**：`generateMetadata` + OG；图片全部 `next/image`（remotePatterns + 本地兜底）；markdown 用轻量渲染（不引重型依赖）。
+- **性能/SEO**：`generateMetadata` + OG（本地生成）；主图 inline SVG（零网络请求），lifestyle 远程图 `next/image` + 静默兜底；markdown 用轻量渲染（不引重型依赖）。
 - **合规**：无 cookie、无埋点；不存个人信息。
 - 品牌名、文案均集中配置，便于日后替换。
 
@@ -234,6 +237,9 @@ docs/superpowers/specs/  本规格
 6. 有 key 失败不静默降级 → 演示诚实性
 7. 无登录/无本站购物/收藏 localStorage/AI 仅会话记忆 → 隐私最小 + 范围控制
 8. 多层护栏防 AI 滥用/烧钱 → 开放无鉴权端点必须自带上限与预算；护栏文案同样克制化（用户补充的硬约束）
+9. 鞋码多市场 = 配置级单市场切换（`SITE_MARKET` 默认 US）+ 脚长 mm 锚换算表 → 数据/换算先行，全站仍英文/USD，新市场仅补表改配置
+10. 产品定位 = 3D 打印休闲鞋：本期商品字段/描述先行体现打印制造，Landing 品牌叙事暂缓（用户分期决策）
+11. 主图改本地程序化 SVG（组件化参数渲染）→ 3D 定位素材自洽、离线一致、零图床依赖；`remote` 字段保留供真实素材替换
 
 ## 14. 待办下一步
 
