@@ -2116,5 +2116,16 @@
         "default": "equal-width-buttons"
       }
     ]
+  },
+  {
+    "name": "Evoloop assistant",
+    "settings": [
+      {
+        "type": "text",
+        "id": "assistant_backend_url",
+        "label": "Assistant backend URL",
+        "info": "Optional. URL of the Evoloop assistant backend (for example the Next.js app, https://shop.example.com). When set, the product page shows a 'Find my size' link and lazy-loads <backend>/assistant-widget.js into the slot. When blank no assistant UI is rendered at all."
+      }
+    ]
   }
 ]

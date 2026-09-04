@@ -4,6 +4,7 @@
 %}
 
 <section class="custom-product-page" data-custom-product-page>
+  <script src="{{ 'evoloop-product-visual.js' | asset_url }}" defer></script>
   <div class="custom-product-page__inner">
     <a class="custom-product-page__back" href="{{ routes.all_products_collection_url }}">Back to all shoes</a>
 
@@ -13,7 +14,15 @@
           {% if featured_image != blank %}
             {{ featured_image | image_url: width: 1600 | image_tag: widths: '600, 900, 1200, 1600', sizes: '(min-width: 990px) 58vw, 100vw', alt: featured_image.alt | default: product.title, loading: 'eager', data-featured-image: '' }}
           {% else %}
-            {{ 'product-apparel-1' | placeholder_svg_tag: 'custom-product-page__placeholder' }}
+            {%- liquid
+              assign evo_pattern = product.metafields.evoloop.construction_pattern
+              assign evo_palette = product.metafields.evoloop.visual_palette
+            -%}
+            {%- if evo_pattern != blank or evo_palette != blank -%}
+              {%- render 'evoloop-product-visual', product: product -%}
+            {%- else -%}
+              {{ 'product-apparel-1' | placeholder_svg_tag: 'custom-product-page__placeholder' }}
+            {%- endif -%}
           {% endif %}
         </div>
         {% if product.images.size > 1 %}
@@ -76,6 +85,8 @@
             <p>Review the shipping, fit, care, and return terms before checkout.</p>
           </details>
         </div>
+
+        {% render 'evoloop-assistant', product: product %}
       </div>
     </div>
   </div>

@@ -1,0 +1,59 @@
+{%- comment -%}
+  Evoloop assistant slot. Renders ONLY when the merchant set
+  settings.assistant_backend_url (theme settings > Evoloop assistant). The
+  mount node stays empty; assets/evoloop-assistant.js lazy-loads
+  <backend>/assistant-widget.js. Zero AI presence when unset (P1).
+{%- endcomment -%}
+{%- if settings.assistant_backend_url != blank -%}
+  <div class="evo-assistant">
+    <button type="button" class="evo-assistant__find" data-evo-find-size>
+      Find my size
+    </button>
+    <p class="evo-assistant__hint">
+      Not sure about fit? Tell us your usual size or foot length — we will
+      recommend the right pair.
+    </p>
+    <div
+      data-evo-assistant-root
+      data-backend="{{ settings.assistant_backend_url | escape }}"
+      data-title="{{ product.title | escape }}"
+      data-handle="{{ product.handle | escape }}"
+      data-url="{{ product.url | escape }}"
+    ></div>
+  </div>
+  <script src="{{ 'evoloop-assistant.js' | asset_url }}" defer></script>
+  <style>
+    /* Evoloop assistant slot — self-contained. */
+    .evo-assistant {
+      margin-top: 1.5rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid #ccd1cb;
+    }
+    .evo-assistant__find {
+      border: 0;
+      padding: 0;
+      background: none;
+      color: #1d2420;
+      font: inherit;
+      font-weight: 700;
+      font-size: 0.85rem;
+      text-decoration: underline;
+      text-decoration-color: #ccd1cb;
+      text-underline-offset: 4px;
+      cursor: pointer;
+    }
+    .evo-assistant__find:hover {
+      text-decoration-color: #1d2420;
+    }
+    .evo-assistant__find:focus-visible {
+      outline: 2px solid #0f766e;
+      outline-offset: 2px;
+    }
+    .evo-assistant__hint {
+      margin: 0.5rem 0 0;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      color: #6b6f6a;
+    }
+  </style>
+{%- endif -%}
