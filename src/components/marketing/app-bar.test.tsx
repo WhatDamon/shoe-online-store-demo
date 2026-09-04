@@ -54,4 +54,50 @@ describe('AppBar', () => {
 
     expect(within(wishlist).getByText('1')).toBeInTheDocument()
   })
+
+  it('opens a mobile search row with an input and closes it via Escape', async () => {
+    const user = userEvent.setup()
+    render(
+      <WishlistProvider>
+        <AppBar />
+      </WishlistProvider>
+    )
+
+    // 初始：展开按钮就绪（aria-expanded=false）；只有桌面内联搜索输入框
+    // （type=search → searchbox 角色）。
+    const openBtn = screen.getByRole('button', { name: 'Search', expanded: false })
+    expect(screen.getAllByRole('searchbox', { name: 'Search products' })).toHaveLength(1)
+
+    await user.click(openBtn)
+    expect(openBtn).toHaveAttribute('aria-expanded', 'true')
+
+    // 展开行：真实可输入的搜索框（桌面内联框之外的第二实例）。
+    const inputs = screen.getAllByRole('searchbox', { name: 'Search products' })
+    expect(inputs).toHaveLength(2)
+    await user.type(inputs[1], 'running shoe')
+    expect(inputs[1]).toHaveValue('running shoe')
+    // 行内提交按钮与顶部开关同为 Search 名 → 应有 2 个。
+    expect(screen.getAllByRole('button', { name: 'Search' })).toHaveLength(2)
+
+    // Escape 关闭展开行（回到仅桌面内联输入框）。
+    await user.keyboard('{Escape}')
+    expect(screen.getAllByRole('searchbox', { name: 'Search products' })).toHaveLength(1)
+    expect(openBtn).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('closes the mobile search row via the cancel button', async () => {
+    const user = userEvent.setup()
+    render(
+      <WishlistProvider>
+        <AppBar />
+      </WishlistProvider>
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Search', expanded: false }))
+    expect(screen.getAllByRole('searchbox', { name: 'Search products' })).toHaveLength(2)
+
+    await user.click(screen.getByRole('button', { name: 'Close search' }))
+    expect(screen.getAllByRole('searchbox', { name: 'Search products' })).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Search' })).toHaveAttribute('aria-expanded', 'false')
+  })
 })
