@@ -1,0 +1,102 @@
+/* Shopify Buy Button —— product 本体宿主 DOM 样式（决策 #15 Buy 全接管）。
+ *
+ * 背景：为了让 Buy 模块自适应铺满所在列（用户 2026-09-06 验收反馈），
+ * product 组件的 options.product.iframe 被设为 false —— SDK 把 variant 选择器与
+ * Buy now 按钮直接渲染进宿主 DOM（不再套 280px 固定宽 iframe，宽度随列伸缩）。
+ * cart 抽屉与右下角 toggle 仍是 iframe，保留 SDK 自带样式，此处不接管。
+ *
+ * iframe:false 的代价：SDK 不再注入自身样式表，options.styles 亦不生效 ——
+ * 下面这些规则即完整替代，把控件外观对齐站点（/shop 筛选 select + PDP 购买条），
+ * 全部走语义 token（--surface/--ink/--border 等），深色模式自动翻转。
+ * 该文件只在该组件的宿主作用域 .evoloop-buy-host 下生效，不污染页面其他部分。
+ */
+.evoloop-buy-host .shopify-buy__product,
+.evoloop-buy-host .shopify-buy__product__variant-selectors {
+  width: 100%;
+}
+
+.evoloop-buy-host .shopify-buy__product__variant-selectors {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.evoloop-buy-host .shopify-buy__option-select__label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.evoloop-buy-host .shopify-buy__option-select-wrapper {
+  position: relative;
+}
+
+/* 与 /shop 筛选 select 同款：36px 高、surface 底、细边框、圆角。 */
+.evoloop-buy-host .shopify-buy__option-select__select {
+  width: 100%;
+  height: 36px;
+  padding: 0 34px 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1;
+  appearance: none;
+  -webkit-appearance: none;
+  outline: none;
+}
+.evoloop-buy-host .shopify-buy__option-select__select:focus {
+  border-color: var(--ring);
+}
+
+/* SDK 自带的下拉箭头由 iframe 内样式定位；宿主态下需手动放回 option 容器右侧。 */
+.evoloop-buy-host .shopify-buy__select-icon {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin-top: -6px;
+  pointer-events: none;
+  fill: var(--ink);
+  opacity: 0.55;
+}
+
+/* Buy now 主按钮：全宽胶囊，与 demo 购买条（bg-ink text-canvas rounded-full）同款。 */
+.evoloop-buy-host .shopify-buy__btn-wrapper {
+  margin-top: 16px;
+}
+.evoloop-buy-host .shopify-buy__btn {
+  display: block;
+  width: 100%;
+  min-height: 46px;
+  padding: 12px 24px;
+  border: 0;
+  border-radius: 9999px;
+  background: var(--ink);
+  color: var(--canvas);
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
+}
+.evoloop-buy-host .shopify-buy__btn:hover {
+  opacity: 0.88;
+}
+.evoloop-buy-host .shopify-buy__btn:active {
+  transform: translateY(1px);
+}
+.evoloop-buy-host .shopify-buy__btn:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}

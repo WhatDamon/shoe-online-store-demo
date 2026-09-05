@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import buyOptions from './shopify-buy-options.json'
 import type { ShopifyBuyConfig } from '@/server/catalog/shopify-buy'
+import './shopify-buy-host.css'
 
 // SDK 加载去重：多个 PDP 实例 / StrictMode 双跑 effect 共享同一份加载 Promise，
 // 避免重复注入 <script> 或对同一 mount 节点二次 createComponent（曾致页面出现两套 Buy now）。
@@ -115,8 +116,10 @@ export function ShopifyBuyButton({ config }: { config: ShopifyBuyConfig }) {
     }
   }, [config.productId, config.domain, config.storefrontAccessToken, config.moneyFormat])
 
+  // 外层加作用域类 evoloop-buy-host：iframe:false 后 SDK 把 product 本体渲染成宿主 DOM
+  // （无 SDK 自带样式），其宽度/外观完全由 shopify-buy-host.css 在该作用域下接管。
   return (
-    <div className="flex flex-col gap-2">
+    <div className="evoloop-buy-host flex flex-col gap-2">
       <div
         ref={mountRef}
         id={`shopify-buy-${mountId}`}
