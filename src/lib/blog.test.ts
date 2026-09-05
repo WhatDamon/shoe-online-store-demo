@@ -39,14 +39,11 @@ describe('blog content layer', () => {
   it('skips invalid metadata, tolerates rolled YAML dates, throws on broken YAML', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'blog-test-'))
     // 半成品：缺 title → 跳过不炸
-    fs.writeFileSync(
-      path.join(dir, 'draft.md'),
-      '---\ndate: 2026-09-01\n---\nDraft body\n',
-    )
+    fs.writeFileSync(path.join(dir, 'draft.md'), '---\ndate: 2026-09-01\n---\nDraft body\n')
     // 坏日期（作者加了引号 → 字符串分支严格拒绝）→ 跳过不炸
     fs.writeFileSync(
       path.join(dir, 'bad-date.md'),
-      '---\ntitle: Bad\ndate: \'2026-13-99\'\n---\nBody\n',
+      "---\ntitle: Bad\ndate: '2026-13-99'\n---\nBody\n",
     )
     // 宽松回卷容忍（js-yaml Date 形态，已文档化）：2026-02-31 → 2026-03-03
     fs.writeFileSync(

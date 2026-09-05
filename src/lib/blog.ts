@@ -115,7 +115,9 @@ export function listPosts(dir: string = defaultDir()): BlogPost[] {
     const post = parsePostFile(path.join(dir, entry.name), slug)
     if (post) posts.push(post)
   }
-  posts.sort((a, b) => (a.date === b.date ? a.slug.localeCompare(b.slug) : b.date.localeCompare(a.date)))
+  posts.sort((a, b) =>
+    a.date === b.date ? a.slug.localeCompare(b.slug) : b.date.localeCompare(a.date),
+  )
   return posts
 }
 

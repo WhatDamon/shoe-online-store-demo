@@ -74,9 +74,7 @@ export default function BlogPage() {
                   {post.title}
                 </h2>
                 {post.description ? (
-                  <p className="mt-2 text-[15px] leading-6 text-neutral-600">
-                    {post.description}
-                  </p>
+                  <p className="mt-2 text-[15px] leading-6 text-neutral-600">{post.description}</p>
                 ) : null}
                 {post.tags.length > 0 ? (
                   <p className="mt-2.5 text-xs text-neutral-400">

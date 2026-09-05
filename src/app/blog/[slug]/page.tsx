@@ -26,11 +26,7 @@ export async function generateMetadata({
 }
 
 // 文章页（SSG）：/blog/[slug] 由 generateStaticParams 预渲染（与 PDP 同约定：新增/改动文章需重建）。
-export default async function BlogPostPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>
-}) {
+export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const post = getPost(slug)
   if (!post) notFound()
@@ -47,7 +43,13 @@ export default async function BlogPostPage({
 
       {post.cover ? (
         <div className="relative mt-6 h-56 w-full overflow-hidden rounded-2xl border border-neutral-200/80 sm:h-72">
-          <Image src={post.cover} alt="" fill sizes="(min-width:768px) 48rem, 100vw" className="object-cover" />
+          <Image
+            src={post.cover}
+            alt=""
+            fill
+            sizes="(min-width:768px) 48rem, 100vw"
+            className="object-cover"
+          />
         </div>
       ) : null}
 
