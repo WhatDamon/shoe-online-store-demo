@@ -20,17 +20,61 @@ interface ProductActionsProps {
   buySlot?: ReactNode
 }
 
-// PDP 购买群集（规格 §9 顺序）：尺码选择（受控）→ "Find my size" → 手风琴（children 插槽）→ 购买条。
+// PDP 购买群集（规格 §9 顺序）：颜色选择（多色款，受控）→ 尺码选择 → "Find my size" → 手风琴（children 插槽）→ 购买条。
 // children 插槽让本集群保持单一 'use client' 边界共享 selected 状态，同时允许页面以 RSC 注入中间内容；
-// 持有所选尺码状态，供购买条在无 store 阶段做 aria-live 说明。
+// 持有所选尺码/颜色状态，供购买条在无 store 阶段做 aria-live 说明。
 export function ProductActions({ product, buyUrl, children, buySlot }: ProductActionsProps) {
+  const colors = product.colors ?? []
+  // 多色款下单前选色：照片未按颜色拆分（决策 #16），色卡仅记录意向，主图保持代表图。
+  const [colorIdx, setColorIdx] = useState(0)
   const [selected, setSelected] = useState<CanonicalSize | null>(null)
   // 面板打开 + 预置 size-fit 上下文由 AssistantProvider 处理；context 为空（Provider 未挂载的孤立渲染）时静默。
   const assistant = useAssistant()
   const selectedLabel = product.sizeOptions.find((o) => o.value === selected)?.label ?? null
+  const colorName =
+    colors.length > 0 ? (colors[Math.min(colorIdx, colors.length - 1)]?.name ?? null) : null
 
   return (
     <div className="flex flex-col gap-5">
+      {colors.length > 1 ? (
+        <fieldset className="flex flex-col gap-2.5">
+          <legend className="text-sm font-medium text-ink">
+            Color
+            {colorName ? (
+              <span className="ml-1.5 font-normal text-neutral-500">{colorName}</span>
+            ) : null}
+          </legend>
+          <div className="flex flex-wrap gap-2.5">
+            {colors.map((c, i) => {
+              const active = i === colorIdx
+              return (
+                <label key={`${c.hex}-${c.name}`} className="group cursor-pointer">
+                  <input
+                    type="radio"
+                    name="colors"
+                    value={c.name}
+                    checked={active}
+                    aria-label={c.name}
+                    onChange={() => setColorIdx(i)}
+                    className="peer sr-only"
+                  />
+                  <span
+                    className={`block h-9 w-9 rounded-full border transition-shadow group-focus-within:outline group-focus-within:outline-2 group-focus-within:outline-offset-2 group-focus-within:outline-neutral-400 ${
+                      active
+                        ? 'ring-2 ring-ink ring-offset-2 ring-offset-canvas'
+                        : 'border-neutral-300'
+                    }`}
+                    style={{ backgroundColor: c.hex }}
+                  />
+                </label>
+              )
+            })}
+          </div>
+          <p className="text-xs leading-5 text-neutral-400">
+            Photos are representative — the actual shade can vary on screen.
+          </p>
+        </fieldset>
+      ) : null}
       <SizeSelector sizeOptions={product.sizeOptions} selected={selected} onChange={setSelected} />
       <div className="-mt-3">
         <button
@@ -47,6 +91,7 @@ export function ProductActions({ product, buyUrl, children, buySlot }: ProductAc
           buyUrl={buyUrl}
           availableSoon={buyUrl == null}
           selectedLabel={selectedLabel}
+          colorName={colorName}
         />
       )}
     </div>

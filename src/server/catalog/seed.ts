@@ -119,6 +119,7 @@ function toProduct(s: SupplierShoe, index: number): Product {
       views: 3,
     },
     images: s.images,
+    colors: s.colors.map((c) => ({ name: c.en, hex: hex(c.hex) })),
     createdAt: '2026-09-06T00:00:00Z',
   }
 }

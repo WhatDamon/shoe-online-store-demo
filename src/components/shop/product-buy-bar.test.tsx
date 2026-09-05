@@ -31,3 +31,15 @@ describe('ProductBuyBar', () => {
     expect(status).toHaveTextContent('US 9')
   })
 })
+
+describe('ProductBuyBar color + size announcement', () => {
+  it('announces size and color together while the store is closed', () => {
+    render(<ProductBuyBar buyUrl={null} availableSoon selectedLabel="US 9" colorName="Ivory" />)
+    expect(screen.getByRole('status')).toHaveTextContent('US 9 · Ivory selected')
+  })
+
+  it('announces only the picked color when no size is picked', () => {
+    render(<ProductBuyBar buyUrl={null} availableSoon selectedLabel={null} colorName="Ivory" />)
+    expect(screen.getByRole('status')).toHaveTextContent('Ivory selected — we open checkout')
+  })
+})

@@ -8,6 +8,12 @@ export interface Price {
   currencyCode: CurrencyCode // amount 为美元数值
 }
 
+/** 可选色卡（决策 #16 供应链颜色词典）：营销名 + 近似 hex（小写）。仅用于下单前选色。 */
+export interface Colorway {
+  name: string
+  hex: string
+}
+
 export interface Product {
   id: string
   handle: string
@@ -29,6 +35,8 @@ export interface Product {
   visual: { palette: [string, string]; accent: string; views: 3 } // 驱动 SVG（无图兜底）
   /** 真实商品照片（public/products/<handle>/*.webp，决策 #16）；缺省/空 → SVG 视觉兜底。 */
   images?: string[]
+  /** 可选色卡；缺省/单色 → PDP 不渲染色卡选择（照片不代表具体色）。 */
+  colors?: Colorway[]
   createdAt: string // ISO，用于 newest 排序
 }
 

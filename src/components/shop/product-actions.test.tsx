@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { ProductActions } from './product-actions'
 import type { ProductView } from '@/server/catalog/service'
 
@@ -72,5 +72,52 @@ describe('ProductActions layout order (spec §9)', () => {
       (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
     expect(before(slot, buySlot)).toBe(true)
     expect(container.firstElementChild?.contains(buySlot)).toBe(true)
+  })
+})
+
+const multiColor = {
+  ...p,
+  colors: [
+    { name: 'Ink Black', hex: '#1a1a1a' },
+    { name: 'Ivory', hex: '#f3ede2' },
+    { name: 'Peach', hex: '#f5c8bd' },
+  ],
+}
+
+describe('PDP colorway picker (decision #16: color selectable pre-order)', () => {
+  it('hides the color picker for single-color or color-less products', () => {
+    const { rerender } = render(<ProductActions product={p} buyUrl={null} />)
+    expect(screen.queryByText('Color')).not.toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: /Black|Ivory/ })).not.toBeInTheDocument()
+
+    rerender(
+      <ProductActions
+        product={{ ...p, colors: [{ name: 'Ivory', hex: '#f3ede2' }] }}
+        buyUrl={null}
+      />,
+    )
+    expect(screen.queryByText('Color')).not.toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: 'Ivory' })).not.toBeInTheDocument()
+  })
+
+  it('shows one swatch per colorway and tracks the picked one in the legend', () => {
+    render(<ProductActions product={multiColor} buyUrl={null} />)
+
+    const ink = screen.getByRole('radio', { name: 'Ink Black' }) as HTMLInputElement
+    const ivory = screen.getByRole('radio', { name: 'Ivory' }) as HTMLInputElement
+    expect(ink.checked).toBe(true)
+    expect(ivory.checked).toBe(false)
+    // 图库未按颜色拆分：代表照片 + 色名标签，含诚实说明
+    expect(
+      screen.getByText('Photos are representative — the actual shade can vary on screen.'),
+    ).toBeInTheDocument()
+
+    fireEvent.click(ivory)
+    expect(ivory.checked).toBe(true)
+    expect((screen.getByRole('radio', { name: 'Ink Black' }) as HTMLInputElement).checked).toBe(
+      false,
+    )
+    // legend 内选中色名（唯一可见文本实例）
+    expect(screen.getByText('Ivory')).toBeInTheDocument()
   })
 })
