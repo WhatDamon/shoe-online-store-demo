@@ -80,7 +80,7 @@ See [`.env.example`](.env.example) for the annotated template. Summary:
 | `SITE_MARKET` | `US` | Market (`US\|EU\|UK\|JP\|CN`); drives the size-display system + mm-anchored conversions |
 | `AI_API_KEY` | *(empty)* | **Empty → Mock mode** (zero cost, demoable). Set to enable the real OpenAI-compatible provider. |
 | `AI_BASE_URL` | *(empty)* | OpenAI-compatible endpoint base URL (empty = official OpenAI) |
-| `AI_MODEL` | `gpt-4o-mini` | Chat model for the real provider |
+| `AI_MODEL` | `gpt-5.6-luna` | Chat model for the real provider (2026-09: GPT-5.6 budget tier; quality-upgrade: `gpt-5.6-terra`) |
 | `AI_EMBEDDING_MODEL` | `text-embedding-3-small` | Embedding model for semantic search (cached locally) |
 | `AI_MAX_TURNS` | `20` | Per-session turn cap (soft message when exceeded) |
 | `AI_MAX_OUTPUT_TOKENS` | `500` | Max output tokens per provider response |
