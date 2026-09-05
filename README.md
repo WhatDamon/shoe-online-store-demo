@@ -38,13 +38,10 @@ cp .env.example .env.local      # defaults are fine — empty AI_API_KEY = Mock 
 bun run dev               # http://localhost:3000
 ```
 
-> **Bun runtime required for the default SQLite driver.** The `next` CLI normally runs on the Node
-> runtime, but the SQLite driver imports `bun:sqlite` (server-only code under `src/server`, `src/db`),
-> so the npm scripts bake in `bun --bun next …` — plain `bun run dev|build|start` already runs the
-> CLI on the Bun runtime. (No `--bun` prefix needed anymore; the scripts do it.)
->
-> Set `DB_DRIVER=postgres` (with a `DATABASE_URL=postgres://…`) and the app runs on plain Node
-> runtimes too — the pg path uses `postgres.js` only, no Bun-specific imports.
+> **Node runtime for Next (spec decision #18).** The `next` CLI runs on Node; the SQLite driver is
+> `better-sqlite3` (Node native, works on Bun too) — no Bun runtime needed for dev/build/start.
+> Bun is the package manager only. `DB_DRIVER=postgres` (with a `DATABASE_URL=postgres://…`)
+> switches to `postgres.js` — both drivers run on Node, Vercel-ready.
 
 First run auto-creates the schema (**three** tables: `products` + `product_embeddings`,
 `ai_usage`) via idempotent `CREATE TABLE IF NOT EXISTS` on **either** driver — SQLite file at

@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "bun --bun next dev",
-    "build": "bun --bun next build",
-    "start": "bun --bun next start",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",
@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
+    "better-sqlite3": "^13.0.3",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.2.5",
     "drizzle-orm": "^0.45.2",
@@ -36,6 +37,7 @@
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.7",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/bun": "^1.4.0",
     "@types/node": "^24",
     "@types/react": "^19",

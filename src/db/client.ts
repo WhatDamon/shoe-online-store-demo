@@ -1,16 +1,16 @@
 import { mkdirSync } from 'node:fs'
-import { Database } from 'bun:sqlite'
+import Database from 'better-sqlite3'
 import { sql } from 'drizzle-orm'
-import { drizzle } from 'drizzle-orm/bun-sqlite'
+import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { drizzle as drizzlePg } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import { schema } from './schema'
 import { schema as pgSchema } from './schema-postgres'
 import { resolveDbDriver } from './dialect'
-import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite'
+import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 
-export type AppDb = BunSQLiteDatabase<typeof schema>
+export type AppDb = BetterSQLite3Database<typeof schema>
 export type PgAppDb = PostgresJsDatabase<typeof pgSchema>
 type AnyDb = AppDb | PgAppDb
 

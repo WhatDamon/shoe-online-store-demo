@@ -17,3 +17,6 @@ next-env.d.ts
 # format-on-save churn.
 /docs/
 *.md
+
+# import.py 生成的真实供应商目录数据文件（数组展开属噪音，不参与格式化）
+src/server/catalog/data/
