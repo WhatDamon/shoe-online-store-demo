@@ -186,7 +186,9 @@ export function AppBar({
             </div>
           </details>
 
-          <Link href="/shop" aria-label={wishlistLabel} className={cn(iconLinkClass, 'relative')}>
+          {/* 愿望单入口（决策：/saved 清单页）——心形徽标直达 Saved pairs；
+              纯 <a> 链接（零 JS 也可达），count 读 WishlistProvider 快照。 */}
+          <Link href="/saved" aria-label={wishlistLabel} className={cn(iconLinkClass, 'relative')}>
             <HeartIcon className="size-5" />
             <Badge
               variant="secondary"

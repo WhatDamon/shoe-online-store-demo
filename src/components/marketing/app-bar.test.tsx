@@ -40,7 +40,7 @@ describe('AppBar', () => {
     expect(blog).toHaveAttribute('href', '/blog')
 
     const wishlist = screen.getByRole('link', { name: /wishlist/i })
-    expect(wishlist).toHaveAttribute('href', '/shop')
+    expect(wishlist).toHaveAttribute('href', '/saved')
     expect(within(wishlist).getByText('0')).toBeInTheDocument()
   })
 
