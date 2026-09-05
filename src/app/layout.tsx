@@ -2,7 +2,6 @@ import type { ReactNode } from 'react'
 import { baseMetadata } from '@/lib/seo'
 import { Geist, Geist_Mono, Newsreader } from 'next/font/google'
 import './globals.css'
-import { DiagBeacon } from '@/components/diag-beacon'
 import { WishlistProvider } from '@/components/shop/wishlist-provider'
 import { AssistantProvider } from '@/components/assistant/assistant-provider'
 
@@ -32,10 +31,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     >
       <body className="flex min-h-full flex-col bg-canvas text-ink">
         <WishlistProvider>
-          <AssistantProvider>
-            <DiagBeacon />
-            {children}
-          </AssistantProvider>
+          <AssistantProvider>{children}</AssistantProvider>
         </WishlistProvider>
       </body>
     </html>
