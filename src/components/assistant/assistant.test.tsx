@@ -111,14 +111,15 @@ describe('assistant FAB + panel', () => {
 
   it('店务客服 chip → POST mode=support（克制客服进 FAB 会话）', async () => {
     nav.pathname = '/'
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(
-        streamedResponse([
-          frame({ type: 'delta', text: 'Care instructions are shown on each product page.' }),
-          frame({ type: 'done' }),
-        ]),
-      )
+    const fetchMock = vi.fn().mockResolvedValue(
+      streamedResponse([
+        frame({
+          type: 'delta',
+          text: 'Care instructions — from the care sheet on each product page:',
+        }),
+        frame({ type: 'done' }),
+      ]),
+    )
     vi.stubGlobal('fetch', fetchMock)
     render(
       <AssistantProvider>
@@ -131,7 +132,7 @@ describe('assistant FAB + panel', () => {
     await user.click(screen.getByRole('button', { name: 'Care guide' }))
 
     expect(
-      await screen.findByText('Care instructions are shown on each product page.'),
+      await screen.findByText('Care instructions — from the care sheet on each product page:'),
     ).toBeInTheDocument()
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     const sent = JSON.parse(String(init.body)) as { mode: string; text: string; product: unknown }
