@@ -66,7 +66,9 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
         All shoes
       </Link>
 
-      <div className="mt-4 grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-14">
+      {/* 网格基础列显式 minmax(0,1fr)：无 lg 双列时若省略列模板，隐式 auto 轨道会按内容
+          max-content 撑宽（缩略图条等不可折内容 → 窄屏横向滚动），显式约束让轨道尊重容器宽度。 */}
+      <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-14">
         <ProductGallery product={product} />
 
         <div className="flex flex-col gap-6">

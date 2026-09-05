@@ -45,7 +45,9 @@ export function ProductGallery({ product }: { product: ProductView }) {
           />
         )}
       </div>
-      <div className="flex gap-2" role="group" aria-label={`${product.title} views`}>
+      {/* flex-wrap：照片多于 4 张时缩略图条的可折行宽度大于窄屏容器，
+          换行而不是把页面撑出横向滚动（auto 轨道 min-content 防护）。 */}
+      <div className="flex flex-wrap gap-2" role="group" aria-label={`${product.title} views`}>
         {hasPhotos
           ? photos.map((src, i) => {
               const current = photoIdx === i
