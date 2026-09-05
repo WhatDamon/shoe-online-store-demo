@@ -1,13 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { HeartIcon, MenuIcon, SearchIcon, XIcon } from 'lucide-react'
 import { site } from '@/lib/site'
 import { useWishlist } from '@/components/shop/wishlist-provider'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { cn } from 'cn'
 
 /**
@@ -32,6 +31,9 @@ export function AppBar({
   const count = items.length
   const [scrolled, setScrolled] = useState(false)
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
+  // 移动菜单用原生 <details>（零 JS 也可展开，见下方说明），ref 仅用于 JS
+  // 可用时点击链接后收起面板（渐进增强，缺 JS 时无害）。
+  const mobileMenuRef = useRef<HTMLDetailsElement>(null)
 
   // 初始恒为 false（SSR/水合一致）；监听 scroll 事件切换磨砂态。
   // setScrolled 仅出现在事件回调内（不在 effect 体内同步执行），
@@ -76,32 +78,35 @@ export function AppBar({
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4">
         {/* 左：移动菜单（md 隐藏）+ 品牌 */}
         <div className="flex flex-1 items-center gap-2">
-          <div className="md:hidden">
-            <Sheet>
-              <SheetTrigger
-                aria-label="Open menu"
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full text-current transition-opacity hover:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
-              >
-                <MenuIcon className="size-5" />
-              </SheetTrigger>
-              <SheetContent side="left">
-                <SheetHeader>
-                  <SheetTitle>Menu</SheetTitle>
-                </SheetHeader>
-                <nav aria-label="Mobile" className="flex flex-col gap-1 px-2">
-                  {site.nav.map((item) => (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className="rounded-md px-3 py-2.5 text-[15px] font-medium text-foreground transition-colors hover:bg-muted"
-                    >
-                      {item.label}
-                    </Link>
-                  ))}
-                </nav>
-              </SheetContent>
-            </Sheet>
-          </div>
+          {/* 移动导航：原生 <details> 披露，不依赖任何 JS/组件库/门户/焦点陷阱。
+              真机报告过：Android Chrome 上 JS 未水合时整站交互失效（汉堡/搜索/
+              滚动磨砂全无反应）。details 由浏览器原生切换，无 JS 也必定能开；
+              JS 可用时额外提供：点击链接收起 + 打开态图标切换 Menu→✕（纯 CSS）。 */}
+          <details ref={mobileMenuRef} className="group relative md:hidden">
+            <summary
+              aria-label="Open menu"
+              className="flex h-11 w-11 list-none cursor-pointer select-none items-center justify-center rounded-full text-current transition-opacity hover:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current [&::-webkit-details-marker]:hidden"
+            >
+              <MenuIcon className="size-5 group-open:hidden" />
+              <XIcon className="hidden size-5 group-open:block" />
+              <span className="sr-only">Menu</span>
+            </summary>
+            <nav
+              aria-label="Mobile"
+              className="absolute left-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-ink/10 bg-popover text-popover-foreground shadow-lg"
+            >
+              {site.nav.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => mobileMenuRef.current?.removeAttribute('open')}
+                  className="block px-4 py-3 text-[15px] font-medium text-foreground transition-colors hover:bg-muted"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+          </details>
           <Link
             href="/"
             className="text-lg font-semibold tracking-tight transition-opacity hover:opacity-80"
