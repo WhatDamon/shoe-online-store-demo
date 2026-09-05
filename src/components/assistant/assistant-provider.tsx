@@ -20,6 +20,7 @@ import {
   subscribeSpeakPreference,
 } from '@/lib/speak-preference'
 import { readAloud, stopSpeaking, toSpeechText } from '@/lib/speech'
+import { getMySizeSnapshot } from '@/lib/my-size'
 import { useChatStream } from './use-chat-stream'
 import { AssistantFabSlot } from './fab'
 import { AssistantPanel } from './assistant-panel'
@@ -95,7 +96,9 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       const needsProduct = chipMode === 'size-fit' || chipMode === 'outfit'
       const ref = needsProduct && product ? { handle: product.handle, title: product.title } : null
       setMode(chipMode)
-      send(chipMode, label, ref)
+      // size-fit 芯片（Find my size）也带已知脚长：文本不含显式尺码时服务端回退预填。
+      const footMm = chipMode === 'size-fit' ? getMySizeSnapshot() : null
+      send(chipMode, label, ref, footMm)
     },
     [product, send],
   )
@@ -110,7 +113,9 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       // 由服务端 size-fit 确定性核心应答（askedForInput → 追问）。
       if (nextMode === 'size-fit' && p) {
         stopSpeaking() // 自动开场即新回合
-        send('size-fit', '', { handle: p.handle, title: p.title })
+        // 已知「我的尺码」（脚长 mm）时一并带去：size-fit 确定性核心文本无码则回退用之，
+        // 直接给出推荐而非追问「您穿什么码」（Find my size 预填）。
+        send('size-fit', '', { handle: p.handle, title: p.title }, getMySizeSnapshot())
       }
     },
     [send],
@@ -123,7 +128,9 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       const nextMode = mode === 'size-fit' && sizeFitSettled ? 'shopping' : mode
       if (nextMode !== mode) setMode(nextMode)
       const ref = product ? { handle: product.handle, title: product.title } : null
-      send(nextMode, text, ref)
+      // size-fit 自由输入已带显式文本；文本无码时仍以已知脚长为回退（服务端语义）。
+      const footMm = nextMode === 'size-fit' ? getMySizeSnapshot() : null
+      send(nextMode, text, ref, footMm)
     },
     [mode, product, send, sizeFitSettled],
   )

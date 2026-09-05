@@ -1,13 +1,16 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useSyncExternalStore, useState, type ReactNode } from 'react'
 import type { CanonicalSize } from '@/server/catalog/types'
 import type { ProductView } from '@/server/catalog/service'
 import type { ShopifyBuyConfig } from '@/server/catalog/shopify-buy'
+import { footMmToEU } from '@/lib/my-size'
+import { getMySizeServerSnapshot, getMySizeSnapshot, subscribeMySize } from '@/lib/my-size'
 import { useAssistant } from '@/components/assistant/assistant-provider'
 import { SizeSelector } from './size-selector'
 import { ProductBuyBar } from './product-buy-bar'
 import { ShopifyBuyButton } from './shopify-buy-button'
+import { MySizeGuide } from './my-size-guide'
 
 interface ProductActionsProps {
   product: ProductView
@@ -37,6 +40,9 @@ export function ProductActions({
 }: ProductActionsProps) {
   const storeLive = buyConfig != null
   const colors = product.colors ?? []
+  // 「我的尺码」快照：demo 分支 Select-size 命中高亮（产品在库才显形，天然自然）。
+  const myMm = useSyncExternalStore(subscribeMySize, getMySizeSnapshot, getMySizeServerSnapshot)
+  const myCanonical = myMm != null ? footMmToEU(myMm) : null
   // 多色款下单前选色：照片未按颜色拆分（决策 #16），色卡仅记录意向，主图保持代表图。
   const [colorIdx, setColorIdx] = useState(0)
   const [selected, setSelected] = useState<CanonicalSize | null>(null)
@@ -111,7 +117,14 @@ export function ProductActions({
           </p>
         </fieldset>
       ) : null}
-      <SizeSelector sizeOptions={product.sizeOptions} selected={selected} onChange={setSelected} />
+      <SizeSelector
+        sizeOptions={product.sizeOptions}
+        selected={selected}
+        onChange={setSelected}
+        match={myCanonical}
+      />
+      {/** 尺码旁「My size」行（克制）：保存后全站高亮 + Find my size 预填。 */}
+      <MySizeGuide />
       {findMySize}
       {children}
       <ProductBuyBar

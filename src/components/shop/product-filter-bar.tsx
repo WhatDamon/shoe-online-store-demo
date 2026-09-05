@@ -1,10 +1,12 @@
 'use client'
 
-import { useEffect, useRef, type FormEvent } from 'react'
+import { useEffect, useRef, useSyncExternalStore, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { parseShopParams, serializeShopParams } from '@/lib/shop-search-params'
 import type { ShopFilter } from '@/lib/shop-search-params'
 import type { CanonicalSize } from '@/server/catalog/types'
+import { footMmToEU } from '@/lib/my-size'
+import { getMySizeServerSnapshot, getMySizeSnapshot, subscribeMySize } from '@/lib/my-size'
 
 export interface FilterOption {
   value: string
@@ -60,6 +62,13 @@ export function ProductFilterBar({
   const router = useRouter()
   const selectedSizes = new Set(initial.sizeLabels ?? [])
   const showClear = hasActiveFilters(initial)
+  // 「我的尺码」命中：保存后所在码 chip 显示圆点 + aria（有码款即使未筛选也可辨识）。
+  const myCanonical = useSyncExternalStore(
+    subscribeMySize,
+    getMySizeSnapshot,
+    getMySizeServerSnapshot,
+  )
+  const myEU = myCanonical != null ? footMmToEU(myCanonical) : null
 
   // 受控 replace 模式下，服务端尚未提交新一轮筛选前 `initial` 是过期快照：若每次
   // 变更都以 `initial` 为基底重新合并，一次 RSC 往返内的连续变更（如快速连勾两个
@@ -180,8 +189,9 @@ export function ProductFilterBar({
       <fieldset className="mt-3">
         <legend className="sr-only">Filter by size</legend>
         <div className="flex flex-wrap gap-1.5">
-          {sizeOptions.map(({ label }) => {
+          {sizeOptions.map(({ label, canonical }) => {
             const checked = selectedSizes.has(label)
+            const isMySize = myEU != null && canonical === myEU
             return (
               <label key={label} className="cursor-pointer">
                 <input
@@ -189,11 +199,21 @@ export function ProductFilterBar({
                   name="size"
                   value={label}
                   checked={checked}
+                  aria-label={isMySize ? `${label} (your size)` : label}
                   onChange={(e) => toggleSize(label, e.target.checked)}
                   className="peer sr-only"
                 />
-                <span className="inline-flex items-center rounded-full border border-neutral-200 px-3 py-1 text-xs text-neutral-700 transition-colors peer-checked:border-neutral-900 peer-checked:bg-neutral-900 peer-checked:text-white">
+                <span
+                  data-your-size={isMySize ? 'true' : undefined}
+                  className="relative inline-flex items-center rounded-full border border-neutral-200 px-3 py-1 text-xs text-neutral-700 transition-colors peer-checked:border-neutral-900 peer-checked:bg-neutral-900 peer-checked:text-white"
+                >
                   {label}
+                  {isMySize ? (
+                    <span
+                      aria-hidden="true"
+                      className="ml-1.5 inline-block size-1.5 rounded-full bg-brand"
+                    />
+                  ) : null}
                 </span>
               </label>
             )

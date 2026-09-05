@@ -29,4 +29,22 @@ describe('SizeSelector', () => {
     expect(screen.getByRole('radio', { name: 'US 8.5' })).toBeChecked()
     expect(screen.getByRole('radio', { name: 'US 9' })).not.toBeChecked()
   })
+
+  it('highlights the matching size chip with a Your-size marker + aria', () => {
+    render(<SizeSelector sizeOptions={options} selected={null} onChange={() => {}} match={43} />)
+    const matched = screen.getByRole('radio', { name: 'US 9 (your size)' })
+    expect(matched).toBeInTheDocument()
+    expect(matched.closest('label')!.querySelector('[data-your-size="true"]')).not.toBeNull()
+    expect(screen.getByText('Your size')).toBeInTheDocument()
+    // 其余 chip 不带命中标注
+    expect(screen.getByRole('radio', { name: 'US 8.5' })).not.toHaveAccessibleName(
+      'US 8.5 (your size)',
+    )
+  })
+
+  it('no match prop leaves chips unmarked', () => {
+    render(<SizeSelector sizeOptions={options} selected={null} onChange={() => {}} />)
+    expect(screen.queryByText('Your size')).not.toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'US 9' })).toBeInTheDocument()
+  })
 })

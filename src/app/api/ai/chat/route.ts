@@ -11,6 +11,7 @@ type Body = {
   mode?: unknown
   text?: unknown
   product?: unknown
+  footMm?: unknown
 }
 
 export async function POST(req: Request) {
@@ -35,13 +36,15 @@ export async function POST(req: Request) {
           title: (body.product as { title: string }).title,
         }
       : null
+  const footMm =
+    typeof body.footMm === 'number' && Number.isFinite(body.footMm) ? body.footMm : null
 
   const stream = new ReadableStream({
     async start(controller) {
       const enc = new TextEncoder()
       const send = (ev: ChatEvent) => controller.enqueue(enc.encode(encodeEvent(ev)))
       try {
-        for await (const ev of chat({ sessionKey, ip, mode, text, product })) {
+        for await (const ev of chat({ sessionKey, ip, mode, text, product, footMm })) {
           send(ev)
           if (ev.type === 'done' || ev.type === 'error') break
         }

@@ -38,7 +38,7 @@ export interface ChatStream {
   /** 最近一次失败展示文案（消费端措辞）。 */
   error: string | null
   errorCode: ChatErrorCode | null
-  send: (mode: Mode, text: string, product?: ChatProductRef | null) => void
+  send: (mode: Mode, text: string, product?: ChatProductRef | null, footMm?: number | null) => void
   /** 重发最近一次请求（error 后 "Try again"）。 */
   retry: () => void
 }
@@ -112,115 +112,121 @@ export function useChatStream(): ChatStream {
     mode: Mode
     text: string
     product: ChatProductRef | null
+    footMm: number | null
   } | null>(null)
 
-  const send = useCallback((mode: Mode, text: string, product?: ChatProductRef | null) => {
-    // 重发/新回合：终止上一路未完成的流
-    abortRef.current?.abort()
-    const controller = new AbortController()
-    abortRef.current = controller
+  const send = useCallback(
+    (mode: Mode, text: string, product?: ChatProductRef | null, footMm?: number | null) => {
+      // 重发/新回合：终止上一路未完成的流
+      abortRef.current?.abort()
+      const controller = new AbortController()
+      abortRef.current = controller
 
-    const p = product ?? null
-    lastReqRef.current = { mode, text, product: p }
-    setError(null)
-    setErrorCode(null)
+      const p = product ?? null
+      const fm = footMm != null && Number.isFinite(footMm) ? footMm : null
+      lastReqRef.current = { mode, text, product: p, footMm: fm }
+      setError(null)
+      setErrorCode(null)
 
-    const userContent = text.trim()
-    const userMessage: ChatMessage | null = userContent
-      ? { id: uid(), role: 'user', content: text }
-      : null
-    const assistantMessage: ChatMessage = {
-      id: uid(),
-      role: 'assistant',
-      content: '',
-      streaming: true,
-    }
-    activeIdRef.current = assistantMessage.id
-    setMessages((prev) =>
-      userMessage ? [...prev, userMessage, assistantMessage] : [...prev, assistantMessage],
-    )
-    setIsStreaming(true)
-
-    const onEvent = (event: ChatEvent) => {
-      const id = activeIdRef.current
-      if (!id) return
-      if (event.type === 'delta') {
-        setMessages((prev) =>
-          prev.map((m) => (m.id === id ? { ...m, content: m.content + event.text } : m)),
-        )
-      } else if (event.type === 'productCards') {
-        const items = event.items.filter(isValidCard)
-        setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, cards: items } : m)))
-      } else if (event.type === 'sizeFit') {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === id
-              ? {
-                  ...m,
-                  sizeFit: {
-                    recommended: event.recommended,
-                    alternatives: event.alternatives,
-                    rationale: event.rationale,
-                  },
-                }
-              : m,
-          ),
-        )
-      } else if (event.type === 'done') {
-        setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, streaming: false } : m)))
-      } else if (event.type === 'error') {
-        const failure = { code: event.code, message: event.message }
-        setMessages((prev) =>
-          prev.map((m) => (m.id === id ? { ...m, streaming: false, error: failure } : m)),
-        )
-        setError(event.message)
-        setErrorCode(event.code)
+      const userContent = text.trim()
+      const userMessage: ChatMessage | null = userContent
+        ? { id: uid(), role: 'user', content: text }
+        : null
+      const assistantMessage: ChatMessage = {
+        id: uid(),
+        role: 'assistant',
+        content: '',
+        streaming: true,
       }
-    }
+      activeIdRef.current = assistantMessage.id
+      setMessages((prev) =>
+        userMessage ? [...prev, userMessage, assistantMessage] : [...prev, assistantMessage],
+      )
+      setIsStreaming(true)
 
-    void (async () => {
-      try {
-        const sessionKey = (sessionKeyRef.current ??= uid())
-        const res = await fetch('/api/ai/chat', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            sessionKey,
-            mode,
-            text: userContent,
-            product: p,
-          }),
-          signal: controller.signal,
-        })
-        if (!res.ok || !res.body) throw new Error(`chat request failed: HTTP ${res.status}`)
-        await consumeSSE(res.body, onEvent)
-      } catch {
-        // 被新请求终止：静默（onEvent 不再有意义，新流接管）
-        if (controller.signal.aborted) return
-        const failure = {
-          code: 'provider' as ChatErrorCode,
-          message: NETWORK_ERROR_TEXT,
-        }
-        setError(NETWORK_ERROR_TEXT)
-        setErrorCode('provider')
+      const onEvent = (event: ChatEvent) => {
         const id = activeIdRef.current
-        if (id) {
+        if (!id) return
+        if (event.type === 'delta') {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === id ? { ...m, content: m.content + event.text } : m)),
+          )
+        } else if (event.type === 'productCards') {
+          const items = event.items.filter(isValidCard)
+          setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, cards: items } : m)))
+        } else if (event.type === 'sizeFit') {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === id
+                ? {
+                    ...m,
+                    sizeFit: {
+                      recommended: event.recommended,
+                      alternatives: event.alternatives,
+                      rationale: event.rationale,
+                    },
+                  }
+                : m,
+            ),
+          )
+        } else if (event.type === 'done') {
+          setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, streaming: false } : m)))
+        } else if (event.type === 'error') {
+          const failure = { code: event.code, message: event.message }
           setMessages((prev) =>
             prev.map((m) => (m.id === id ? { ...m, streaming: false, error: failure } : m)),
           )
-        }
-      } finally {
-        if (abortRef.current === controller) {
-          abortRef.current = null
-          setIsStreaming(false)
+          setError(event.message)
+          setErrorCode(event.code)
         }
       }
-    })()
-  }, [])
+
+      void (async () => {
+        try {
+          const sessionKey = (sessionKeyRef.current ??= uid())
+          const res = await fetch('/api/ai/chat', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              sessionKey,
+              mode,
+              text: userContent,
+              product: p,
+              ...(fm != null ? { footMm: fm } : {}),
+            }),
+            signal: controller.signal,
+          })
+          if (!res.ok || !res.body) throw new Error(`chat request failed: HTTP ${res.status}`)
+          await consumeSSE(res.body, onEvent)
+        } catch {
+          // 被新请求终止：静默（onEvent 不再有意义，新流接管）
+          if (controller.signal.aborted) return
+          const failure = {
+            code: 'provider' as ChatErrorCode,
+            message: NETWORK_ERROR_TEXT,
+          }
+          setError(NETWORK_ERROR_TEXT)
+          setErrorCode('provider')
+          const id = activeIdRef.current
+          if (id) {
+            setMessages((prev) =>
+              prev.map((m) => (m.id === id ? { ...m, streaming: false, error: failure } : m)),
+            )
+          }
+        } finally {
+          if (abortRef.current === controller) {
+            abortRef.current = null
+            setIsStreaming(false)
+          }
+        }
+      })()
+    },
+    [],
+  )
 
   const retry = useCallback(() => {
     const last = lastReqRef.current
-    if (last) send(last.mode, last.text, last.product)
+    if (last) send(last.mode, last.text, last.product, last.footMm)
   }, [send])
 
   return { messages, isStreaming, error, errorCode, send, retry }

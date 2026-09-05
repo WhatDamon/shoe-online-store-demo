@@ -11,6 +11,7 @@ import { convert } from '@/server/catalog/size-charts'
 import type { CanonicalSize, Product } from '@/server/catalog/types'
 import { getProductForMarket } from '@/server/catalog/service'
 import { market } from '@/lib/market'
+import { footMmToEU } from '@/lib/my-size'
 import { retrieve } from '@/server/search/retrieval'
 import { createDefaultRepository } from '@/server/search/repository'
 import { createSizeFitEvent } from './events'
@@ -36,6 +37,8 @@ export interface ChatRequest {
   mode: Mode
   product?: { handle: string; title: string } | null
   text: string
+  /** 「我的尺码」脚长 mm（可选预填）：size-fit 且文本无显式尺码时回退用之。 */
+  footMm?: number | null
 }
 
 export interface ChatOptions {
@@ -155,7 +158,10 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
         return
       }
       const system = systemFor('size-fit', { product: productContextOf(view) })
-      const advice = adviceFor(view, text)
+      // 「我的尺码」预填（Find my size）：文本无显式尺码且脚长 mm 在表内 → adviceFor 直接采用。
+      const known =
+        req.footMm != null && Number.isFinite(req.footMm) ? footMmToEU(req.footMm) : null
+      const advice = adviceFor(view, text, null, known)
       if (advice.askedForInput || advice.recommended === null) {
         // 追问问题 / 附近无在库——都只回文本
         yield { type: 'delta', text: advice.rationale }
