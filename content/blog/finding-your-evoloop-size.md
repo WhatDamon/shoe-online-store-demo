@@ -24,15 +24,15 @@ Once we know your length, a standard conversion table maps it to the EU size we 
 3. Mark the tip of your longest toe.
 4. Measure the distance in millimetres.
 
-That number is your starting point. If you fall between sizes, size up — our studio advice is always the same: *comfort over looks*.
+That number is your starting point. If you fall between sizes, size up — our studio advice is always the same: _comfort over looks_.
 
 ## An example
 
-| Foot length (mm) | EU size | Notes |
-| --- | --- | --- |
-| 227 | 35 | smallest size we print |
-| 260 | 40 | most common for our everyday collection |
-| 290 | 45 | upper end of the range |
+| Foot length (mm) | EU size | Notes                                   |
+| ---------------- | ------- | --------------------------------------- |
+| 227              | 35      | smallest size we print                  |
+| 260              | 40      | most common for our everyday collection |
+| 290              | 45      | upper end of the range                  |
 
 A few points worth knowing:
 
@@ -42,4 +42,4 @@ A few points worth knowing:
 
 ## Still unsure?
 
-Reach for the *Find my size* helper on any product page, or ask the shop assistant right there. We would rather you size up than size out.
+Reach for the _Find my size_ helper on any product page, or ask the shop assistant right there. We would rather you size up than size out.
