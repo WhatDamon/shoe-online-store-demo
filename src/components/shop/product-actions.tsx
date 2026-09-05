@@ -43,7 +43,11 @@ export function ProductActions({ product, buyUrl, children, buySlot }: ProductAc
       </div>
       {children}
       {buySlot ?? (
-        <ProductBuyBar buyUrl={buyUrl} availableSoon={buyUrl == null} selectedLabel={selectedLabel} />
+        <ProductBuyBar
+          buyUrl={buyUrl}
+          availableSoon={buyUrl == null}
+          selectedLabel={selectedLabel}
+        />
       )}
     </div>
   )

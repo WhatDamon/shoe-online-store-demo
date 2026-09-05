@@ -101,7 +101,7 @@ export function AssistantPanel({
         <div className="min-h-0 flex-1">
           {showWelcome ? (
             <div className="flex h-full flex-col gap-4 overflow-y-auto px-4 py-4">
-              <div className="max-w-[85%] rounded-2xl rounded-bl-sm border border-neutral-200 bg-white px-3.5 py-2.5 text-sm leading-6 text-neutral-800">
+              <div className="max-w-[85%] rounded-2xl rounded-bl-sm border border-neutral-200 bg-surface px-3.5 py-2.5 text-sm leading-6 text-neutral-800">
                 Hi — need a hand finding your pair?
               </div>
               {/* size-fit/outfit 需商品上下文；无商品时不渲染死路入口（服务端会回

@@ -43,7 +43,7 @@ export async function CollectionCards() {
   )
 
   return (
-    <section id="collections" aria-labelledby="collections-heading" className="bg-white">
+    <section id="collections" aria-labelledby="collections-heading" className="bg-surface">
       <div className="mx-auto w-full max-w-6xl px-4 py-20 md:py-28">
         <p className="text-xs font-medium uppercase tracking-[0.18em] text-brand">Shop by series</p>
         <h2
@@ -57,7 +57,7 @@ export async function CollectionCards() {
             <Link
               key={card.handle}
               href={`/shop?collection=${card.handle}`}
-              className="group flex flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white transition-shadow hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
+              className="group flex flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-surface transition-shadow hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
             >
               <div className="overflow-hidden bg-[#f3f1ea]">
                 {card.representative ? (

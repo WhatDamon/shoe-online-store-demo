@@ -85,7 +85,11 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
 
           <p className="text-[15px] leading-7 text-neutral-600">{product.description}</p>
 
-          <ProductActions product={product} buyUrl={buyUrl} buySlot={buyButton ? <ShopifyBuyButton config={buyButton} /> : undefined}>
+          <ProductActions
+            product={product}
+            buyUrl={buyUrl}
+            buySlot={buyButton ? <ShopifyBuyButton config={buyButton} /> : undefined}
+          >
             <Accordion className="border-t border-neutral-200">
               <AccordionItem value="materials-fit">
                 <AccordionTrigger>Materials &amp; fit</AccordionTrigger>

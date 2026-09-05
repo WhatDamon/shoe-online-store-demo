@@ -54,7 +54,11 @@ describe('ProductActions layout order (spec §9)', () => {
 
   it('renders the buySlot in the CTA position instead of the BuyBar when provided', () => {
     const { container } = render(
-      <ProductActions product={p} buyUrl={null} buySlot={<div data-testid="buy-slot">Buy on Shopify</div>}>
+      <ProductActions
+        product={p}
+        buyUrl={null}
+        buySlot={<div data-testid="buy-slot">Buy on Shopify</div>}
+      >
         <div data-testid="accordion-slot">Materials &amp; fit</div>
       </ProductActions>,
     )

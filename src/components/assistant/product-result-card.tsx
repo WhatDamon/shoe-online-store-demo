@@ -13,7 +13,7 @@ export function ProductResultCard({ item }: { item: ProductCardEvent }) {
   return (
     <Link
       href={href}
-      className="flex items-center gap-3 rounded-xl border border-neutral-200 bg-white p-2 transition-colors hover:border-neutral-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
+      className="flex items-center gap-3 rounded-xl border border-neutral-200 bg-surface p-2 transition-colors hover:border-neutral-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
     >
       <span className="block h-12 w-[4.5rem] shrink-0 overflow-hidden rounded-md bg-[#f3f1ea]">
         <ProductVisual

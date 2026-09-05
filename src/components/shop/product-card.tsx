@@ -28,7 +28,7 @@ export function ProductCard({ product }: { product: ProductView }) {
   const hasWishlist = useOptionalWishlist() !== null
 
   return (
-    <article className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white transition-shadow hover:shadow-md">
+    <article className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-surface transition-shadow hover:shadow-md">
       <Link
         href={href}
         className="flex h-full flex-col focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
@@ -56,7 +56,7 @@ export function ProductCard({ product }: { product: ProductView }) {
         </div>
       </Link>
       {hasWishlist ? (
-        <div className="absolute right-2.5 top-2.5 z-10 rounded-full bg-white/90 backdrop-blur-sm">
+        <div className="absolute right-2.5 top-2.5 z-10 rounded-full bg-surface/90 backdrop-blur-sm">
           {/* 角落按钮是 Link 的兄弟节点（非后代）：点击它不会触发卡片导航 */}
           <WishlistButton handle={product.handle} />
         </div>

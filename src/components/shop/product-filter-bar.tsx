@@ -46,7 +46,7 @@ function hasActiveFilters(f: ShopFilter): boolean {
 }
 
 const selectClass =
-  'h-9 rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-900 focus:border-neutral-400 focus:outline-none'
+  'h-9 rounded-lg border border-neutral-200 bg-surface px-3 text-sm text-neutral-900 focus:border-neutral-400 focus:outline-none'
 
 export function ProductFilterBar({
   initial,
@@ -129,11 +129,11 @@ export function ProductFilterBar({
             key={initial.q ?? ''}
             defaultValue={initial.q ?? ''}
             placeholder="Search styles"
-            className="h-9 w-full min-w-0 flex-1 rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-400 focus:outline-none"
+            className="h-9 w-full min-w-0 flex-1 rounded-lg border border-neutral-200 bg-surface px-3 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-400 focus:outline-none"
           />
           <button
             type="submit"
-            className="h-9 shrink-0 rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-700 transition-colors hover:bg-neutral-50"
+            className="h-9 shrink-0 rounded-lg border border-neutral-200 bg-surface px-3 text-sm text-neutral-700 transition-colors hover:bg-neutral-50"
           >
             Search
           </button>

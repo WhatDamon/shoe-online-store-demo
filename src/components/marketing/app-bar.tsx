@@ -102,7 +102,7 @@ export function AppBar({
           </div>
           <Link
             href="/"
-            className="font-heading text-lg font-semibold tracking-tight transition-opacity hover:opacity-80"
+            className="text-lg font-semibold tracking-tight transition-opacity hover:opacity-80"
           >
             {site.name}
           </Link>
@@ -138,7 +138,7 @@ export function AppBar({
               className={cn(
                 'h-9 w-44 rounded-full pl-10 text-sm transition-colors',
                 searchSolid
-                  ? 'border-neutral-300 bg-white text-ink placeholder:text-neutral-400'
+                  ? 'border-neutral-300 bg-surface text-ink placeholder:text-neutral-400'
                   : 'border-white/25 bg-white/10 text-white placeholder:text-white/60',
               )}
             />
@@ -188,7 +188,7 @@ export function AppBar({
                 autoFocus
                 placeholder="Search styles"
                 aria-label="Search products"
-                className="h-10 w-full rounded-full border-neutral-300 bg-white pl-10 pr-4 text-ink placeholder:text-neutral-400"
+                className="h-10 w-full rounded-full border-neutral-300 bg-surface pl-10 pr-4 text-ink placeholder:text-neutral-400"
               />
             </div>
             <button

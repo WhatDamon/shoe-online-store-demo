@@ -15,7 +15,7 @@ export function Hero() {
   const [imageFailed, setImageFailed] = useState(false)
 
   return (
-    <section className="relative flex min-h-dvh items-end overflow-hidden bg-ink">
+    <section className="relative flex min-h-dvh items-end overflow-hidden bg-[#111111]">
       {imageFailed ? null : (
         <Image
           src={HERO_IMAGE}
@@ -30,7 +30,7 @@ export function Hero() {
       {/* 顶部较深，保证透明 AppBar 上的白色文字可读 */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-ink/70 via-ink/10 to-ink/50"
+        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#111111]/70 via-[#111111]/10 to-[#111111]/50"
       />
 
       <div className="relative mx-auto w-full max-w-6xl px-4 pb-28 pt-40">
@@ -44,7 +44,7 @@ export function Hero() {
         <div className="mt-10 flex flex-wrap items-center gap-4">
           <Link
             href="/shop"
-            className="inline-flex h-12 items-center justify-center rounded-full bg-white px-7 text-[15px] font-medium text-ink transition-colors hover:bg-neutral-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            className="inline-flex h-12 items-center justify-center rounded-full bg-white px-7 text-[15px] font-medium text-[#111111] transition-colors hover:bg-[#e5e5e5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
             {site.hero.cta}
           </Link>

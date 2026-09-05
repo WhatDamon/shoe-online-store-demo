@@ -75,7 +75,7 @@ export function MessageList({ messages, isStreaming, sizeLabelFor, onRetry }: Me
                   'flex max-w-[85%] flex-col gap-2 rounded-2xl px-3.5 py-2.5 text-sm leading-6',
                   isUser
                     ? 'rounded-br-sm bg-ink text-canvas'
-                    : 'rounded-bl-sm border border-neutral-200 bg-white text-neutral-800',
+                    : 'rounded-bl-sm border border-neutral-200 bg-surface text-neutral-800',
                 )}
               >
                 {message.sizeFit ? (

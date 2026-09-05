@@ -15,7 +15,7 @@ const storyPoints = [
 
 export function StorySection() {
   return (
-    <section id="story" aria-labelledby="story-heading" className="bg-white">
+    <section id="story" aria-labelledby="story-heading" className="bg-surface">
       <div className="mx-auto w-full max-w-6xl px-4 py-20 md:py-28">
         <div className="mx-auto max-w-3xl text-center">
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-brand">

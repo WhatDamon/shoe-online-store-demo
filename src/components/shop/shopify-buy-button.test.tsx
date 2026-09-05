@@ -18,8 +18,7 @@ interface FakeSdk {
 }
 
 function makeSdk(ui?: FakeUi): FakeSdk {
-  const resolvedUi: FakeUi =
-    ui ?? { createComponent: vi.fn(async () => {}) }
+  const resolvedUi: FakeUi = ui ?? { createComponent: vi.fn(async () => {}) }
   return {
     buildClient: vi.fn(() => ({})),
     UI: { onReady: vi.fn(async () => resolvedUi) },

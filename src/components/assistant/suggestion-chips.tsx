@@ -36,7 +36,7 @@ export function SuggestionChips({
           <button
             type="button"
             onClick={() => onPick(s.mode, s.label)}
-            className="rounded-full border border-neutral-300 bg-white px-3.5 py-1.5 text-[13px] text-neutral-800 transition-colors hover:border-neutral-400 hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
+            className="rounded-full border border-neutral-300 bg-surface px-3.5 py-1.5 text-[13px] text-neutral-800 transition-colors hover:border-neutral-400 hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
           >
             {s.label}
           </button>
