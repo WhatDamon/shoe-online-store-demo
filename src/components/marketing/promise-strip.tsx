@@ -1,7 +1,9 @@
 const promises = [
   {
-    title: 'Free returns',
-    copy: 'Try them for 30 days. If the fit is not right, send them back on us.',
+    // 决策 #20：定制按单打印不可退，故首页不再承诺免费退货；
+    // 改为「按脚长（mm）选码」的预防性合脚承诺（与 PDP 尺码表/Story 的 mm-fit 叙事一致）。
+    title: 'Sized to you',
+    copy: 'Find your pair by foot length — sizing is anchored in millimetres and checked before it prints.',
   },
   {
     title: 'Printed to order',

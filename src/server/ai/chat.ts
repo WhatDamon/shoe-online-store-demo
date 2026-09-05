@@ -7,8 +7,10 @@ import type { SessionMessage } from '@/server/guardrails/session-state'
 import { MAX_OUTPUT_TOKENS, estTokens, truncateMessage } from '@/server/guardrails/text'
 import { today } from '@/server/guardrails/budget'
 import { catalog } from '@/server/catalog/adapter'
-import type { Product } from '@/server/catalog/types'
+import { convert } from '@/server/catalog/size-charts'
+import type { CanonicalSize, Product } from '@/server/catalog/types'
 import { getProductForMarket } from '@/server/catalog/service'
+import { market } from '@/lib/market'
 import { retrieve } from '@/server/search/retrieval'
 import { createDefaultRepository } from '@/server/search/repository'
 import { createSizeFitEvent } from './events'
@@ -17,6 +19,16 @@ import type { ChatEvent, Mode, ProductCard } from './events'
 import { aiProvider, aiModel } from './provider'
 import { systemFor } from './prompts'
 import { adviceFor } from './size-input'
+
+// 商品卡/码段展示口径（决策 #20）：与 PDP 描述/Select size chips 同源——canonical(EU) 经
+// 市场换算表显示为市场系统区间（默认 US），绝不裸写 EU 数字（同号易与中国码混读）。
+// 市场大小写标签取市场系统名（US/EU/UK/JP/CN）。
+function sizeRangeText(sizes: number[]): string | null {
+  const lo = convert(Math.min(...sizes) as CanonicalSize, market.sizeSystem)
+  const hi = convert(Math.max(...sizes) as CanonicalSize, market.sizeSystem)
+  if (lo == null || hi == null) return null
+  return `${market.sizeSystem} ${lo}–${hi}`
+}
 
 export interface ChatRequest {
   sessionKey: string
@@ -58,7 +70,7 @@ const toCard = (p: Product): ProductCard => ({
   image: p.images?.[0] ?? null,
   imageKind: (p.images?.length ?? 0) > 0 ? 'photo' : 'svg',
   photoCount: p.images?.length ?? 0,
-  sizeRange: p.sizes.length ? `EU ${Math.min(...p.sizes)}–${Math.max(...p.sizes)}` : null,
+  sizeRange: p.sizes.length ? sizeRangeText(p.sizes) : null,
   colorCount: p.colors?.length ?? 0,
   palette: p.visual.palette,
 })

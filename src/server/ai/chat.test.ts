@@ -63,7 +63,7 @@ describe('events SSE 帧往返', () => {
             image: null,
             imageKind: 'svg',
             photoCount: 0,
-            sizeRange: 'EU 35–44',
+            sizeRange: 'US 4.5–9.5',
             colorCount: 5,
             palette: ['#a', '#b'],
           },

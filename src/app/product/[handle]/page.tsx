@@ -106,8 +106,9 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
                       we only print what you buy.
                     </p>
                     <p className="text-neutral-600">
-                      Orders ship in recycled packaging once your pair is printed. Free returns
-                      within 30 days.
+                      Because each pair is made to your order, custom-printed items can&apos;t be
+                      returned or refunded. If your pair arrives faulty or the fit is not as
+                      promised, message us within 30 days and we&apos;ll sort it out.
                     </p>
                   </AccordionContent>
                 </AccordionItem>

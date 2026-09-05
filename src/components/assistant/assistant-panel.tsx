@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input'
 import type { Mode } from '@/server/ai/events'
 import type { CanonicalSize } from '@/server/catalog/types'
 import type { ProductView } from '@/server/catalog/service'
+import { convert } from '@/server/catalog/size-charts'
+import { market } from '@/lib/market'
 import type { ChatMessage } from './use-chat-stream'
 import { MessageList } from './message-list'
 import {
@@ -53,8 +55,14 @@ export function AssistantPanel({
     setDraft('')
   }
 
+  // 决策 #20：码段/附近尺码一律走市场标签（同 Select size chips）；
+  // 无商品上下文时也无 sizeOptions，回退同口径市场标签（默认 US，经换算表）。
   const sizeLabelFor = (eu: CanonicalSize): string =>
-    product?.sizeOptions.find((o) => o.value === eu)?.label ?? `EU ${eu}`
+    product?.sizeOptions.find((o) => o.value === eu)?.label ??
+    (() => {
+      const v = convert(eu, market.sizeSystem)
+      return v == null ? `EU ${eu}` : `${market.sizeSystem} ${v}`
+    })()
 
   const showWelcome = messages.length === 0 && !isStreaming
 

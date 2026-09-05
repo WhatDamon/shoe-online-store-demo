@@ -119,7 +119,7 @@ describe('assistant FAB + panel', () => {
               image: null,
               imageKind: 'svg',
               photoCount: 0,
-              sizeRange: 'EU 35–44',
+              sizeRange: 'US 4.5–9.5',
               colorCount: 5,
               palette: ['#e8e6e0', '#d8d4cb'],
             },
@@ -156,7 +156,7 @@ describe('assistant FAB + panel', () => {
     expect(link).toHaveAttribute('href', '/product/daily-drift')
     // 真实元数据（货号 + 码段·色卡），绝不出现价格（AI 不带价）
     expect(within(link).getByText('DC-1001')).toBeInTheDocument()
-    expect(within(link).getByText(/EU 35–44 · 5 colors/)).toBeInTheDocument()
+    expect(within(link).getByText(/US 4.5–9.5 · 5 colors/)).toBeInTheDocument()
     expect(within(link).queryByText('$128.00')).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /Broken/i })).not.toBeInTheDocument()
     expect(await screen.findByText(/Here is your match/i)).toBeInTheDocument()

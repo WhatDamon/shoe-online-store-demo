@@ -1,4 +1,5 @@
-import type { Product } from './types'
+import type { CanonicalSize, Product } from './types'
+import { convert } from './size-charts'
 import supplier from './data/supplier.json'
 
 // 供应商真实目录（决策 #16）：源为 /Users/damon233/Downloads/萨洛丁款式集合.xlsx，
@@ -70,9 +71,20 @@ const GENDER_WORD: Record<SupplierShoe['genders'], string> = {
 }
 
 const colorNames = (s: SupplierShoe) => s.colors.map((c) => c.en)
+
+// 码段展示（决策 #20 文案美标化）：供应商段为 EU/中国同号整数（女 35-40# / 男 39-44#），
+// 描述与 features 不再裸写 EU 数字（恰与中国码同号，易误读为中国标准），而是按 US 市场
+// 换算成分段区间展示。换算走仓库统一 mm 锚表（与 Select size chips / size-range 同源），
+// 男女同表（fixture 为 unisex/men 基础，用户已接受该 demo 口径，见 size-fixture 注释）。
 const sizeRunText = (s: SupplierShoe) =>
   s.segments
-    .map((seg) => `${seg.kind === 'women' ? "Women's" : "Men's"} ${seg.lo}–${seg.hi}`)
+    .map((seg) => {
+      const lo = convert(seg.lo as CanonicalSize, 'US')
+      const hi = convert(seg.hi as CanonicalSize, 'US')
+      if (lo == null || hi == null) return null // 表外段（当前目录不存在）不产出文案
+      return `${seg.kind === 'women' ? "Women's" : "Men's"} US ${lo}–${hi}`
+    })
+    .filter((part): part is string => part !== null)
     .join(', ')
 
 const hex = (value: string) => (value || '').toLowerCase()

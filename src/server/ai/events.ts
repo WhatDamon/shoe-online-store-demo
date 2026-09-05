@@ -15,7 +15,7 @@ export type ProductCard = {
   imageKind: 'photo' | 'svg'
   /** 该款照片张数（真实）。 */
   photoCount: number
-  /** EU 整档码段（如 35–44）；暂无尺码 → null。 */
+  /** 可售码段的市场显示区间（如 “US 4.5–9.5”）；暂无尺码 → null。 */
   sizeRange: string | null
   /** 色卡数（真实）。 */
   colorCount: number
