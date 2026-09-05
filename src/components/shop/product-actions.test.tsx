@@ -75,6 +75,38 @@ describe('ProductActions layout order (spec §9)', () => {
   })
 })
 
+// 店款（决策 #15 Buy 模块接管）：交互区只有真实购买模块 + 手风琴 children，
+// demo 选色/选码/尺码助手全隐藏；结账警示须含「学生黑客松、非长期服务、真实出货、售后找供应商」。
+describe('store-live PDP (Buy takeover + project-nature caption)', () => {
+  it('renders only children + buy slot + caption, no demo pickers', () => {
+    render(
+      <ProductActions
+        product={p}
+        buyUrl={null}
+        storeLive
+        buySlot={<div data-testid="buy-slot">Buy module</div>}
+      >
+        <div data-testid="accordion-slot">Materials &amp; fit</div>
+      </ProductActions>,
+    )
+
+    // demo 交互件全部隐藏
+    expect(screen.queryByText('Select size')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Find my size' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Available soon' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Color')).not.toBeInTheDocument()
+
+    // 手风琴 children 与 Buy 模块保留
+    expect(screen.getByTestId('accordion-slot')).toBeInTheDocument()
+    expect(screen.getByTestId('buy-slot')).toBeInTheDocument()
+
+    // 结账警示：非长期商业服务 + 真实出货 + 售后需联系供应商
+    const caption = screen.getByText(/not a long-term commercial service/)
+    expect(caption.textContent).toContain('really produced and shipped')
+    expect(caption.textContent).toContain('contact the supplier')
+  })
+})
+
 const multiColor = {
   ...p,
   colors: [

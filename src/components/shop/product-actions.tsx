@@ -51,7 +51,9 @@ export function ProductActions({
           {children}
           {buySlot}
           <p className="text-xs leading-5 text-neutral-500">
-            Currency, size availability and checkout are handled live on Shopify.
+            Evoloop is a student hackathon showcase, not a long-term commercial service. This
+            checkout is live — orders are really produced and shipped. For after-sales support,
+            contact the supplier (details on your order confirmation).
           </p>
         </>
       ) : (

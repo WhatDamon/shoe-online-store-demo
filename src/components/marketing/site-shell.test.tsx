@@ -30,6 +30,12 @@ describe('SiteShell', () => {
     expect(
       within(footer).getByText('3D Printed. Closed-Loop. A New Footwear Phenomenon.'),
     ).toBeInTheDocument()
+    // 项目性质声明：学生黑客松作品、非商业服务（页脚全站一行）
+    expect(
+      within(footer).getByText(
+        'A student hackathon project — a design showcase, not a commercial store. Availability and features are not guaranteed.',
+      ),
+    ).toBeInTheDocument()
   })
 
   it('keeps the same structure for the overlay tone (landing)', () => {

@@ -30,9 +30,13 @@ export function Footer() {
         <p className="text-sm text-[#fafaf8]/50">© 2026 {site.name}</p>
       </div>
       {/* 核心 Slogan：全站页脚收尾，每页可见（规格克制：小号、低对比） */}
-      <p className="mx-auto w-full max-w-6xl border-t border-[#fafaf8]/10 px-4 pb-12 pt-6 text-center text-sm text-[#fafaf8]/50">
-        {site.tagline}
-      </p>
+      <div className="mx-auto w-full max-w-6xl border-t border-[#fafaf8]/10 px-4 pb-12 pt-6 text-center">
+        <p className="text-sm text-[#fafaf8]/50">{site.tagline}</p>
+        {/* 项目性质：学生黑客松作品、非商业服务（克制：更小字号、更低对比） */}
+        <p className="mx-auto mt-3 max-w-2xl text-xs leading-5 text-[#fafaf8]/40">
+          {site.projectNote}
+        </p>
+      </div>
     </footer>
   )
 }
