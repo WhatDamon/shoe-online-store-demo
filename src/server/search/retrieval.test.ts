@@ -27,15 +27,18 @@ describe('retrieve', () => {
   })
 
   // 语义路径：mock embed 返回按 seed 内容 one-hot 的固定向量。
+  // 支持批量入参（补齐逻辑现为一次请求补算全部缺失商品）。
   // 查询向量与 daily-drift(p01) 对齐 → 余弦 1，其余产品 0。
   function mockSemanticEmbed() {
     const contents = new Map(seedProducts.map((p) => [textualContent(p), p]))
-    mockEmbed.mockImplementation(async (texts: string[]) => {
-      const hit = contents.get(texts[0])
-      if (!hit) return [oneHot(0)] // 查询串 → 对齐 p01
-      const idx = seedProducts.findIndex((p) => p.id === hit.id)
-      return [oneHot(idx)]
-    })
+    mockEmbed.mockImplementation(async (texts: string[]) =>
+      texts.map((t) => {
+        const hit = contents.get(t)
+        if (!hit) return oneHot(0) // 查询串 → 对齐 p01
+        const idx = seedProducts.findIndex((p) => p.id === hit.id)
+        return oneHot(idx)
+      }),
+    )
   }
 
   it('无 embedding 能力时走关键词降级，且不调用 embed', async () => {
@@ -70,8 +73,10 @@ describe('retrieve', () => {
 
     const res = await retrieve('everyday breathable runner', { embedIfAvailable: true }, repo)
 
-    // 全量 16 商品首次懒嵌入 + 1 次查询嵌入
-    expect(mockEmbed).toHaveBeenCalledTimes(DIM + 1)
+    // 1 次查询嵌入 + 1 次批量补齐嵌入（DIM 个商品一次请求）
+    expect(mockEmbed).toHaveBeenCalledTimes(2)
+    const batchCall = mockEmbed.mock.calls.find(([texts]) => (texts as string[]).length > 1)
+    expect((batchCall?.[0] as string[]).length).toBe(DIM)
     expect(res).toHaveLength(DIM)
     expect(res[0].handle).toBe('daily-drift')
     expect(res[0].score).toBeCloseTo(1)
@@ -92,11 +97,11 @@ describe('retrieve', () => {
     mockSemanticEmbed()
     const repo = createRepository(createDb(':memory:'))
     await retrieve('warmup query', { embedIfAvailable: true }, repo)
-    expect(mockEmbed).toHaveBeenCalledTimes(DIM + 1)
+    expect(mockEmbed).toHaveBeenCalledTimes(2) // 查询 + 批量补齐
 
     await retrieve('warmup query', { embedIfAvailable: true }, repo)
     // 第二次仅查询嵌入（+1），16 商品全部命中缓存不再嵌入
-    expect(mockEmbed).toHaveBeenCalledTimes(DIM + 2)
+    expect(mockEmbed).toHaveBeenCalledTimes(3)
   })
 
   it('contentHash 变化时仅重算该商品并刷新缓存', async () => {
@@ -115,7 +120,8 @@ describe('retrieve', () => {
     }
 
     const res = await retrieve('everyday breathable runner', { embedIfAvailable: true }, repo)
-    expect(mockEmbed).toHaveBeenCalledTimes(2) // 1 查询 + 仅 p01
+    expect(mockEmbed).toHaveBeenCalledTimes(2) // 1 查询 + 批量补齐(仅 p01 一个)
+    expect((mockEmbed.mock.calls[1][0] as string[]).length).toBe(1)
     expect(res[0].handle).toBe('daily-drift')
 
     const rows = await repo.allEmbeddings('test-model')
