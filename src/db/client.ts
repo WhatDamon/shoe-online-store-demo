@@ -34,6 +34,26 @@ export function createDb(file: string = process.env.DATABASE_URL ?? './data/loca
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_ai_usage_day ON ai_usage(day);
+    CREATE TABLE IF NOT EXISTS products (
+      id TEXT PRIMARY KEY,
+      handle TEXT NOT NULL UNIQUE,
+      title TEXT NOT NULL,
+      subtitle TEXT NOT NULL,
+      description TEXT NOT NULL,
+      price_amount REAL NOT NULL,
+      currency TEXT NOT NULL,
+      product_type TEXT NOT NULL,
+      collections TEXT NOT NULL,
+      sizes TEXT NOT NULL,
+      colors TEXT NOT NULL,
+      features TEXT NOT NULL,
+      tags TEXT NOT NULL,
+      construction TEXT NOT NULL,
+      visual TEXT NOT NULL,
+      images TEXT NOT NULL,
+      fit_notes TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
   `)
   return drizzle(sqlite, { schema })
 }
@@ -96,6 +116,26 @@ async function runPgDdl(db: PgAppDb): Promise<void> {
       created_at bigint NOT NULL
     )`,
     sql`CREATE INDEX IF NOT EXISTS idx_ai_usage_day ON ai_usage (day)`,
+    sql`CREATE TABLE IF NOT EXISTS products (
+      id text PRIMARY KEY,
+      handle text NOT NULL UNIQUE,
+      title text NOT NULL,
+      subtitle text NOT NULL,
+      description text NOT NULL,
+      price_amount double precision NOT NULL,
+      currency text NOT NULL,
+      product_type text NOT NULL,
+      collections text NOT NULL,
+      sizes text NOT NULL,
+      colors text NOT NULL,
+      features text NOT NULL,
+      tags text NOT NULL,
+      construction text NOT NULL,
+      visual text NOT NULL,
+      images text NOT NULL,
+      fit_notes text NOT NULL,
+      created_at text NOT NULL
+    )`,
   ]
   for (const statement of statements) await db.execute(statement)
 }

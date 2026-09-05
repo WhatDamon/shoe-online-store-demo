@@ -1,7 +1,8 @@
 import { eq, sql } from 'drizzle-orm'
-import { aiUsage, productEmbeddings } from '@/db/schema-postgres'
+import { aiUsage, productEmbeddings, products } from '@/db/schema-postgres'
 import { ensurePgTables } from '@/db/client'
 import type { PgAppDb } from '@/db/client'
+import type { ProductRecord } from '@/db/product-row'
 import { parseVector } from './vector'
 import type { EmbeddingRow } from './repository'
 
@@ -81,6 +82,86 @@ export function createPostgresRepository(db: PgAppDb) {
       await ensurePgTables(db)
       await db.delete(productEmbeddings)
       await db.delete(aiUsage)
+      await db.delete(products)
+    },
+    // ---- products 表（决策 #17：DB 为运行时目录源；与 sqlite 实现同形）----
+    async countProducts(): Promise<number> {
+      await ensurePgTables(db)
+      const [row] = await db.select({ n: sql<number>`count(*)` }).from(products)
+      return Number(row?.n ?? 0)
+    },
+    async listAllProducts(): Promise<ProductRecord[]> {
+      await ensurePgTables(db)
+      const rows = await db.select().from(products)
+      return rows.map((r) => ({
+        id: r.id,
+        handle: r.handle,
+        title: r.title,
+        subtitle: r.subtitle,
+        description: r.description,
+        priceAmount: r.priceAmount,
+        currency: r.currency,
+        productType: r.productType,
+        collections: r.collections,
+        sizes: r.sizes,
+        colors: r.colors,
+        features: r.features,
+        tags: r.tags,
+        construction: r.construction,
+        visual: r.visual,
+        images: r.images,
+        fitNotes: r.fitNotes,
+        createdAt: r.createdAt,
+      }))
+    },
+    async upsertProducts(records: ProductRecord[]): Promise<void> {
+      await ensurePgTables(db)
+      for (const r of records) {
+        await db
+          .insert(products)
+          .values({
+            id: r.id,
+            handle: r.handle,
+            title: r.title,
+            subtitle: r.subtitle,
+            description: r.description,
+            priceAmount: r.priceAmount,
+            currency: r.currency,
+            productType: r.productType,
+            collections: r.collections,
+            sizes: r.sizes,
+            colors: r.colors,
+            features: r.features,
+            tags: r.tags,
+            construction: r.construction,
+            visual: r.visual,
+            images: r.images,
+            fitNotes: r.fitNotes,
+            createdAt: r.createdAt,
+          })
+          .onConflictDoUpdate({
+            target: products.id,
+            set: {
+              handle: r.handle,
+              title: r.title,
+              subtitle: r.subtitle,
+              description: r.description,
+              priceAmount: r.priceAmount,
+              currency: r.currency,
+              productType: r.productType,
+              collections: r.collections,
+              sizes: r.sizes,
+              colors: r.colors,
+              features: r.features,
+              tags: r.tags,
+              construction: r.construction,
+              visual: r.visual,
+              images: r.images,
+              fitNotes: r.fitNotes,
+              createdAt: r.createdAt,
+            },
+          })
+      }
     },
   }
 }

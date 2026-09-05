@@ -1,31 +1,12 @@
 import { seedProducts } from './seed'
 import { collections } from './collections'
+import { filterProducts } from './filter'
 import type { CatalogAdapter, Product, ProductFilter } from './types'
 
-const byText = (p: Product, q: string) =>
-  [p.title, p.subtitle, p.productType, ...p.tags, ...p.features, p.description]
-    .join(' ')
-    .toLowerCase()
-    .includes(q)
-
+// 纯内存目录源（导入层兜底/测试，决策 #17）：CATALOG_SOURCE=seed 时使用。
 export class SeedAdapter implements CatalogAdapter {
   async getProducts(filter: ProductFilter = {}): Promise<Product[]> {
-    let out = seedProducts.filter((p) => {
-      if (filter.collection && !p.collections.includes(filter.collection)) return false
-      if (filter.sizes?.length && !filter.sizes.some((s) => p.sizes.includes(s))) return false
-      if (filter.minPrice != null && p.price.amount < filter.minPrice) return false
-      if (filter.maxPrice != null && p.price.amount > filter.maxPrice) return false
-      if (filter.q && !byText(p, filter.q.trim().toLowerCase())) return false
-      return true
-    })
-    const sort = filter.sort ?? 'featured'
-    out = [...out].sort((a, b) => {
-      if (sort === 'price-asc') return a.price.amount - b.price.amount
-      if (sort === 'price-desc') return b.price.amount - a.price.amount
-      if (sort === 'newest') return b.createdAt.localeCompare(a.createdAt)
-      return a.id.localeCompare(b.id) // featured = seed 顺序
-    })
-    return out
+    return filterProducts(seedProducts, filter)
   }
   async getProductByHandle(handle: string): Promise<Product | null> {
     return seedProducts.find((p) => p.handle === handle) ?? null

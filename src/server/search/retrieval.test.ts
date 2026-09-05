@@ -26,22 +26,22 @@ describe('retrieve', () => {
     vi.stubEnv('AI_EMBEDDING_MODEL', 'test-model')
   })
 
-// 语义路径：mock embed 返回按 seed 内容 one-hot 的固定向量。
-// 支持批量入参（补齐逻辑现为一次请求补算全部缺失商品）。
-// 查询向量与首商品对齐 → 余弦 1，其余产品 0。
-function mockSemanticEmbed() {
-  const contents = new Map(seedProducts.map((p) => [textualContent(p), p]))
-  mockEmbed.mockImplementation(async (texts: string[]) =>
-    texts.map((t) => {
-      const hit = contents.get(t)
-      if (!hit) return oneHot(0) // 查询串 → 对齐首商品
-      const idx = seedProducts.findIndex((p) => p.id === hit.id)
-      return oneHot(idx)
-    }),
-  )
-}
+  // 语义路径：mock embed 返回按 seed 内容 one-hot 的固定向量。
+  // 支持批量入参（补齐逻辑现为一次请求补算全部缺失商品）。
+  // 查询向量与首商品对齐 → 余弦 1，其余产品 0。
+  function mockSemanticEmbed() {
+    const contents = new Map(seedProducts.map((p) => [textualContent(p), p]))
+    mockEmbed.mockImplementation(async (texts: string[]) =>
+      texts.map((t) => {
+        const hit = contents.get(t)
+        if (!hit) return oneHot(0) // 查询串 → 对齐首商品
+        const idx = seedProducts.findIndex((p) => p.id === hit.id)
+        return oneHot(idx)
+      }),
+    )
+  }
 
-const oneHot = (idx: number) => Array.from({ length: DIM }, (_, d) => (d === idx ? 1 : 0))
+  const oneHot = (idx: number) => Array.from({ length: DIM }, (_, d) => (d === idx ? 1 : 0))
 
   it('无 embedding 能力时走关键词降级，且不调用 embed', async () => {
     mockEmbeddingsAvailable.mockResolvedValue(false)
