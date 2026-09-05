@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/accordion'
 import { formatPrice } from '@/lib/format'
 import { pageMetadata } from '@/lib/seo'
+import { POLICY_PRODUCTION, POLICY_RETURNS } from '@/lib/store-policy'
 
 export async function generateStaticParams() {
   const products = await catalog.getProducts()
@@ -105,15 +106,9 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
                 <AccordionItem value="shipping">
                   <AccordionTrigger>Shipping &amp; returns</AccordionTrigger>
                   <AccordionContent>
-                    <p className="mb-3 text-neutral-600">
-                      Every pair is printed to order in our studio, so nothing sits in a warehouse —
-                      we only print what you buy.
-                    </p>
-                    <p className="text-neutral-600">
-                      Because each pair is made to your order, custom-printed items can&apos;t be
-                      returned or refunded. If your pair arrives faulty or the fit is not as
-                      promised, message us within 30 days and we&apos;ll sort it out.
-                    </p>
+                    {/* 文案单源（store-policy.ts）：与 AI support 客服注入同一份，禁止在此另写。 */}
+                    <p className="mb-3 text-neutral-600">{POLICY_PRODUCTION}</p>
+                    <p className="text-neutral-600">{POLICY_RETURNS}</p>
                   </AccordionContent>
                 </AccordionItem>
               </Accordion>

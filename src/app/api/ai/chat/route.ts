@@ -4,7 +4,7 @@ import { chat } from '@/server/ai/chat'
 import { encodeEvent } from '@/server/ai/events'
 import type { ChatEvent, Mode } from '@/server/ai/events'
 
-const MODES: readonly string[] = ['shopping', 'size-fit', 'outfit', 'find-shoes']
+const MODES: readonly string[] = ['shopping', 'size-fit', 'outfit', 'find-shoes', 'support']
 
 type Body = {
   sessionKey?: unknown

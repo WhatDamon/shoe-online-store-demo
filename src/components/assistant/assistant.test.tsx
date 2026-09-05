@@ -101,8 +101,42 @@ describe('assistant FAB + panel', () => {
     for (const label of ['Help me pick', 'Everyday sneakers']) {
       expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
     }
+    // 店务客服 chips（克制客服）：无需商品上下文，welcome 常驻可见。
+    for (const label of ['Shipping & returns', 'Care guide']) {
+      expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
+    }
     expect(screen.queryByRole('button', { name: 'Find my size' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Style it with' })).not.toBeInTheDocument()
+  })
+
+  it('店务客服 chip → POST mode=support（克制客服进 FAB 会话）', async () => {
+    nav.pathname = '/'
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        streamedResponse([
+          frame({ type: 'delta', text: 'Care instructions are shown on each product page.' }),
+          frame({ type: 'done' }),
+        ]),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+    render(
+      <AssistantProvider>
+        <OpenShopping />
+      </AssistantProvider>,
+    )
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: 'open shopping panel' }))
+    await user.click(screen.getByRole('button', { name: 'Care guide' }))
+
+    expect(
+      await screen.findByText('Care instructions are shown on each product page.'),
+    ).toBeInTheDocument()
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    const sent = JSON.parse(String(init.body)) as { mode: string; text: string; product: unknown }
+    expect(sent.mode).toBe('support')
+    expect(sent.product).toBeNull() // 客服不需商品上下文
   })
 
   it('renders streamed product result cards linking to the detail page', async () => {

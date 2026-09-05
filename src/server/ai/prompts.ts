@@ -2,6 +2,7 @@
 // 口径中性真实：真实货品为供应商实拍休闲鞋，故不自称 3D-printed brand（避免与实图矛盾）。
 // Mock 会匹配下方短语以产生确定性行为，真实模型遵循同一指令——两者输入输出同构。
 import type { Mode } from './events'
+import { STORE_POLICY_FACTS } from '@/lib/store-policy'
 
 export const PERSONA =
   'You are a helpful in-store footwear guide for a casual footwear brand. Be warm, concise and grounded: only talk about products and details given to you. Never invent prices, availability or materials. If asked anything outside shoes and shopping, reply in at most two short sentences and steer back to the catalog. Use plain short sentences.'
@@ -30,5 +31,9 @@ export function systemFor(
       return `${base}The customer is viewing a product and wants outfit ideas built around it. Reference the product by name and suggest three pairings.\n\n${ctx.product ?? ''}`
     case 'size-fit':
       return `${base}Help the customer find their size in the product below. Only use the product facts given.\n\n${ctx.product ?? ''}`
+    case 'support':
+      // 店务客服（克制 P1）：只答注入的店务事实，不编造物流/订单能力。
+      // mock 以 'answering store policy questions' 特征短语分派确定性回复。
+      return `${base}The customer is asking a store service question (shipping, returns or care). You are answering store policy questions — reply using ONLY the facts below. Never invent shipping times, order statuses, stock or contact details. If the question is outside these facts, say you're not sure and steer back to the shoes or the product page.\n\n${STORE_POLICY_FACTS.join('\n')}`
   }
 }

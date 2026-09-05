@@ -204,6 +204,24 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
       return
     }
 
+    // ---- support：店务政策问答（克制客服，规格：只答注入事实，不编造订单/物流能力）----
+    if (req.mode === 'support') {
+      const system = systemFor('support', {})
+      const messages: AiContext['messages'] = [...history, { role: 'user', content: text }]
+      let assistant = ''
+      for await (const delta of provider.stream({
+        system,
+        maxTokens: MAX_OUTPUT_TOKENS,
+        messages,
+      })) {
+        assistant += delta
+        yield { type: 'delta', text: delta }
+      }
+      await record(system, text, assistant)
+      yield { type: 'done' }
+      return
+    }
+
     // ---- find-shoes / shopping：显式检索 → 注入 → 流式 ----
     const products = await retrieveProducts(text)
     if (products.length === 0) {

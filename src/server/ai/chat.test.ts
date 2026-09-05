@@ -179,6 +179,24 @@ describe('chat mock 编排', () => {
     }
   })
 
+  it('support 客服：护理/退换关键词 → 确定性店务回复（真实事实，无商品必需）', async () => {
+    const g = fresh()
+    const evs = await collect(
+      chat(req({ mode: 'support', text: 'how do I care for my shoes' }), { guardrails: g }),
+    )
+    // 只回店务事实 + done，不做商品检索（无 productCards）、无 error。
+    expect(deltasOf(evs)).toContain('Care instructions')
+    expect(evs.some((e) => e.type === 'productCards')).toBe(false)
+    expect(evs[evs.length - 1]).toEqual({ type: 'done' })
+    expect(evs.some((e) => e.type === 'error')).toBe(false)
+
+    const ret = await collect(
+      chat(req({ mode: 'support', text: 'can I return these?' }), { guardrails: g }),
+    )
+    expect(deltasOf(ret)).toContain("can't be returned or refunded")
+    expect(ret[ret.length - 1]).toEqual({ type: 'done' })
+  })
+
   it('护栏顺序：turns 超限（假时钟第 21 次）→ error code=turns + 温和文案，非 rate_limited', async () => {
     const clock = { now: 0 }
     const g = fresh(() => clock.now)

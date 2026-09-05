@@ -77,7 +77,7 @@ export function AssistantPanel({
         <SheetHeader className="shrink-0 border-b border-neutral-200 pr-12">
           <SheetTitle>Need a hand?</SheetTitle>
           <p className="text-xs text-neutral-500">
-            Ask about sizing, styles, or what&rsquo;s in the shop.
+            Ask about sizing, styles, shipping &amp; returns, or what&rsquo;s in the shop.
           </p>
         </SheetHeader>
 

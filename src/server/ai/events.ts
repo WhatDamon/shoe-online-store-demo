@@ -23,8 +23,8 @@ export type ProductCard = {
   palette: [string, string]
 }
 
-/** 助手四模式（消费端措辞 ↔ 内部模式，规格 §8.2）。 */
-export type Mode = 'shopping' | 'size-fit' | 'outfit' | 'find-shoes'
+/** 助手模式（消费端措辞 ↔ 内部模式，规格 §8.2；support = 店务政策问答，克制客服）。 */
+export type Mode = 'shopping' | 'size-fit' | 'outfit' | 'find-shoes' | 'support'
 
 // error code：护栏三类（rate_limited/budget/turns，文案一律温和消费者措辞）
 // + provider（真实调用失败，P3 不静默降级）+ invalid（请求本身不可处理）。

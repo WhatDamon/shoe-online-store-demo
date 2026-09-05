@@ -4,6 +4,7 @@
 //   find-shoes 短语 → 一句总结；outfit 短语 → 固定 3 条搭配建议；否则 → 引用 digest 商品的简短推荐。
 // 文案一律引用注入 digest 里的真实商品名，绝不臆造价格/库存（规格 P1/P3）。
 import type { AiContext, AiProvider } from './provider'
+import { POLICY_CARE, POLICY_RETURNS } from '@/lib/store-policy'
 
 const OFF_TOPIC = [
   'recipe',
@@ -50,6 +51,25 @@ const productTitle = (system: string): string | null =>
 export class MockProvider implements AiProvider {
   async *stream(ctx: AiContext & { system: string; maxTokens: number }): AsyncGenerator<string> {
     const lastUser = [...ctx.messages].reverse().find((m) => m.role === 'user')?.content ?? ''
+    // 店务客服（support）：确定性回复注入的真实店务事实。先于 OFF_TOPIC 判断——
+    // 客服词（return/ship）不应被当离题 redirect；无命中子主题时给温和引导。
+    if (ctx.system.includes('answering store policy questions')) {
+      const q = lastUser.toLowerCase()
+      if (/care|wash|clean|maintain/.test(q)) {
+        yield POLICY_CARE
+      } else if (/return|refund|exchange|replace/.test(q)) {
+        yield POLICY_RETURNS
+      } else if (/shipping|ship|deliver|arrive|production|print/.test(q)) {
+        yield* toDeltas(
+          'Every pair is printed to order in our studio, so nothing sits in a warehouse — we only print what you buy.',
+        )
+      } else {
+        yield* toDeltas(
+          'Happy to help with shipping, returns and care — what would you like to know?',
+        )
+      }
+      return
+    }
     if (OFF_TOPIC.some((k) => lastUser.toLowerCase().includes(k))) {
       yield REDIRECT_TEXT
       return

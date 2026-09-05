@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GIFT_OFFER_FACT, GIFT_OFFER_RULES, systemFor } from './prompts'
+import { POLICY_CARE, POLICY_RETURNS } from '@/lib/store-policy'
 
 // 赠品营销只存在于 shopping 模式（决策 #16 + P1 克制：不打扰找鞋/搭配/尺码流程）。
 const OFFER_MARKERS = ['over $50', 'little buddy', 'offcut'] as const
@@ -42,5 +43,22 @@ describe('gift offer prompt copy', () => {
     // 版权规则必须要求模型不联想、不暗示联名/授权，且允许用户在追问时给出中性回绝。
     expect(GIFT_OFFER_RULES).toMatch(/never (name|imply|compare|suggest)/i)
     expect(GIFT_OFFER_RULES).toMatch(/original little buddies/i)
+  })
+})
+
+describe('support 店务客服 prompt', () => {
+  it('注入店务事实（发货/退换/护理）且不注入任何商品目录/营销推送', () => {
+    const sys = systemFor('support', {})
+    // 事实来自单源 store-policy（与 PDP 静态文案同一份）。
+    expect(sys).toContain(POLICY_RETURNS)
+    expect(sys).toContain(POLICY_CARE)
+    expect(sys).toContain('printed to order')
+    // 克制 P1：客服口径不出现促销/gift/赠品营销句，也不出现商品检索词。
+    for (const m of OFFER_MARKERS) expect(sys).not.toContain(m)
+    expect(sys).not.toMatch(/Catalog:/)
+    expect(sys).not.toMatch(/Product:/)
+    // 限定只基于注入事实作答，不编造物流/订单能力。
+    expect(sys).toMatch(/only the facts below/i)
+    expect(sys).toMatch(/never invent shipping times/i)
   })
 })
