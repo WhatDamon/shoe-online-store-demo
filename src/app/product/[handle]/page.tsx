@@ -4,6 +4,7 @@ import type { Metadata } from 'next'
 import { ArrowLeft } from 'lucide-react'
 import { catalog } from '@/server/catalog/adapter'
 import { getProductForMarket, getRelatedProducts } from '@/server/catalog/service'
+import { shopifyBuyConfigFor } from '@/server/catalog/shopify-buy'
 import { ProductGallery } from '@/components/shop/product-gallery'
 import { ProductActions } from '@/components/shop/product-actions'
 import { CareInstructionsButton } from '@/components/shop/care-instructions'
@@ -47,7 +48,9 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
   const product = await getProductForMarket(handle)
   if (!product) notFound()
 
-  // 决策 #19：Buy Button 测试款已整体回退，全 PDP 均为 demo 购买条（getBuyUrl 未配 → null）。
+  // 商店直购（决策 #15 重启用，2026-09-06 全目录映射）：商店有同 handle 商品且 SHOPIFY_BUY_* env 已配 →
+  // 该 PDP 由 Shopify Buy Button 接管变体选择与结算（隐藏 demo 价与选择器）；否则维持 demo 购买条。
+  const buyConfig = shopifyBuyConfigFor(product.handle)
   const [buyUrl, related] = await Promise.all([
     catalog.getBuyUrl(product),
     getRelatedProducts(product.handle, 3),
@@ -85,11 +88,14 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
             <WishlistButton handle={product.handle} />
           </div>
 
-          <p className="text-2xl font-semibold text-ink">{formatPrice(product.price.amount)}</p>
+          {/* 商店直购形态：demo $ 价不显示（价格仅由 Buy Button 以店币呈现，决策：不并存误导） */}
+          {buyConfig == null ? (
+            <p className="text-2xl font-semibold text-ink">{formatPrice(product.price.amount)}</p>
+          ) : null}
 
           <p className="text-[15px] leading-7 text-neutral-600">{product.description}</p>
 
-          <ProductActions product={product} buyUrl={buyUrl}>
+          <ProductActions product={product} buyUrl={buyUrl} buyConfig={buyConfig}>
             <div className="flex flex-col gap-3">
               {/* 详情手风琴分区标题：base-ui AccordionHeader 固定渲染 h3，
                   需 h2 祖先承接 h1 → h3 的标题层级（heading-order 修复）。 */}

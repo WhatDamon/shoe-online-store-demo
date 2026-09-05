@@ -5,12 +5,14 @@ A consumer-facing storefront demo for a fictional brand of **3D-printed casual /
 Tailwind + shadcn/ui**, with a server-side AI shopping guide that stays deliberately subtle
 (spec principle P1: consumer language only, no "AI" branding).
 
-This is a **product prototype / frontend demo**: there is no checkout. Product detail CTAs are a
-placeholder until a Shopify storefront exists (a switchable catalog adapter is ready for it). The
-catalog is a local seed of **29 real supplier styles** (imported from the brand supply-chain
-workbook, spec decision #16) with **real product photos** (WebP in `public/products/`); image-less
-entries fall back to programmatic SVG visuals. `/shop` also carries the "spend $50, get a free
-gift" offer with a gallery of leftover-offcut trinkets.
+This is a **product prototype / frontend demo**: there is no checkout on this site. PDPs whose
+product exists in the linked Shopify store switch to a **Shopify Buy Button** (real store variants,
+currency and checkout in an embedded widget) when `SHOPIFY_BUY_*` env is configured; without it
+they stay an "Available soon" placeholder (a switchable catalog adapter is also ready for a
+future direct Storefront read). The catalog is a local seed of **29 real supplier styles**
+(imported from the brand supply-chain workbook, spec decision #16) with **real product photos**
+(WebP in `public/products/`); image-less entries fall back to programmatic SVG visuals. `/shop`
+also carries the "spend $50, get a free gift" offer with a gallery of leftover-offcut trinkets.
 
 > Docs: [design spec](docs/superpowers/specs/2026-09-04-shoe-store-ai-design.md) ·
 > [implementation plan](docs/superpowers/plans/2026-09-04-shoe-store-frontend-ai.md) ·
@@ -96,6 +98,7 @@ See [`.env.example`](.env.example) for the annotated template. Summary:
 | `CATALOG_SOURCE` | `db` | Runtime catalog source (decision #17): `db` = `products` table (default, auto-seeded when empty); `seed` = in-memory import layer (tests); `SHOPIFY_*` still wins |
 | `DATABASE_URL` | `./data/local.db` | sqlite: local file; postgres: `postgres://…` connection string |
 | `SHOPIFY_DOMAIN`, `SHOPIFY_STOREFRONT_TOKEN` | *(empty)* | Reserved. Catalog adapter switches seed → Shopify only when **both** are set (not yet active). |
+| `SHOPIFY_BUY_DOMAIN`, `SHOPIFY_BUY_TOKEN` | *(empty)* | **PDP Shopify Buy Button channel** (2026-09): when **both** are set, every PDP mapped in `src/server/catalog/shopify-buy.ts` (29/29 store products, handle-keyed) renders a real Buy Button that takes over variant selection + checkout; unset keeps the demo pickers/price. Independent of the two vars above on purpose (setting those would trip the catalog stub). |
 
 ### Enabling real AI
 
@@ -128,7 +131,7 @@ src/
     assistant/             # FAB + Sheet chat panel, SSE hook, chips, message list
     ui/                    # shadcn/ui primitives
   server/                  # Server-only layers (never imported by client code except `type`)
-    catalog/               # Seed/Shopify adapter + market-aware service (conversions, related)
+  catalog/               # Seed/DB adapter + market-aware service + Shopify Buy map (handle → store id)
     search/                # embedder, keyword search, retrieval (embedding cache + cosine), vector
     ai/                    # providers (Mock/OpenAI-compatible), chat orchestration, SSE events, prompts
     guardrails/            # rate limit, session state (turns/TTL/trim), token budget, soft copy
@@ -146,10 +149,14 @@ src/
   in-memory layer for tests. Product cards and PDP galleries use real photos (`Product.images`,
   WebP under `public/products/<handle>/`) and fall back to SVG visuals only when image-less. A
   separate `gifts.ts` module feeds the `/shop` free-gift gallery (gifts are display-only, never in
-  the sellable catalog). The Shopify adapter mirrors the Storefront API shape and activates when
-  `SHOPIFY_*` is configured — no other code changes. All PDPs stay pure demo purchases
-  ("Available soon") until a real store channel is wired; the Buy Button test product (`3d-shoes`)
-  was removed in decision #19.
+  the sellable catalog).
+- **Store buy channel** (2026-09, replacing the #19 rollback): the linked Shopify store holds the
+  same 29 products under matching handles. `src/server/catalog/shopify-buy.ts` is a **low-coupling
+  static map** (local `handle` → store numeric id, no Product/DB/schema changes) read by the PDP
+  page; when `SHOPIFY_BUY_DOMAIN` + `SHOPIFY_BUY_TOKEN` are set, the store-mapped PDP hides the
+  demo price/pickers and mounts one parameterized `ShopifyBuyButton` (SDK `createComponent`
+  loading the admin-generated options verbatim), letting the store own variants, price and
+  checkout. Unset → all PDPs stay demo (P1 zero buy UI).
 - **AI**: RAG-lite, zero tool-calling — every real/gateway model only needs chat completions.
   Retrieved product cards are injected into the system prompt; the model must answer from that
   injected content only. Modes: `shopping`, `size-fit` (deterministic), `outfit`, `find-shoes`.
@@ -163,8 +170,9 @@ src/
 
 ## Known limitations (see `docs/implementation-report.md` for the full list)
 
-- Checkout is not implemented; the detail CTA is an "Available soon" placeholder driven by a
-  `getBuyUrl` adapter contract (returns `null` until the Shopify store exists).
+- Checkout lives on the Shopify store behind the Buy Button; **this site has no cart/checkout**.
+  Without `SHOPIFY_BUY_*` env, the detail CTA is an "Available soon" placeholder driven by a
+  `getBuyUrl` adapter contract (returns `null` until configured).
 - Unknown product handles return the not-found UI with **HTTP 200 + `noindex`** under the current
   `dynamicParams` SSG setting (a deliberate, documented tradeoff; revisit if SEO on 404s matters).
 - Compliance: no cookies, no tracking, no personal data sent to AI providers. Anonymous `ai_usage`

@@ -99,3 +99,39 @@ describe('PDP colorway picker (decision #16: color selectable pre-order)', () =>
     expect(screen.getByText('Ivory')).toBeInTheDocument()
   })
 })
+
+// 商店直购形态（决策 #15 重启用，2026-09-06）：buyConfig 非 null → 本站颜色/尺码选择器与
+// demo 购买条整体隐藏，Buy Button 挂载；Find my size 与 children 插槽保留（克制：不删演示内容）。
+const storeCfg = {
+  productId: '9407853625559',
+  domain: 'demo.myshopify.com',
+  storefrontAccessToken: 'tok',
+  moneyFormat: '¥{{amount}}',
+}
+
+describe('ProductActions store-live takeover (Shopify Buy Button)', () => {
+  it('hides demo pickers + demo buy bar when buyConfig is present', () => {
+    const { container } = render(
+      <ProductActions product={multiColor} buyUrl={null} buyConfig={storeCfg}>
+        <div data-testid="accordion-slot">Materials &amp; fit</div>
+      </ProductActions>,
+    )
+
+    // 本站选择器与 demo 购买条不渲染
+    expect(screen.queryByText('Select size')).not.toBeInTheDocument()
+    expect(screen.queryByText('Color')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Available soon' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/selected — we open checkout/)).not.toBeInTheDocument()
+
+    // 保留：Find my size、children 插槽、Buy Button 挂载点
+    expect(screen.getByRole('button', { name: 'Find my size' })).toBeInTheDocument()
+    expect(screen.getByTestId('accordion-slot')).toBeInTheDocument()
+    expect(container.querySelector('.shopify-buy[data-product-id="9407853625559"]')).not.toBeNull()
+  })
+
+  it('keeps demo UI when buyConfig is null', () => {
+    render(<ProductActions product={multiColor} buyUrl={null} buyConfig={null} />)
+    expect(screen.getByText('Select size')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Available soon' })).toBeInTheDocument()
+  })
+})
