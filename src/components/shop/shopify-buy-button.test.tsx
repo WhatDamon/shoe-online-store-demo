@@ -37,14 +37,35 @@ describe('ShopifyBuyButton', () => {
     ;(window as unknown as { ShopifyBuy?: unknown }).ShopifyBuy = previous
   })
 
-  it('mounts the product component through the SDK when available', async () => {
+  it('mounts the product component through the SDK with node + site skin', async () => {
     const ui = { createComponent: vi.fn(async () => {}) }
     ;(window as unknown as { ShopifyBuy?: unknown }).ShopifyBuy = makeSdk(ui)
 
-    render(<ShopifyBuyButton config={config} />)
+    const { container } = render(<ShopifyBuyButton config={config} />)
 
     await waitFor(() => expect(ui.createComponent).toHaveBeenCalledTimes(1))
-    expect(ui.createComponent).toHaveBeenCalledWith('product', { id: config.productId })
+    const calls = ui.createComponent.mock.calls as unknown as Array<
+      [kind: string, config: Record<string, unknown>]
+    >
+    const [, cfg] = calls[0]
+    expect(cfg.id).toBe(config.productId)
+    // 显式挂到 mount 节点（而非隐式 body），options 注入站点皮肤
+    expect(container.querySelector('[data-testid="shopify-buy-button"]')).not.toBeNull()
+    expect(cfg.node).toBeInstanceOf(HTMLElement)
+    const options = cfg.options as Record<string, unknown>
+    const product = options.product as Record<string, unknown>
+    const styles = product.styles as Record<string, unknown>
+    const button = styles.button as Record<string, unknown>
+    const contents = product.contents as Record<string, unknown>
+    const cartText = (options.cart as Record<string, unknown>).text as Record<string, unknown>
+    expect(button['background-color']).toBe('#111111')
+    expect(button['border-radius']).toBe('10px')
+    // 重复内容（媒体/标题/描述）被裁剪：内嵌只留 variant/数量/价格/加购
+    expect(contents.img).toBe(false)
+    expect(contents.title).toBe(false)
+    expect(contents.description).toBe(false)
+    // 购物车抽屉结账已启用
+    expect(cartText.button).toBe('Checkout')
   })
 
   it('degrades to a store product link when the SDK fails', async () => {

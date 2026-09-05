@@ -123,5 +123,29 @@ function toProduct(s: SupplierShoe, index: number): Product {
     createdAt: '2026-09-06T00:00:00Z',
   }
 }
+// 店款（决策 #15 深定制）：Shopify 店铺真实在售商品（3d-shoes, id 9406447583447）。
+// SHOPIFY_BUY_BUTTON env 匹配其 handle 时，该 PDP 交互区由 Buy 模块接管（真实 variant/价格/购物车）。
+// 无本地照片（图在店中）→ images 留空走 SVG 视觉兜底；不做 demo 选码。
+export const STORE_LIVE_HANDLE = '3d-shoes'
+const STORE_LIVE_PRODUCT: Product = {
+  id: 'evo-30',
+  handle: STORE_LIVE_HANDLE,
+  title: '3D Shoes',
+  subtitle: '3D-printed · Store-live',
+  description:
+    'Our flagship 3D-printed everyday sneaker. Prices, sizes and checkout are handled live on our Shopify store.',
+  price: { amount: 138, currencyCode: 'USD' },
+  productType: 'Sneaker',
+  tags: ['casual', 'real-catalog', 'store-live'],
+  collections: ['everyday'],
+  sizes: [38, 39, 40, 41, 42, 43, 44],
+  features: ['3D-printed upper', 'Sized on Shopify checkout', 'Store-live product'],
+  fitNotes: 'Select your size on checkout — live availability from our store.',
+  construction: { pattern: 'lattice', density: 0.75, printedUpper: true },
+  visual: { palette: ['#111111', '#fafaf8'], accent: '#0f766e', views: 3 },
+  images: [],
+  colors: [],
+  createdAt: '2026-09-07T00:00:00Z',
+}
 
-export const seedProducts: Product[] = shoes.map(toProduct)
+export const seedProducts: Product[] = [...shoes.map(toProduct), STORE_LIVE_PRODUCT]

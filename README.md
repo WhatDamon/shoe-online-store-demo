@@ -99,6 +99,7 @@ See [`.env.example`](.env.example) for the annotated template. Summary:
 | `CATALOG_SOURCE` | `db` | Runtime catalog source (decision #17): `db` = `products` table (default, auto-seeded when empty); `seed` = in-memory import layer (tests); `SHOPIFY_*` still wins |
 | `DATABASE_URL` | `./data/local.db` | sqlite: local file; postgres: `postgres://…` connection string |
 | `SHOPIFY_DOMAIN`, `SHOPIFY_STOREFRONT_TOKEN` | *(empty)* | Reserved. Catalog adapter switches seed → Shopify only when **both** are set (not yet active). |
+| `SHOPIFY_BUY_BUTTON` | *(empty)* | JSON `{handle, domain, productId, token, moneyFormat?}` (decision #15). When `handle` matches a product, that PDP becomes a **store-live** item: the Next demo color/size/CTA cluster is replaced by a styled Shopify Buy Button module (real variants + price + qty) with its own cart drawer. Blank → normal "Available soon" PDP. Token stays in your private env (never committed). |
 
 ### Enabling real AI
 
@@ -150,7 +151,9 @@ src/
   WebP under `public/products/<handle>/`) and fall back to SVG visuals only when image-less. A
   separate `gifts.ts` module feeds the `/shop` free-gift gallery (gifts are display-only, never in
   the sellable catalog). The Shopify adapter mirrors the Storefront API shape and activates when
-  `SHOPIFY_*` is configured — no other code changes.
+  `SHOPIFY_*` is configured — no other code changes. The store-live product `3d-shoes`
+  (`seed.ts` `STORE_LIVE_PRODUCT`, id `evo-30`, synced into `products` like any seed row) is the
+  only item whose PDP hosts the Buy Button purchase module; everything else stays a pure demo.
 - **AI**: RAG-lite, zero tool-calling — every real/gateway model only needs chat completions.
   Retrieved product cards are injected into the system prompt; the model must answer from that
   injected content only. Modes: `shopping`, `size-fit` (deterministic), `outfit`, `find-shoes`.

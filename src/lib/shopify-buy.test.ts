@@ -8,6 +8,9 @@ const valid = {
   token: 'public-storefront-token',
 }
 
+// 决策 #15 深定制：嵌入码 moneyFormat（¥{{amount}} 解码后）随配置传入 SDK。
+const withMoney = { ...valid, moneyFormat: '¥{{amount}}' }
+
 describe('parseShopifyBuyButton', () => {
   it('returns null for empty / missing env', () => {
     expect(parseShopifyBuyButton(undefined)).toBeNull()
@@ -28,6 +31,12 @@ describe('parseShopifyBuyButton', () => {
 
   it('parses a valid config', () => {
     expect(parseShopifyBuyButton(JSON.stringify(valid))).toEqual(valid)
+  })
+
+  it('parses optional moneyFormat and rejects empty/non-string ones', () => {
+    expect(parseShopifyBuyButton(JSON.stringify(withMoney))).toEqual(withMoney)
+    expect(parseShopifyBuyButton(JSON.stringify({ ...withMoney, moneyFormat: '' }))).toEqual(valid)
+    expect(parseShopifyBuyButton(JSON.stringify({ ...withMoney, moneyFormat: 42 }))).toBeNull()
   })
 })
 

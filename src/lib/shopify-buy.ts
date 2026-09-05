@@ -11,6 +11,8 @@ export interface ShopifyBuyButtonConfig {
   productId: number
   /** Buy Button 嵌入码自带的 storefront token（公开只读，设计上用于客户端） */
   token: string
+  /** 嵌入码 moneyFormat（如 ¥{{amount}}，URL 编码的 ¥ 已解码）；缺省用店铺默认 */
+  moneyFormat?: string
 }
 
 /** 纯函数解析（env 实参注入便于测试，避免 vi.stubEnv） */
@@ -23,7 +25,7 @@ export function parseShopifyBuyButton(raw: string | undefined): ShopifyBuyButton
     return null
   }
   if (typeof parsed !== 'object' || parsed === null) return null
-  const { handle, domain, productId, token } = parsed as Record<string, unknown>
+  const { handle, domain, productId, token, moneyFormat } = parsed as Record<string, unknown>
   if (
     typeof handle !== 'string' ||
     handle.length === 0 ||
@@ -37,7 +39,12 @@ export function parseShopifyBuyButton(raw: string | undefined): ShopifyBuyButton
   ) {
     return null
   }
-  return { handle, domain, productId, token }
+  // 空串按未提供处理（环境变量常被置空以禁用）；非字符串/有值非串 → 结构非法
+  if (moneyFormat !== undefined && typeof moneyFormat !== 'string') {
+    return null
+  }
+  const mf = typeof moneyFormat === 'string' && moneyFormat.length > 0 ? moneyFormat : undefined
+  return { handle, domain, productId, token, ...(mf ? { moneyFormat: mf } : {}) }
 }
 
 /** 调用时读取 env：与 market.code 同一策略（懒读取）。SSG 构建期快照差异同 decision #14 备注。 */

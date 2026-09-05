@@ -49,6 +49,7 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
 
   // spec 决策 #15：env 配置的 Shopify Buy Button 仅匹配 handle 时替换购买条；未配置 → null（不替换）
   const buyButton = shopifyBuyButtonForHandle(product.handle)
+  const storeLive = buyButton !== null
 
   const [buyUrl, related] = await Promise.all([
     catalog.getBuyUrl(product),
@@ -81,13 +82,16 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
             <WishlistButton handle={product.handle} />
           </div>
 
-          <p className="text-2xl font-semibold text-ink">{formatPrice(product.price.amount)}</p>
+          {!storeLive ? (
+            <p className="text-2xl font-semibold text-ink">{formatPrice(product.price.amount)}</p>
+          ) : null}
 
           <p className="text-[15px] leading-7 text-neutral-600">{product.description}</p>
 
           <ProductActions
             product={product}
             buyUrl={buyUrl}
+            storeLive={storeLive}
             buySlot={buyButton ? <ShopifyBuyButton config={buyButton} /> : undefined}
           >
             <Accordion className="border-t border-neutral-200">
