@@ -37,6 +37,24 @@ function interesting(message: string): boolean {
 }
 
 if (typeof window !== 'undefined') {
+  // boot 心跳：只要能执行到本模块就上报一次。若手机侧日志完全没有 boot 记录，
+  // 则证明 JS 根本没有执行（站点禁用 JS / 脚本块加载失败），而非水合崩溃。
+  post('boot', navigator.userAgent.slice(0, 300), '')
+
+  // 资源加载失败（capture 阶段捕获不冒泡的 script/link/img error）
+  window.addEventListener(
+    'error',
+    (e) => {
+      const el = e.target
+      if (el && el instanceof HTMLElement && /^(SCRIPT|LINK|IMG)$/.test(el.tagName)) {
+        const src = el instanceof HTMLImageElement || el instanceof HTMLScriptElement ? el.src : ''
+        const href = el instanceof HTMLLinkElement ? el.href : ''
+        post('resfail', `${el.tagName} ${src || href}`.slice(0, 600), '')
+      }
+    },
+    true,
+  )
+
   window.addEventListener('error', (e) => {
     post(
       'error',
