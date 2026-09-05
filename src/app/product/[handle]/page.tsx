@@ -73,9 +73,13 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
               <h1 className="font-heading text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
                 {product.title}
               </h1>
-              {product.subtitle ? (
-                <p className="mt-1.5 text-[15px] text-neutral-600">{product.subtitle}</p>
-              ) : null}
+              {/* 真实货号：import.py 以 slugify(code) 生成 handle（29/29 code === handle.toUpperCase()），
+                  故展示层由 handle 回大写即得供应商货号（如 DC-1001 / 26016-M）。原副标题
+                  （"Unisex · 5 colorways"）与描述首句重复且无货号价值，替换为货号行更疏朗。
+                  若未来 handle 不再由货号派生（如 Shopify 商品），此推导需改为显式 code 字段。 */}
+              <p className="mt-1.5 text-[13px] uppercase tracking-wider text-neutral-500">
+                {product.handle.toUpperCase()}
+              </p>
             </div>
             <WishlistButton handle={product.handle} />
           </div>
