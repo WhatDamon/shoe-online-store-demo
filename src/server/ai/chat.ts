@@ -48,16 +48,24 @@ const toErrorEvent = (e: unknown): ChatEvent => {
   return { type: 'error', code: 'provider', message: FALLBACK_ERROR_TEXT }
 }
 
+// 商品结果卡：真实首图 + 真实元数据（码段/色卡数/照片数），不带价格（价格只在
+// 详情页与店铺；AI 不传播 demo 价段）。images 为空的产品（如 store-live 店款）→
+// imageKind 'svg'，由 UI 以 ProductVisual 色卡视觉兜底。
 const toCard = (p: Product): ProductCard => ({
   handle: p.handle,
   title: p.title,
-  price: p.price.amount,
-  imageKind: 'local',
+  subtitle: p.subtitle,
+  image: p.images?.[0] ?? null,
+  imageKind: (p.images?.length ?? 0) > 0 ? 'photo' : 'svg',
+  photoCount: p.images?.length ?? 0,
+  sizeRange: p.sizes.length ? `EU ${Math.min(...p.sizes)}–${Math.max(...p.sizes)}` : null,
+  colorCount: p.colors?.length ?? 0,
   palette: p.visual.palette,
 })
 
+// digest 注入真实字段（标题/品类/描述），绝不携带价格（价格非原始数据，勿向模型传播）。
 const digestLines = (ps: Product[]): string =>
-  ps.map((p) => `- ${p.title} ($${p.price.amount}, ${p.productType}): ${p.description}`).join('\n')
+  ps.map((p) => `- ${p.title} (${p.productType}): ${p.description}`).join('\n')
 
 /** 检索 top-N 并取回完整商品。注意 retrieve 默认参陷阱：省略第二参（勿传 {}，会关掉语义嵌入）。 */
 async function retrieveProducts(query: string, limit = 4): Promise<Product[]> {

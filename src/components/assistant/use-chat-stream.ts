@@ -46,8 +46,8 @@ export interface ChatStream {
 const NETWORK_ERROR_TEXT = 'Something went wrong on our end — please try again.'
 
 /** 结果卡运行时 shape 守卫：parseEvent 对 productCards 只验 Array.isArray，坏 item
- *  （缺 handle/palette 等）会让 ProductVisual 抛 TypeError 打崩整条会话，故在
- *  入口过滤，渲染侧只需消费干净数据。 */
+ *  （缺 handle/palette/字段类型错）会让渲染崩溃或兜底不可用，故在入口过滤，
+ *  渲染侧只需消费干净数据。不要求价格——AI 卡片不带价（价格只在详情页/店铺）。 */
 function isValidCard(c: unknown): c is ProductCard {
   if (typeof c !== 'object' || c === null) return false
   const o = c as Record<string, unknown>
@@ -55,12 +55,20 @@ function isValidCard(c: unknown): c is ProductCard {
     typeof o.handle === 'string' &&
     o.handle.length > 0 &&
     typeof o.title === 'string' &&
-    typeof o.price === 'number' &&
-    Number.isFinite(o.price) &&
+    o.title.length > 0 &&
+    typeof o.subtitle === 'string' &&
+    (o.image === null || typeof o.image === 'string') &&
+    (o.imageKind === 'photo' || o.imageKind === 'svg') &&
+    typeof o.photoCount === 'number' &&
+    Number.isFinite(o.photoCount) &&
+    o.photoCount >= 0 &&
+    (o.sizeRange === null || typeof o.sizeRange === 'string') &&
+    typeof o.colorCount === 'number' &&
+    Number.isFinite(o.colorCount) &&
+    o.colorCount >= 0 &&
     Array.isArray(o.palette) &&
     o.palette.length >= 2 &&
-    (o.palette as unknown[]).every((x) => typeof x === 'string' && x.length > 0) &&
-    o.imageKind === 'local'
+    (o.palette as unknown[]).every((x) => typeof x === 'string' && x.length > 0)
   )
 }
 

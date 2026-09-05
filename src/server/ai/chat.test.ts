@@ -59,8 +59,12 @@ describe('events SSE 帧往返', () => {
           {
             handle: 'daily-drift',
             title: 'Daily Drift',
-            price: 128,
-            imageKind: 'local',
+            subtitle: 'DC-1001',
+            image: null,
+            imageKind: 'svg',
+            photoCount: 0,
+            sizeRange: 'EU 35–44',
+            colorCount: 5,
             palette: ['#a', '#b'],
           },
         ],
@@ -99,7 +103,9 @@ describe('chat mock 编排', () => {
     if (cards?.type === 'productCards') {
       expect(cards.items.length).toBeGreaterThan(0)
       expect(cards.items[0].handle).toBe('26016-m')
-      expect(cards.items[0]).toMatchObject({ imageKind: 'local' })
+      // 真实商品带真实照片 → photo 卡；且事件不带 price（AI 不传播 demo 价段）
+      expect(cards.items[0]).toMatchObject({ imageKind: 'photo' })
+      expect(cards.items[0]).not.toHaveProperty('price')
     }
     expect(evs[evs.length - 1]).toEqual({ type: 'done' })
     expect(evs.some((e) => e.type === 'error')).toBe(false)

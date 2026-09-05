@@ -3,11 +3,23 @@
 // （消费方：'use client' 的 use-chat-stream 在客户端 import 本模块）。
 import type { CanonicalSize } from '@/server/catalog/types'
 
+// 商品结果卡事件：只携带展示所需真实字段（规格 §8.4）——不携带价格（价格只存在
+// 详情页/店舖，AI 不传播 demo 价段；决策：AI 彻底不带价）。
+// image = 真实首图（public/products/...）否则 null（SVG 兜底），其余为真实元数据。
 export type ProductCard = {
   handle: string
   title: string
-  price: number
-  imageKind: 'local'
+  /** 货号/子标题（真实原始数据，如 DC-1001）。 */
+  subtitle: string
+  image: string | null
+  imageKind: 'photo' | 'svg'
+  /** 该款照片张数（真实）。 */
+  photoCount: number
+  /** EU 整档码段（如 35–44）；暂无尺码 → null。 */
+  sizeRange: string | null
+  /** 色卡数（真实）。 */
+  colorCount: number
+  /** SVG 兜底/无图时才需要（真实色卡 hex）。 */
   palette: [string, string]
 }
 

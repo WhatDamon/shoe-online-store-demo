@@ -38,9 +38,10 @@ function* toDeltas(text: string, step = 8): Generator<string> {
   for (let i = 0; i < ws.length; i += step) yield ws.slice(i, i + step).join(' ')
 }
 
-// 从 system 的 digest/商品上下文抽取可引用标题：匹配 "- Title ($…" 行。
+// 从 system 的 digest/商品上下文抽取可引用标题：匹配 "- Title (Type):" 行。
+// 注意 digest 不含价格（AI 不带价），标题在括号前。
 const digestTitles = (system: string): string[] =>
-  [...system.matchAll(/^- ([^($]+) \(\$/gm)].map((m) => m[1].trim())
+  [...system.matchAll(/^- ([^(]+) \(/gm)].map((m) => m[1].trim())
 
 // 从 outfit 上下文行 "Product: Title." 抽标题。
 const productTitle = (system: string): string | null =>

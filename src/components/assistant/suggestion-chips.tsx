@@ -9,7 +9,7 @@ export const SUGGESTIONS: { mode: Mode; label: string }[] = [
   { mode: 'size-fit', label: 'Find my size' },
   { mode: 'outfit', label: 'Style it with' },
   { mode: 'shopping', label: 'Help me pick' },
-  { mode: 'find-shoes', label: 'Everyday sneakers under $150' },
+  { mode: 'find-shoes', label: 'Everyday sneakers' },
 ]
 
 /** 无需商品上下文的通用建议。 */

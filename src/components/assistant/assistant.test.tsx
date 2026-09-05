@@ -98,7 +98,7 @@ describe('assistant FAB + panel', () => {
     expect(await screen.findByText(/need a hand finding your pair/i)).toBeInTheDocument()
     // 无商品上下文：只出通用建议，不出 size-fit/outfit（服务端要求 product 引用，
     // 无上下文时这两条是死路入口——点击必得 "Pick a product first" 错误）。
-    for (const label of ['Help me pick', 'Everyday sneakers under $150']) {
+    for (const label of ['Help me pick', 'Everyday sneakers']) {
       expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
     }
     expect(screen.queryByRole('button', { name: 'Find my size' })).not.toBeInTheDocument()
@@ -115,16 +115,25 @@ describe('assistant FAB + panel', () => {
             {
               handle: 'daily-drift',
               title: 'Daily Drift',
-              price: 128,
-              imageKind: 'local',
+              subtitle: 'DC-1001',
+              image: null,
+              imageKind: 'svg',
+              photoCount: 0,
+              sizeRange: 'EU 35–44',
+              colorCount: 5,
               palette: ['#e8e6e0', '#d8d4cb'],
             },
-            // 坏 item：缺 palette，渲染前应被过滤而非打崩会话
+            // 坏 item：palette 不足两色，渲染前应被过滤而非打崩会话
             {
               handle: 'broken',
               title: 'Broken',
-              price: 99,
-              imageKind: 'local',
+              subtitle: 'X',
+              image: null,
+              imageKind: 'svg',
+              photoCount: 0,
+              sizeRange: null,
+              colorCount: 0,
+              palette: ['#111'],
             },
           ],
         }),
@@ -141,11 +150,14 @@ describe('assistant FAB + panel', () => {
     const user = userEvent.setup()
 
     await user.click(screen.getByRole('button', { name: 'open shopping panel' }))
-    await user.click(screen.getByRole('button', { name: 'Everyday sneakers under $150' }))
+    await user.click(screen.getByRole('button', { name: 'Everyday sneakers' }))
 
     const link = await screen.findByRole('link', { name: /Daily Drift/i })
     expect(link).toHaveAttribute('href', '/product/daily-drift')
-    expect(within(link).getByText('$128.00')).toBeInTheDocument()
+    // 真实元数据（货号 + 码段·色卡），绝不出现价格（AI 不带价）
+    expect(within(link).getByText('DC-1001')).toBeInTheDocument()
+    expect(within(link).getByText(/EU 35–44 · 5 colors/)).toBeInTheDocument()
+    expect(within(link).queryByText('$128.00')).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /Broken/i })).not.toBeInTheDocument()
     expect(await screen.findByText(/Here is your match/i)).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith(
