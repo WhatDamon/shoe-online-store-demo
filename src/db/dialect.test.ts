@@ -5,6 +5,10 @@ describe('resolveDbDriver (spec decision #13)', () => {
   it('defaults to sqlite when DB_DRIVER is unset', () => {
     expect(resolveDbDriver({})).toBe('sqlite')
   })
+  it('treats empty/whitespace DB_DRIVER as unset (Vercel injects DB_DRIVER="")', () => {
+    expect(resolveDbDriver({ DB_DRIVER: '' })).toBe('sqlite')
+    expect(resolveDbDriver({ DB_DRIVER: '   ' })).toBe('sqlite')
+  })
   it('honors DB_DRIVER=postgres', () => {
     expect(resolveDbDriver({ DB_DRIVER: 'postgres' })).toBe('postgres')
   })

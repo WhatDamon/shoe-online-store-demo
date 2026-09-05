@@ -5,7 +5,8 @@ export type DbDriver = 'sqlite' | 'postgres'
 const DRIVERS: readonly DbDriver[] = ['sqlite', 'postgres']
 
 export function resolveDbDriver(env: Record<string, string | undefined> = process.env): DbDriver {
-  const raw = (env.DB_DRIVER ?? 'sqlite').trim().toLowerCase()
+  // 空串/纯空白视为未设置（Vercel 常注入 DB_DRIVER=''），回落 sqlite；仅显式未知值才报错。
+  const raw = (env.DB_DRIVER ?? '').trim().toLowerCase() || 'sqlite'
   const found = DRIVERS.find((d) => d === raw)
   if (!found) throw new Error(`Unknown DB_DRIVER '${raw}' (expected: sqlite | postgres)`)
   return found
