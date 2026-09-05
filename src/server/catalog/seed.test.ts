@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { seedProducts, STORE_LIVE_HANDLE } from './seed'
+import { seedProducts } from './seed'
 import { collections } from './collections'
 import { sizeRows } from './size-fixture'
 
 describe('seed integrity', () => {
-  it('has the real-catalog product count (29 supplier styles + store-live)', () => {
+  it('has the real-catalog product count (29 supplier styles)', () => {
+    // 决策 #19：store-live 演示款已移除，目录回归纯供应商款。
     expect(seedProducts.length).toBeGreaterThanOrEqual(25)
     expect(seedProducts.length).toBeLessThanOrEqual(35)
   })
@@ -37,12 +38,10 @@ describe('seed integrity', () => {
 })
 
 // 真实目录图片契约（决策 #16）：所有款带本地照片（首图即卡片封面）；无图款才允许走 SVG 兜底。
-// 当前供应商款均含图 → 断言非空 + public/products 路径格式；店款（STORE_LIVE_HANDLE，决策 #15）图在 Shopify 店内，豁免。
+// 当前供应商款均含图 → 断言非空 + public/products 路径格式。
 it('every real-catalog product carries local product photos', () => {
-  seedProducts
-    .filter((p) => p.handle !== STORE_LIVE_HANDLE)
-    .forEach((p) => {
-      expect(p.images?.length).toBeGreaterThan(0)
-      p.images!.forEach((src) => expect(src).toMatch(/^\/products\/[a-z0-9-]+\/\d+\.webp$/))
-    })
+  seedProducts.forEach((p) => {
+    expect(p.images?.length).toBeGreaterThan(0)
+    p.images!.forEach((src) => expect(src).toMatch(/^\/products\/[a-z0-9-]+\/\d+\.webp$/))
+  })
 })

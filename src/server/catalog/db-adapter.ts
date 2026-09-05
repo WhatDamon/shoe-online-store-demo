@@ -7,7 +7,7 @@ import { seedProducts } from './seed'
 import type { CatalogAdapter, Collection, Product, ProductFilter } from './types'
 
 // DB 运行时目录适配器（决策 #17）：products 表空时从导入层（seed 策展）灌种；
-// 此后读取一律走表。增量同步：每次首读补入缺失的 seed id（例如新增店款 evo-30），
+// 此后读取一律走表。增量同步：每次首读补入缺失的 seed id（例如目录新增款），
 // 已有行永不被 seed 覆盖（DB 编辑优先）——因此从表里删除一个 seed id 不是受支持操作。
 // 注入 repoFactory 便于测试用 :memory:；构造不做任何 DB 访问（懒）。
 export class DbCatalogAdapter implements CatalogAdapter {

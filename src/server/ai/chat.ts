@@ -49,7 +49,7 @@ const toErrorEvent = (e: unknown): ChatEvent => {
 }
 
 // 商品结果卡：真实首图 + 真实元数据（码段/色卡数/照片数），不带价格（价格只在
-// 详情页与店铺；AI 不传播 demo 价段）。images 为空的产品（如 store-live 店款）→
+// 详情页与店铺；AI 不传播 demo 价段）。images 为空的产品（目前目录无此情形）→
 // imageKind 'svg'，由 UI 以 ProductVisual 色卡视觉兜底。
 const toCard = (p: Product): ProductCard => ({
   handle: p.handle,

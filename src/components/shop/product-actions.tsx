@@ -16,24 +16,12 @@ interface ProductActionsProps {
    * （材质/合脚手风琴，无尺码依赖）。
    */
   children?: ReactNode
-  /** 可选购买替代槽（如 Shopify Buy Button）：存在时替换 ProductBuyBar，保持 §9 CTA 位序。 */
-  buySlot?: ReactNode
-  /** 店款（决策 #15）：Buy 模块全接管交互区——不渲染 demo 颜色/尺码/Find-my-size，仅保留 children 手风琴 + buySlot。 */
-  storeLive?: boolean
 }
 
 // PDP 购买群集（规格 §9 顺序）：颜色选择（多色款，受控）→ 尺码选择 → "Find my size" → 手风琴（children 插槽）→ 购买条。
 // children 插槽让本集群保持单一 'use client' 边界共享 selected 状态，同时允许页面以 RSC 注入中间内容；
 // 持有所选尺码/颜色状态，供购买条在无 store 阶段做 aria-live 说明。
-// storeLive（店款，决策 #15）：真实交易走 Shopify Buy 模块（自含真实 variant/数量/价格），
-// demo 颜色/尺码/Find-my-size 全部跳过，避免两套选择器打架。
-export function ProductActions({
-  product,
-  buyUrl,
-  children,
-  buySlot,
-  storeLive = false,
-}: ProductActionsProps) {
+export function ProductActions({ product, buyUrl, children }: ProductActionsProps) {
   const colors = product.colors ?? []
   // 多色款下单前选色：照片未按颜色拆分（决策 #16），色卡仅记录意向，主图保持代表图。
   const [colorIdx, setColorIdx] = useState(0)
@@ -46,82 +34,62 @@ export function ProductActions({
 
   return (
     <div className="flex flex-col gap-5">
-      {storeLive ? (
-        <>
-          {children}
-          {buySlot}
-          <p className="text-xs leading-5 text-neutral-500">
-            Evoloop is a student hackathon showcase, not a long-term commercial service. This
-            checkout is live — orders are really produced and shipped. For after-sales support,
-            contact the supplier (details on your order confirmation).
-          </p>
-        </>
-      ) : (
-        <>
-          {colors.length > 1 ? (
-            <fieldset className="flex flex-col gap-2.5">
-              <legend className="text-sm font-medium text-ink">
-                Color
-                {colorName ? (
-                  <span className="ml-1.5 font-normal text-neutral-500">{colorName}</span>
-                ) : null}
-              </legend>
-              <div className="flex flex-wrap gap-2.5">
-                {colors.map((c, i) => {
-                  const active = i === colorIdx
-                  return (
-                    <label key={`${c.hex}-${c.name}`} className="group cursor-pointer">
-                      <input
-                        type="radio"
-                        name="colors"
-                        value={c.name}
-                        checked={active}
-                        aria-label={c.name}
-                        onChange={() => setColorIdx(i)}
-                        className="peer sr-only"
-                      />
-                      <span
-                        className={`block h-9 w-9 rounded-full border transition-shadow group-focus-within:outline group-focus-within:outline-2 group-focus-within:outline-offset-2 group-focus-within:outline-neutral-400 ${
-                          active
-                            ? 'ring-2 ring-ink ring-offset-2 ring-offset-canvas'
-                            : 'border-neutral-300'
-                        }`}
-                        style={{ backgroundColor: c.hex }}
-                      />
-                    </label>
-                  )
-                })}
-              </div>
-              <p className="text-xs leading-5 text-neutral-400">
-                Photos are representative — the actual shade can vary on screen.
-              </p>
-            </fieldset>
-          ) : null}
-          <SizeSelector
-            sizeOptions={product.sizeOptions}
-            selected={selected}
-            onChange={setSelected}
-          />
-          <div className="-mt-3">
-            <button
-              type="button"
-              onClick={() => assistant?.open('size-fit', product)}
-              className="text-sm font-medium text-ink underline decoration-neutral-300 underline-offset-4 transition-colors hover:decoration-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
-            >
-              Find my size
-            </button>
+      {colors.length > 1 ? (
+        <fieldset className="flex flex-col gap-2.5">
+          <legend className="text-sm font-medium text-ink">
+            Color
+            {colorName ? (
+              <span className="ml-1.5 font-normal text-neutral-500">{colorName}</span>
+            ) : null}
+          </legend>
+          <div className="flex flex-wrap gap-2.5">
+            {colors.map((c, i) => {
+              const active = i === colorIdx
+              return (
+                <label key={`${c.hex}-${c.name}`} className="group cursor-pointer">
+                  <input
+                    type="radio"
+                    name="colors"
+                    value={c.name}
+                    checked={active}
+                    aria-label={c.name}
+                    onChange={() => setColorIdx(i)}
+                    className="peer sr-only"
+                  />
+                  <span
+                    className={`block h-9 w-9 rounded-full border transition-shadow group-focus-within:outline group-focus-within:outline-2 group-focus-within:outline-offset-2 group-focus-within:outline-neutral-400 ${
+                      active
+                        ? 'ring-2 ring-ink ring-offset-2 ring-offset-canvas'
+                        : 'border-neutral-300'
+                    }`}
+                    style={{ backgroundColor: c.hex }}
+                  />
+                </label>
+              )
+            })}
           </div>
-          {children}
-          {buySlot ?? (
-            <ProductBuyBar
-              buyUrl={buyUrl}
-              availableSoon={buyUrl == null}
-              selectedLabel={selectedLabel}
-              colorName={colorName}
-            />
-          )}
-        </>
-      )}
+          <p className="text-xs leading-5 text-neutral-400">
+            Photos are representative — the actual shade can vary on screen.
+          </p>
+        </fieldset>
+      ) : null}
+      <SizeSelector sizeOptions={product.sizeOptions} selected={selected} onChange={setSelected} />
+      <div className="-mt-3">
+        <button
+          type="button"
+          onClick={() => assistant?.open('size-fit', product)}
+          className="text-sm font-medium text-ink underline decoration-neutral-300 underline-offset-4 transition-colors hover:decoration-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
+        >
+          Find my size
+        </button>
+      </div>
+      {children}
+      <ProductBuyBar
+        buyUrl={buyUrl}
+        availableSoon={buyUrl == null}
+        selectedLabel={selectedLabel}
+        colorName={colorName}
+      />
     </div>
   )
 }

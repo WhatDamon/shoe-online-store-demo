@@ -7,7 +7,7 @@ import type { ProductCard as ProductCardEvent } from '@/server/ai/events'
 
 // 会话内商品结果卡：展示真实首图 + 真实元数据（货号/码段/色卡数/照片数），
 // 一律不带价格——价格只在详情页/店铺出现（AI 不传播 demo 价段）。
-// 无照片的产品（如 store-live 店款）→ 以 ProductVisual 真实色卡 SVG 兜底。
+// 无照片的产品（目前目录无此情形）→ 以 ProductVisual 真实色卡 SVG 兜底。
 const metaOf = (item: ProductCardEvent): string | null => {
   const parts: string[] = []
   if (item.sizeRange) parts.push(item.sizeRange)

@@ -51,60 +51,6 @@ describe('ProductActions layout order (spec §9)', () => {
     // children 是 flex 容器的直接子节点之一（而非被隔离渲染），保持在同一文档流。
     expect(container.firstElementChild?.contains(slot)).toBe(true)
   })
-
-  it('renders the buySlot in the CTA position instead of the BuyBar when provided', () => {
-    const { container } = render(
-      <ProductActions
-        product={p}
-        buyUrl={null}
-        buySlot={<div data-testid="buy-slot">Buy on Shopify</div>}
-      >
-        <div data-testid="accordion-slot">Materials &amp; fit</div>
-      </ProductActions>,
-    )
-
-    const slot = screen.getByTestId('accordion-slot')
-    const buySlot = screen.getByTestId('buy-slot')
-    // BuyBar 占位被替代：页面上不再有 "Available soon"
-    expect(screen.queryByRole('button', { name: 'Available soon' })).toBeNull()
-
-    const before = (a: Element, b: Element) =>
-      (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
-    expect(before(slot, buySlot)).toBe(true)
-    expect(container.firstElementChild?.contains(buySlot)).toBe(true)
-  })
-})
-
-// 店款（决策 #15 Buy 模块接管）：交互区只有真实购买模块 + 手风琴 children，
-// demo 选色/选码/尺码助手全隐藏；结账警示须含「学生黑客松、非长期服务、真实出货、售后找供应商」。
-describe('store-live PDP (Buy takeover + project-nature caption)', () => {
-  it('renders only children + buy slot + caption, no demo pickers', () => {
-    render(
-      <ProductActions
-        product={p}
-        buyUrl={null}
-        storeLive
-        buySlot={<div data-testid="buy-slot">Buy module</div>}
-      >
-        <div data-testid="accordion-slot">Materials &amp; fit</div>
-      </ProductActions>,
-    )
-
-    // demo 交互件全部隐藏
-    expect(screen.queryByText('Select size')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Find my size' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Available soon' })).not.toBeInTheDocument()
-    expect(screen.queryByText('Color')).not.toBeInTheDocument()
-
-    // 手风琴 children 与 Buy 模块保留
-    expect(screen.getByTestId('accordion-slot')).toBeInTheDocument()
-    expect(screen.getByTestId('buy-slot')).toBeInTheDocument()
-
-    // 结账警示：非长期商业服务 + 真实出货 + 售后需联系供应商
-    const caption = screen.getByText(/not a long-term commercial service/)
-    expect(caption.textContent).toContain('really produced and shipped')
-    expect(caption.textContent).toContain('contact the supplier')
-  })
 })
 
 const multiColor = {

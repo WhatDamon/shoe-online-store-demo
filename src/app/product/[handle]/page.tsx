@@ -6,8 +6,7 @@ import { catalog } from '@/server/catalog/adapter'
 import { getProductForMarket, getRelatedProducts } from '@/server/catalog/service'
 import { ProductGallery } from '@/components/shop/product-gallery'
 import { ProductActions } from '@/components/shop/product-actions'
-import { ShopifyBuyButton } from '@/components/shop/shopify-buy-button'
-import { shopifyBuyButtonForHandle } from '@/lib/shopify-buy'
+import { CareInstructionsButton } from '@/components/shop/care-instructions'
 import { ProductGrid } from '@/components/shop/product-grid'
 import { WishlistButton } from '@/components/shop/wishlist-button'
 import {
@@ -47,10 +46,7 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
   const product = await getProductForMarket(handle)
   if (!product) notFound()
 
-  // spec 决策 #15：env 配置的 Shopify Buy Button 仅匹配 handle 时替换购买条；未配置 → null（不替换）
-  const buyButton = shopifyBuyButtonForHandle(product.handle)
-  const storeLive = buyButton !== null
-
+  // 决策 #19：Buy Button 测试款已整体回退，全 PDP 均为 demo 购买条（getBuyUrl 未配 → null）。
   const [buyUrl, related] = await Promise.all([
     catalog.getBuyUrl(product),
     getRelatedProducts(product.handle, 3),
@@ -84,44 +80,41 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
             <WishlistButton handle={product.handle} />
           </div>
 
-          {!storeLive ? (
-            <p className="text-2xl font-semibold text-ink">{formatPrice(product.price.amount)}</p>
-          ) : null}
+          <p className="text-2xl font-semibold text-ink">{formatPrice(product.price.amount)}</p>
 
           <p className="text-[15px] leading-7 text-neutral-600">{product.description}</p>
 
-          <ProductActions
-            product={product}
-            buyUrl={buyUrl}
-            storeLive={storeLive}
-            buySlot={buyButton ? <ShopifyBuyButton config={buyButton} /> : undefined}
-          >
-            <Accordion className="border-t border-neutral-200">
-              <AccordionItem value="materials-fit">
-                <AccordionTrigger>Materials &amp; fit</AccordionTrigger>
-                <AccordionContent>
-                  <ul className="mb-4 list-disc space-y-1 pl-4 text-neutral-600">
-                    {product.features.map((feature) => (
-                      <li key={feature}>{feature}</li>
-                    ))}
-                  </ul>
-                  <p className="text-neutral-600">{product.fitNotes}</p>
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="shipping">
-                <AccordionTrigger>Shipping &amp; returns</AccordionTrigger>
-                <AccordionContent>
-                  <p className="mb-3 text-neutral-600">
-                    Every pair is printed to order in our studio, so nothing sits in a warehouse —
-                    we only print what you buy.
-                  </p>
-                  <p className="text-neutral-600">
-                    Orders ship in recycled packaging once your pair is printed. Free returns within
-                    30 days.
-                  </p>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
+          <ProductActions product={product} buyUrl={buyUrl}>
+            <div className="flex flex-col gap-3">
+              <Accordion className="border-t border-neutral-200">
+                <AccordionItem value="materials-fit">
+                  <AccordionTrigger>Materials &amp; fit</AccordionTrigger>
+                  <AccordionContent>
+                    <ul className="mb-4 list-disc space-y-1 pl-4 text-neutral-600">
+                      {product.features.map((feature) => (
+                        <li key={feature}>{feature}</li>
+                      ))}
+                    </ul>
+                    <p className="text-neutral-600">{product.fitNotes}</p>
+                  </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="shipping">
+                  <AccordionTrigger>Shipping &amp; returns</AccordionTrigger>
+                  <AccordionContent>
+                    <p className="mb-3 text-neutral-600">
+                      Every pair is printed to order in our studio, so nothing sits in a warehouse —
+                      we only print what you buy.
+                    </p>
+                    <p className="text-neutral-600">
+                      Orders ship in recycled packaging once your pair is printed. Free returns
+                      within 30 days.
+                    </p>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+              {/* 护理说明海报入口（决策 #19）：每 PDP 通用，弹窗查看，不占首屏。 */}
+              <CareInstructionsButton />
+            </div>
           </ProductActions>
         </div>
       </div>
