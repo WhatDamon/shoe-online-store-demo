@@ -47,7 +47,7 @@ export function ProductResultCard({ item }: { item: ProductCardEvent }) {
           </span>
         ) : null}
         {meta ? (
-          <span className="mt-0.5 block text-[11px] leading-4 text-neutral-400">{meta}</span>
+          <span className="mt-0.5 block text-[11px] leading-4 text-neutral-500">{meta}</span>
         ) : null}
       </span>
     </Link>

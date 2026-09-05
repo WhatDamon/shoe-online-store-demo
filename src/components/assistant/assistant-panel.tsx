@@ -90,7 +90,7 @@ export function AssistantPanel({
               type="button"
               onClick={onRemoveProduct}
               aria-label={`Remove ${product.title}`}
-              className="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-200 hover:text-neutral-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
+              className="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-neutral-200 hover:text-neutral-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
             >
               <XIcon className="size-3.5" />
             </button>

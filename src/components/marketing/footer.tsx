@@ -33,7 +33,7 @@ export function Footer() {
       <div className="mx-auto w-full max-w-6xl border-t border-[#fafaf8]/10 px-4 pb-12 pt-6 text-center">
         <p className="text-sm text-[#fafaf8]/50">{site.tagline}</p>
         {/* 项目性质：学生黑客松作品、非商业服务（克制：更小字号、更低对比） */}
-        <p className="mx-auto mt-3 max-w-2xl text-xs leading-5 text-[#fafaf8]/40">
+        <p className="mx-auto mt-3 max-w-2xl text-xs leading-5 text-[#fafaf8]/60">
           {site.projectNote}
         </p>
       </div>

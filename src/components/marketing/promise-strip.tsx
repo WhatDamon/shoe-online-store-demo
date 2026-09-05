@@ -18,6 +18,8 @@ const promises = [
 export function PromiseStrip() {
   return (
     <section aria-label="Why Evoloop" className="bg-canvas">
+      {/* 视觉隐藏的 section 标题：给三个卖点 h3 一个 h2 祖先，避免 h1 → h3 跳级（WCAG 1.3.1）。 */}
+      <h2 className="sr-only">Why Evoloop</h2>
       <div className="mx-auto grid w-full max-w-6xl gap-10 px-4 py-16 sm:grid-cols-3 md:py-20">
         {promises.map((item) => (
           <div key={item.title} className="flex flex-col gap-2">

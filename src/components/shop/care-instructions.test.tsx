@@ -37,4 +37,21 @@ describe('CareInstructionsButton (decision #19: universal PDP care poster)', () 
     fireEvent.click(dialog)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
+
+  it('moves focus into the dialog on open and back to the trigger on close (WCAG 2.4.3)', () => {
+    render(<CareInstructionsButton />)
+    const trigger = screen.getByRole('button', { name: 'Care instructions' })
+    fireEvent.click(trigger)
+    // 打开后焦点移入 dialog 的关闭按钮（首个可聚焦元素）。
+    expect(screen.getByRole('button', { name: 'Close care instructions' })).toHaveFocus()
+
+    // Tab 圈闭：仅一个可聚焦元素 → 焦点保持在关闭按钮上（不逃逸到 body）。
+    fireEvent.keyDown(window, { key: 'Tab' })
+    expect(screen.getByRole('button', { name: 'Close care instructions' })).toHaveFocus()
+
+    // Escape 关闭并把焦点还原给触发按钮。
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
+  })
 })

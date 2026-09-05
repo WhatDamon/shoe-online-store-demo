@@ -68,7 +68,7 @@ export function ProductActions({ product, buyUrl, children }: ProductActionsProp
               )
             })}
           </div>
-          <p className="text-xs leading-5 text-neutral-400">
+          <p className="text-xs leading-5 text-neutral-500">
             Photos are representative — the actual shade can vary on screen.
           </p>
         </fieldset>

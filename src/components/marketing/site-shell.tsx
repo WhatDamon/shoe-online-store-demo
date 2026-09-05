@@ -23,8 +23,22 @@ export function SiteShell({
 }) {
   return (
     <div className="flex min-h-dvh flex-col bg-canvas text-ink">
+      {/* 键盘/读屏跳转链接（WCAG 2.4.1）：Tab 首元素即达，跳过头部导航直达正文。 */}
+      <a
+        href="#main"
+        className="sr-only z-[60] rounded-md bg-ink px-4 py-2 text-sm font-medium text-canvas focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:outline-2 focus:outline-offset-2 focus:outline-brand"
+      >
+        Skip to content
+      </a>
       <AppBar tone={tone} />
-      <main className={cn('flex flex-1 flex-col', tone === 'solid' && 'pt-16')}>{children}</main>
+      {/* id="main" 是 skip link 的落地锚点（tabIndex=-1 使旧版 Safari 也能接收焦点）。 */}
+      <main
+        id="main"
+        tabIndex={-1}
+        className={cn('flex flex-1 flex-col', tone === 'solid' && 'pt-16')}
+      >
+        {children}
+      </main>
       <Footer />
     </div>
   )

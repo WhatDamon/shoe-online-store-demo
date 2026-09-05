@@ -89,7 +89,7 @@ export function MessageList({ messages, isStreaming, sizeLabelFor, onRetry }: Me
                 {message.content ? (
                   <MarkdownLite text={message.content} />
                 ) : message.streaming ? (
-                  <span aria-hidden="true" className="tracking-widest text-neutral-400">
+                  <span aria-hidden="true" className="tracking-widest text-neutral-500">
                     ···
                   </span>
                 ) : null}

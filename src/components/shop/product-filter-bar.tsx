@@ -119,6 +119,7 @@ export function ProductFilterBar({
       <div className="flex flex-wrap items-center gap-2">
         <form
           role="search"
+          aria-label="Search within results"
           onSubmit={handleSearch}
           className="flex min-w-0 flex-1 basis-64 items-center gap-2"
         >
@@ -129,7 +130,7 @@ export function ProductFilterBar({
             key={initial.q ?? ''}
             defaultValue={initial.q ?? ''}
             placeholder="Search styles"
-            className="h-9 w-full min-w-0 flex-1 rounded-lg border border-neutral-200 bg-surface px-3 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-400 focus:outline-none"
+            className="h-9 w-full min-w-0 flex-1 rounded-lg border border-neutral-200 bg-surface px-3 text-sm text-neutral-900 placeholder:text-neutral-500 focus:border-neutral-400 focus:outline-none"
           />
           <button
             type="submit"

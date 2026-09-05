@@ -126,7 +126,12 @@ export function AppBar({
         <div className="flex flex-1 items-center justify-end gap-1">
           {/* 桌面内联搜索：图标以输入框为锚绝对定位，垂直水平严格居中（不再用
               relative 硬推，避免偏移）；输入框 pl-10 让文字让出图标。 */}
-          <form action="/shop" role="search" className="relative hidden items-center lg:flex">
+          <form
+            action="/shop"
+            role="search"
+            aria-label="Search products"
+            className="relative hidden items-center lg:flex"
+          >
             <SearchIcon
               aria-hidden="true"
               className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-current opacity-70"
@@ -139,7 +144,7 @@ export function AppBar({
               className={cn(
                 'h-9 w-44 rounded-full pl-10 text-sm transition-colors',
                 searchSolid
-                  ? 'border-neutral-300 bg-surface text-ink placeholder:text-neutral-400'
+                  ? 'border-neutral-300 bg-surface text-ink placeholder:text-neutral-500'
                   : 'border-white/25 bg-white/10 text-white placeholder:text-white/60',
               )}
             />
@@ -160,6 +165,7 @@ export function AppBar({
             </summary>
             <div
               role="search"
+              aria-label="Search products"
               className="absolute right-0 top-full z-50 mt-2 w-[min(26rem,calc(100vw-3.5rem))] border border-ink/10 bg-canvas p-2 text-ink shadow-lg"
             >
               <form action="/shop" className="flex items-center gap-2">
@@ -168,7 +174,7 @@ export function AppBar({
                   type="search"
                   placeholder="Search styles"
                   aria-label="Search products"
-                  className="h-10 min-w-0 flex-1 rounded-full border-neutral-300 bg-surface pl-4 text-ink placeholder:text-neutral-400"
+                  className="h-10 min-w-0 flex-1 rounded-full border-neutral-300 bg-surface pl-4 text-ink placeholder:text-neutral-500"
                 />
                 <button
                   type="submit"

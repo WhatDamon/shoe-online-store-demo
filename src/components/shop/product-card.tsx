@@ -30,7 +30,7 @@ export function ProductCard({ product }: { product: ProductView }) {
             <div className="relative aspect-square w-full bg-white">
               <Image
                 src={cover}
-                alt={product.title}
+                alt=""
                 fill
                 sizes="(max-width:640px) 100vw, (max-width:1024px) 50vw, 25vw"
                 className="object-contain transition-transform duration-300 group-hover:scale-[1.03]"
@@ -55,7 +55,7 @@ export function ProductCard({ product }: { product: ProductView }) {
             <p className="text-[15px] font-semibold text-neutral-900">
               {formatPrice(product.price.amount)}
             </p>
-            {sizeHint ? <p className="text-xs text-neutral-400">{sizeHint}</p> : null}
+            {sizeHint ? <p className="text-xs text-neutral-500">{sizeHint}</p> : null}
           </div>
         </div>
       </Link>

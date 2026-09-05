@@ -80,6 +80,8 @@ export default async function ShopPage({
 
       {products.length > 0 ? (
         <div className="mt-4">
+          {/* 结果区分区标题（读屏）：商品卡 h3 需要一个 h2 祖先，避免 h1 → h3 跳级。 */}
+          <h2 className="sr-only">All styles</h2>
           <ProductGrid products={products} />
         </div>
       ) : (

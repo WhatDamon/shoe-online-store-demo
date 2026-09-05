@@ -77,7 +77,7 @@ export default function BlogPage() {
                   <p className="mt-2 text-[15px] leading-6 text-neutral-600">{post.description}</p>
                 ) : null}
                 {post.tags.length > 0 ? (
-                  <p className="mt-2.5 text-xs text-neutral-400">
+                  <p className="mt-2.5 text-xs text-neutral-500">
                     {post.tags.map((tag) => `#${tag}`).join('  ')}
                   </p>
                 ) : null}

@@ -225,3 +225,16 @@
     @apply font-semibold text-ink;
   }
 }
+
+/* 无障碍（WCAG 2.3.3）：尊重用户的减弱动效偏好。动画类（hero 滚动箭头 bounce、
+   skeleton pulse、hover 缩放）与过渡在 reduced-motion 下被显著缩短——不动效不丢信息。 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

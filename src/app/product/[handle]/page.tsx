@@ -91,6 +91,9 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
 
           <ProductActions product={product} buyUrl={buyUrl}>
             <div className="flex flex-col gap-3">
+              {/* 详情手风琴分区标题：base-ui AccordionHeader 固定渲染 h3，
+                  需 h2 祖先承接 h1 → h3 的标题层级（heading-order 修复）。 */}
+              <h2 className="sr-only">Product details</h2>
               <Accordion className="border-t border-neutral-200">
                 <AccordionItem value="materials-fit">
                   <AccordionTrigger>Materials &amp; fit</AccordionTrigger>

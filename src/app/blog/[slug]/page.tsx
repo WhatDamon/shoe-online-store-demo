@@ -65,7 +65,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
       </div>
 
       {post.tags.length > 0 ? (
-        <p className="mt-10 border-t border-neutral-200 pt-5 text-xs text-neutral-400">
+        <p className="mt-10 border-t border-neutral-200 pt-5 text-xs text-neutral-500">
           {post.tags.map((tag) => `#${tag}`).join('  ')}
         </p>
       ) : null}
