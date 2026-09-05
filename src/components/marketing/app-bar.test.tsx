@@ -38,6 +38,30 @@ describe('AppBar', () => {
     expect(within(wishlist).getByText('0')).toBeInTheDocument()
   })
 
+  it('opens the mobile menu (hamburger) sheet with nav links', async () => {
+    const user = userEvent.setup()
+    render(
+      <WishlistProvider>
+        <AppBar />
+      </WishlistProvider>,
+    )
+
+    const openMenu = screen.getByRole('button', { name: 'Open menu' })
+    await user.click(openMenu)
+
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByRole('heading', { name: 'Menu' })).toBeInTheDocument()
+    // 移动导航：桌面导航之外的独立实例（同一 site.nav 数据源）
+    for (const [label, href] of [
+      ['Shop', '/shop'],
+      ['Collections', '/#collections'],
+      ['Our Story', '/#story'],
+    ] as const) {
+      const link = within(dialog).getByRole('link', { name: label })
+      expect(link).toHaveAttribute('href', href)
+    }
+  })
+
   it('shows an updated wishlist count when an item is added', async () => {
     const user = userEvent.setup()
     render(

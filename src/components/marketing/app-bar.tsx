@@ -57,8 +57,10 @@ export function AppBar({
 
   const searchSolid = scrolled || tone === 'solid'
   const wishlistLabel = `Wishlist, ${count} ${count === 1 ? 'item' : 'items'}`
+  // 头部触控目标统一 ≥44px（Apple/Android 触控命中区规范下限）：真机手指出手偏
+  // 离 36px 图标外沿即落空（表现为“点了没反应”），44px + 图标居中保证命中。
   const iconLinkClass =
-    'inline-flex h-9 w-9 items-center justify-center rounded-full text-current transition-opacity hover:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current'
+    'inline-flex h-11 w-11 items-center justify-center rounded-full text-current transition-opacity hover:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current'
 
   return (
     <header
@@ -78,7 +80,7 @@ export function AppBar({
             <Sheet>
               <SheetTrigger
                 aria-label="Open menu"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full text-current transition-opacity hover:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full text-current transition-opacity hover:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
               >
                 <MenuIcon className="size-5" />
               </SheetTrigger>
