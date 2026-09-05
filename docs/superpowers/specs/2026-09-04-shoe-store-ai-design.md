@@ -30,15 +30,15 @@
 
 ## 3. 产品原则
 
-| # | 原则 | 落地 |
-|---|------|------|
-| P1 | **AI 克制呈现（消费端）** | 助手入口用消费者语言（"Need a hand?" / "Find my size" / "Style ideas"），不出现 "AI" 字样；Landing 页零 AI 痕迹，卖产品与舒适 |
-| P2 | 无凭证可演示 | 默认 env 即全功能 Mock：无 key → Mock AI、无 Shopify → Seed 商品、主图本地程序化生成（离线自洽） |
-| P3 | 诚实失败 | 有 key 但调用失败 → 明确报错 + 重试，**不静默降级**为 Mock（防"假成功"演示） |
-| P4 | 单一事实源 | 商品实时从 CatalogAdapter 拉取（现为 Seed），本地库只存派生缓存（embedding 快照） |
-| P5 | 面向隔离 | server-only 边界、适配器契约、类型化数据流；改实现不改调用方 |
-| P6 | 隐私最小 | 无 cookie、无埋点、无个人信息进 AI 上下文；仅当次会话记忆 |
-| P7 | **成本护栏** | 开放无鉴权端点必须自带多层限流与预算（回合/令牌/日预算），防脚本刷量与"免费聊天室"式滥用（§8.5） |
+| #   | 原则                      | 落地                                                                                                                          |
+| --- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| P1  | **AI 克制呈现（消费端）** | 助手入口用消费者语言（"Need a hand?" / "Find my size" / "Style ideas"），不出现 "AI" 字样；Landing 页零 AI 痕迹，卖产品与舒适 |
+| P2  | 无凭证可演示              | 默认 env 即全功能 Mock：无 key → Mock AI、无 Shopify → Seed 商品、主图本地程序化生成（离线自洽）                              |
+| P3  | 诚实失败                  | 有 key 但调用失败 → 明确报错 + 重试，**不静默降级**为 Mock（防"假成功"演示）                                                  |
+| P4  | 单一事实源                | 商品实时从 CatalogAdapter 拉取（现为 Seed），本地库只存派生缓存（embedding 快照）                                             |
+| P5  | 面向隔离                  | server-only 边界、适配器契约、类型化数据流；改实现不改调用方                                                                  |
+| P6  | 隐私最小                  | 无 cookie、无埋点、无个人信息进 AI 上下文；仅当次会话记忆                                                                     |
+| P7  | **成本护栏**              | 开放无鉴权端点必须自带多层限流与预算（回合/令牌/日预算），防脚本刷量与"免费聊天室"式滥用（§8.5）                              |
 
 ## 4. 技术栈（经版本调研确认的组合）
 
@@ -133,12 +133,12 @@ ai_usage: {           // 匿名成本计量（§8.5），无个人信息
 
 ### 8.2 四种能力（消费者措辞 ↔ 内部模式）
 
-| 消费端措辞 | 内部 | 流程 |
-|---|---|---|
-| 找鞋帮助 / Help me pick | shopping | 用户提问 → 检索注入上下文 → 模型仅基于注入内容回答并引用商品 |
-| Find my size | size-fit | 附该鞋在当前市场体系尺码表（canonical → 换算）+ fitNotes，引导式问脚型/习惯码 → 推荐 + 解释 |
-| Style ideas / Style it with | outfit | 以当前商品为主角的搭配建议 |
-| 搜索框自然语言 / 浏览找鞋 | find-shoes | 显式检索 → 商品卡网格 + 一句总结 |
+| 消费端措辞                  | 内部       | 流程                                                                                        |
+| --------------------------- | ---------- | ------------------------------------------------------------------------------------------- |
+| 找鞋帮助 / Help me pick     | shopping   | 用户提问 → 检索注入上下文 → 模型仅基于注入内容回答并引用商品                                |
+| Find my size                | size-fit   | 附该鞋在当前市场体系尺码表（canonical → 换算）+ fitNotes，引导式问脚型/习惯码 → 推荐 + 解释 |
+| Style ideas / Style it with | outfit     | 以当前商品为主角的搭配建议                                                                  |
+| 搜索框自然语言 / 浏览找鞋   | find-shoes | 显式检索 → 商品卡网格 + 一句总结                                                            |
 
 导购人设：专业、亲切、克制（资深店员），不推销、不臆造库存/价格以外的信息。
 
@@ -209,18 +209,18 @@ docs/superpowers/specs/  本规格
 
 ## 11. 环境变量（提供 `.env.local.example`）
 
-| 变量 | 说明 |
-|---|---|
-| `AI_API_KEY` | 空 → Mock 模式（默认可演示） |
-| `AI_BASE_URL` / `AI_MODEL` | OpenAI 兼容端点与模型 |
-| `AI_EMBEDDING_MODEL` | 缓存行标记 + 切换时整表重算 |
-| `AI_MAX_TURNS` / `AI_MAX_OUTPUT_TOKENS` / `AI_REQUEST_TIMEOUT_MS` | 护栏默认 20 回合 / 500 token / 20s（§8.5） |
-| `AI_DAILY_TOKEN_CAP` | 每日 token 预算，超限温和拒答（默认 ~1M/日） |
-| `AI_DISABLE_REAL` | 强制 Mock 总开关（遇滥用一键止血） |
-| `SITE_MARKET` | 市场配置（默认 `US`），决定尺码展示体系（US/EU/UK/JP/CN，§6 换算） |
-| `DB_DRIVER` | `sqlite`（默认）/ `postgres`：应用数据库驱动选择（决策 #13） |
-| `DATABASE_URL` | sqlite：本地文件（默认 `./data/local.db`）；postgres：`postgres://…` 连 Cloud SQL |
-| `SHOPIFY_*` | 预留（本期忽略） |
+| 变量                                                              | 说明                                                                              |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `AI_API_KEY`                                                      | 空 → Mock 模式（默认可演示）                                                      |
+| `AI_BASE_URL` / `AI_MODEL`                                        | OpenAI 兼容端点与模型                                                             |
+| `AI_EMBEDDING_MODEL`                                              | 缓存行标记 + 切换时整表重算                                                       |
+| `AI_MAX_TURNS` / `AI_MAX_OUTPUT_TOKENS` / `AI_REQUEST_TIMEOUT_MS` | 护栏默认 20 回合 / 500 token / 20s（§8.5）                                        |
+| `AI_DAILY_TOKEN_CAP`                                              | 每日 token 预算，超限温和拒答（默认 ~1M/日）                                      |
+| `AI_DISABLE_REAL`                                                 | 强制 Mock 总开关（遇滥用一键止血）                                                |
+| `SITE_MARKET`                                                     | 市场配置（默认 `US`），决定尺码展示体系（US/EU/UK/JP/CN，§6 换算）                |
+| `DB_DRIVER`                                                       | `sqlite`（默认）/ `postgres`：应用数据库驱动选择（决策 #13）                      |
+| `DATABASE_URL`                                                    | sqlite：本地文件（默认 `./data/local.db`）；postgres：`postgres://…` 连 Cloud SQL |
+| `SHOPIFY_*`                                                       | 预留（本期忽略）                                                                  |
 
 ## 12. 工程 / 测试 / 可靠性
 
@@ -250,6 +250,6 @@ docs/superpowers/specs/  本规格
 
 ## 14. 待办下一步
 
-规格经用户审阅后 → **writing-plans** 产出分阶段实现计划（含脚手架锁定版本、seed 内容清单、SSE 契约落地顺序、测试顺序、验收清单）。
-15. **Shopify 购物接入改为 Buy Button（放弃 PDP 主题迁移）**：themes/evoloop（Horizon fork）二开后导入观感仍不达预期，用户决定**删除主题**、PDP 继续用本站自定义页。交易接入 = **Shopify Buy Button 渠道嵌入**（v3，admin 生成：含 domain + storefront token + 商品 numeric id），不做目录级 Storefront 适配器。本站目录维持 seed 演示；新增与店铺同 handle 的演示商品 `3d-shoes` 承载 PDP；Buy Button 仅在 env 配置 `SHOPIFY_BUY_BUTTON` JSON（handle/domain/productId/token）且 handle 匹配时替换 PDP 购买条（Buy Button 自带尺码/加购/结账 UI），未配置时维持 “Available soon” 占位与零购买 UI（克制 P1）。`SHOPIFY_DOMAIN=03zrk0-2u.myshopify.com` 备查。备注：Buy Button 内嵌 token 日后亦可复用于真 Storefront 读取（决策 #14 仍为远期选项）（用户决策 2026-09-05）
-16. **真实供应链目录导入（萨洛丁款式集合.xlsx）**：seed 由 16 双虚构 3D 打印鞋换为供应商真目录 —— 29 款鞋（联盟新创 DC-10xx / 26xxx-M / JX119 系列）+ 11 行小件赠品（同名行合并，得 9 款）。图片为 Excel 内嵌 PNG（每款 2-10 张），导出转 WebP 落 `public/products/<handle>/`，本地静态资产、无图床；产品 `Product.images`（可选本地路径列表）为新增契约，缺省/空仍回落到程序化 SVG 视觉。**界面范围（用户决策）**：/shop 卡片与搜索卡片用该款首图、PDP 相册用全量图；SVG 仅作无图兜底；AI 会话内结果卡保持 SVG 缩略。**赠品（用户决策）**：边角料小件满 $50 赠一 —— 商店页加 “Spend $50, get a free gift” 活动条 + 独立 Free gifts 画廊（图+名+多色，不单独售卖、无 PDP，点击看大图）；赠品不入正价目录（不进 getProducts/筛选/AI 检索）。**名称/文案（用户决策）**：按款式合成英文名（图不可视故以系列+色系+性别生成、低调不虚构材质），货号入副标题；颜色中文名映射英文 + 十六进制近似。**价格（用户决策）**：沿用 $98-178 demo 价带并在数据层标注 placeholder。**尺码（用户决策）**：码段（如 女 35-40# / 男 39-44#）数字直读为 EU 整档并取并集入库，size fixture 扩至 EU 35；「暂无尺码」款保留空 sizes（PDP 提示尺码待定）。删除演示商品 `3d-shoes`（其 PDP 预览使命随 Buy Button 搁置结束）。集合映射为站点策展占位（不随数据导入定稿）。2026-09-06 用户逐项确认后记录。
+规格经用户审阅后 → **writing-plans** 产出分阶段实现计划（含脚手架锁定版本、seed 内容清单、SSE 契约落地顺序、测试顺序、验收清单）。15. **Shopify 购物接入改为 Buy Button（放弃 PDP 主题迁移）**：themes/evoloop（Horizon fork）二开后导入观感仍不达预期，用户决定**删除主题**、PDP 继续用本站自定义页。交易接入 = **Shopify Buy Button 渠道嵌入**（v3，admin 生成：含 domain + storefront token + 商品 numeric id），不做目录级 Storefront 适配器。本站目录维持 seed 演示；新增与店铺同 handle 的演示商品 `3d-shoes` 承载 PDP；Buy Button 仅在 env 配置 `SHOPIFY_BUY_BUTTON` JSON（handle/domain/productId/token）且 handle 匹配时替换 PDP 购买条（Buy Button 自带尺码/加购/结账 UI），未配置时维持 “Available soon” 占位与零购买 UI（克制 P1）。`SHOPIFY_DOMAIN=03zrk0-2u.myshopify.com` 备查。备注：Buy Button 内嵌 token 日后亦可复用于真 Storefront 读取（决策 #14 仍为远期选项）（用户决策 2026-09-05）16. **真实供应链目录导入（萨洛丁款式集合.xlsx）**：seed 由 16 双虚构 3D 打印鞋换为供应商真目录 —— 29 款鞋（联盟新创 DC-10xx / 26xxx-M / JX119 系列）+ 11 行小件赠品（同名行合并，得 9 款）。图片为 Excel 内嵌 PNG（每款 2-10 张），导出转 WebP 落 `public/products/<handle>/`，本地静态资产、无图床；产品 `Product.images`（可选本地路径列表）为新增契约，缺省/空仍回落到程序化 SVG 视觉。**界面范围（用户决策）**：/shop 卡片与搜索卡片用该款首图、PDP 相册用全量图；SVG 仅作无图兜底；AI 会话内结果卡保持 SVG 缩略。**赠品（用户决策）**：边角料小件满 $50 赠一 —— 商店页加 “Spend $50, get a free gift” 活动条 + 独立 Free gifts 画廊（图+名+多色，不单独售卖、无 PDP，点击看大图）；赠品不入正价目录（不进 getProducts/筛选/AI 检索）。**名称/文案（用户决策）**：按款式合成英文名（图不可视故以系列+色系+性别生成、低调不虚构材质），货号入副标题；颜色中文名映射英文 + 十六进制近似。**价格（用户决策）**：沿用 $98-178 demo 价带并在数据层标注 placeholder。**尺码（用户决策）**：码段（如 女 35-40# / 男 39-44#）数字直读为 EU 整档并取并集入库，size fixture 扩至 EU 35；「暂无尺码」款保留空 sizes（PDP 提示尺码待定）。删除演示商品 `3d-shoes`（其 PDP 预览使命随 Buy Button 搁置结束）。集合映射为站点策展占位（不随数据导入定稿）。2026-09-06 用户逐项确认后记录。
+
+17. **products 表：商品数据入库（用户决策 2026-09-06）**：目录运行时源由“内存 seedProducts”迁到 SQL 表 `products` —— DB 为运行时源，启动/首次访问时表空则自动从导入层（supplier.json + seed.ts 策展）灌种一次；此后 /shop 列表、PDP、检索一致从 DB 读取（改价/改集合/上下架只需写该表；JSON 降级为“导入源”，不再作为运行时真源）。**存储形态（用户决策）**：规范列 + JSON 副列 —— id(PK)/handle(UNIQUE)/title/subtitle/description/price_amount/currency/product_type/collections(JSON)/sizes(JSON)/colors(JSON)/features(JSON)/tags(JSON)/construction(JSON)/visual(JSON)/images(JSON)/fit_notes/created_at；两方言同构（SQLite text · Postgres text/double），无 jsonb/方言分支；读写经单一编解码映射模块。**方言范围（用户决策）**：双驱动都加（schema.ts 与 schema-postgres.ts 同构 + parity 契约测试继续约束）。运行选择开关：`CATALOG_SOURCE=db|seed|shopify`（默认 `db`；测试环境 `seed` 保持既有单元测试的纯内存语义；`SHOPIFY_*` 配置仍优先生效走 stub）。自动建表沿用 CREATE TABLE IF NOT EXISTS；embedding 缓存键仍为 Product.id（evo-XX，行解码后不变，不回退）。过滤/排序继续内存执行（29 行规模），DB 负责持久化与后续扩展查询。
