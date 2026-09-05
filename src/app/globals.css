@@ -260,11 +260,13 @@
     color: #111111 !important;
   }
 
-  /* 站点 UI：壳（skip link/header/footer/nav）与 SDK/iframe 一律不打印。 */
+  /* 站点 UI：壳（skip link/header/footer/nav）、SDK/iframe 与固定悬浮层
+    （AI 助手 FAB/面板、护理弹窗等）一律不打印——打印只应含 sheet 内容。 */
   header,
   footer,
   nav,
-  iframe {
+  iframe,
+  .fixed {
     display: none !important;
   }
 

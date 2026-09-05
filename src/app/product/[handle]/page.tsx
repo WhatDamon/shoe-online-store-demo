@@ -89,7 +89,12 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
                   {product.handle.toUpperCase()}
                 </p>
               </div>
-              <WishlistButton handle={product.handle} />
+              {/* 工具类动作角落：收藏心形 + 打印规格图标（用户 2026-09-06：打印入口
+                 由详情区移至此，轻量图标、不挤占详情区）。 */}
+              <div className="flex shrink-0 items-center gap-1">
+                <WishlistButton handle={product.handle} />
+                <PrintSpecSheetButton />
+              </div>
             </div>
 
             {/* 商店直购形态：demo $ 价不显示（价格仅由 Buy Button 以店币呈现，决策：不并存误导） */}
@@ -127,8 +132,6 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
                 </Accordion>
                 {/* 护理说明海报入口（决策 #19）：每 PDP 通用，弹窗查看，不占首屏。 */}
                 <CareInstructionsButton />
-                {/* 打印规格入口（决策 #25 类：Print / Save as PDF，克制、不占首屏）。 */}
-                <PrintSpecSheetButton />
               </div>
             </ProductActions>
           </div>
