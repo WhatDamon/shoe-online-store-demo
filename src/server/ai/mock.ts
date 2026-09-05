@@ -83,6 +83,9 @@ export class MockProvider implements AiProvider {
         : titles.length === 1
           ? `I would start with the ${a} — it reads as a strong match for what you described.`
           : `I would start with the ${a} and the ${b} — both read as strong matches for what you described.`
-    yield* toDeltas(recommendation)
+    // 满 $50 赠一行（与 prompts 购物 mode 的 GIFT_OFFER_FACT 同源，只回一次）。
+    const offer =
+      ' And heads-up: orders over $50 include one free little buddy — a small accessory pressed from leftover upper offcuts — while supplies last.'
+    yield* toDeltas(recommendation + (titles.length > 0 ? offer : ''))
   }
 }
