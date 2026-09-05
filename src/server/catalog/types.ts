@@ -1,6 +1,6 @@
-// 跨任务统一的领域契约（禁改名）。canonical 尺码存储：EU 整档 36–48。
+// 跨任务统一的领域契约（禁改名）。canonical 尺码存储：EU 整档 35–48（决策 #16 扩至 35）。
 export type SizeSystem = 'US' | 'EU' | 'UK' | 'JP' | 'CN'
-export type CanonicalSize = number // EU 整档，36–48（唯一 canonical 存储）
+export type CanonicalSize = number // EU 整档，35–48（唯一 canonical 存储）
 type CurrencyCode = 'USD' // 市场决策 #9：本版锁定 USD
 
 export interface Price {
@@ -26,8 +26,9 @@ export interface Product {
     density: 0.6 | 0.75 | 0.9
     printedUpper: boolean
   }
-  visual: { palette: [string, string]; accent: string; views: 3 } // 驱动 SVG
-  image?: { remote?: string } // 未来真实素材/Shopify 图（本期仅 localGenerated）
+  visual: { palette: [string, string]; accent: string; views: 3 } // 驱动 SVG（无图兜底）
+  /** 真实商品照片（public/products/<handle>/*.webp，决策 #16）；缺省/空 → SVG 视觉兜底。 */
+  images?: string[]
   createdAt: string // ISO，用于 newest 排序
 }
 

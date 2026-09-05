@@ -23,11 +23,11 @@ function makeProduct(handle: string, over: Partial<Product>): Product {
 
 describe('keywordSearch', () => {
   it('命中 lightweight 标签的鞋排在没有该标签的鞋之前（无命中者不返回）', () => {
-    const tagged = seedProducts[0] // p01 daily-drift, tags 含 'lightweight'
-    const plain = seedProducts[1] // p02 cloudwalk-slip, tags 无 'lightweight'
-    const res = keywordSearch('lightweight', [plain, tagged])
+    const base = makeProduct('base-clean', { title: 'A', description: 'b' })
+    const tagged = makeProduct('tagged-shoe', { title: 'Tagged', tags: ['lightweight'] })
+    const res = keywordSearch('lightweight', [base, tagged])
     expect(res).toHaveLength(1)
-    expect(res[0].handle).toBe(tagged.handle)
+    expect(res[0].handle).toBe('tagged-shoe')
     expect(res[0].score).toBeGreaterThan(0)
   })
 
@@ -54,7 +54,9 @@ describe('keywordSearch', () => {
   })
 
   it('降序返回且仅含命中产品', () => {
-    const res = keywordSearch('cloudwalk', seedProducts)
+    // 用真实目录首个商品的标题词保证有命中（词出现在 title，确定性）
+    const query = seedProducts[0].title.split(' ')[0].toLowerCase()
+    const res = keywordSearch(query, seedProducts)
     expect(res.length).toBeGreaterThan(0)
     for (let i = 1; i < res.length; i++) {
       expect(res[i - 1].score).toBeGreaterThanOrEqual(res[i].score)

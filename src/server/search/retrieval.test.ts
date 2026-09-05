@@ -16,8 +16,8 @@ vi.mock('./embedder', () => ({
   embed: mockEmbed,
 }))
 
-const DIM = seedProducts.length // 16
-const oneHot = (idx: number) => Array.from({ length: DIM }, (_, d) => (d === idx ? 1 : 0))
+const DIM = seedProducts.length // 商品数（随 seed 动态）
+const FIRST = seedProducts[0]
 
 describe('retrieve', () => {
   beforeEach(() => {
@@ -26,34 +26,37 @@ describe('retrieve', () => {
     vi.stubEnv('AI_EMBEDDING_MODEL', 'test-model')
   })
 
-  // 语义路径：mock embed 返回按 seed 内容 one-hot 的固定向量。
-  // 支持批量入参（补齐逻辑现为一次请求补算全部缺失商品）。
-  // 查询向量与 daily-drift(p01) 对齐 → 余弦 1，其余产品 0。
-  function mockSemanticEmbed() {
-    const contents = new Map(seedProducts.map((p) => [textualContent(p), p]))
-    mockEmbed.mockImplementation(async (texts: string[]) =>
-      texts.map((t) => {
-        const hit = contents.get(t)
-        if (!hit) return oneHot(0) // 查询串 → 对齐 p01
-        const idx = seedProducts.findIndex((p) => p.id === hit.id)
-        return oneHot(idx)
-      }),
-    )
-  }
+// 语义路径：mock embed 返回按 seed 内容 one-hot 的固定向量。
+// 支持批量入参（补齐逻辑现为一次请求补算全部缺失商品）。
+// 查询向量与首商品对齐 → 余弦 1，其余产品 0。
+function mockSemanticEmbed() {
+  const contents = new Map(seedProducts.map((p) => [textualContent(p), p]))
+  mockEmbed.mockImplementation(async (texts: string[]) =>
+    texts.map((t) => {
+      const hit = contents.get(t)
+      if (!hit) return oneHot(0) // 查询串 → 对齐首商品
+      const idx = seedProducts.findIndex((p) => p.id === hit.id)
+      return oneHot(idx)
+    }),
+  )
+}
+
+const oneHot = (idx: number) => Array.from({ length: DIM }, (_, d) => (d === idx ? 1 : 0))
 
   it('无 embedding 能力时走关键词降级，且不调用 embed', async () => {
     mockEmbeddingsAvailable.mockResolvedValue(false)
     const repo = createRepository(createDb(':memory:'))
-    const res = await retrieve('cloudwalk', {}, repo)
+    // avocado 仅出现在 26016-m 的色系描述里 → 单命中确定性断言
+    const res = await retrieve('avocado', {}, repo)
     expect(mockEmbed).not.toHaveBeenCalled()
-    expect(res).toEqual([{ handle: 'cloudwalk-slip', score: expect.any(Number) }])
+    expect(res).toEqual([{ handle: '26016-m', score: expect.any(Number) }])
     expect(res[0].score).toBeGreaterThan(0)
   })
 
   it('关键词降级返回形状 {handle,score} 且降序', async () => {
     mockEmbeddingsAvailable.mockResolvedValue(false)
     const repo = createRepository(createDb(':memory:'))
-    const res = await retrieve('slip', {}, repo)
+    const res = await retrieve('sneaker', {}, repo) // productType 全目录含 sneaker
     expect(res.length).toBeGreaterThan(1)
     for (let i = 1; i < res.length; i++) {
       expect(res[i - 1].score).toBeGreaterThanOrEqual(res[i].score)
@@ -78,7 +81,7 @@ describe('retrieve', () => {
     const batchCall = mockEmbed.mock.calls.find(([texts]) => (texts as string[]).length > 1)
     expect((batchCall?.[0] as string[]).length).toBe(DIM)
     expect(res).toHaveLength(DIM)
-    expect(res[0].handle).toBe('daily-drift')
+    expect(res[0].handle).toBe(FIRST.handle)
     expect(res[0].score).toBeCloseTo(1)
 
     // 缓存落库：每行 contentHash/model 与源一致
@@ -109,23 +112,23 @@ describe('retrieve', () => {
     mockSemanticEmbed()
     const repo = createRepository(createDb(':memory:'))
 
-    // 预置 16 行正确哈希，仅 p01 置为过期哈希
+    // 预置全部行正确哈希，仅首商品置为过期哈希
     for (const p of seedProducts) {
       await repo.upsertEmbedding({
         productId: p.id,
-        contentHash: p.id === 'p01' ? 'stale-hash' : hashText(textualContent(p)),
+        contentHash: p.id === FIRST.id ? 'stale-hash' : hashText(textualContent(p)),
         model: 'test-model',
         vector: oneHot(seedProducts.findIndex((s) => s.id === p.id)),
       })
     }
 
     const res = await retrieve('everyday breathable runner', { embedIfAvailable: true }, repo)
-    expect(mockEmbed).toHaveBeenCalledTimes(2) // 1 查询 + 批量补齐(仅 p01 一个)
+    expect(mockEmbed).toHaveBeenCalledTimes(2) // 1 查询 + 批量补齐(仅首商品一个)
     expect((mockEmbed.mock.calls[1][0] as string[]).length).toBe(1)
-    expect(res[0].handle).toBe('daily-drift')
+    expect(res[0].handle).toBe(FIRST.handle)
 
     const rows = await repo.allEmbeddings('test-model')
-    const p01 = rows.find((r) => r.productId === 'p01')
-    expect(p01!.contentHash).toBe(hashText(textualContent(seedProducts[0])))
+    const firstRow = rows.find((r) => r.productId === FIRST.id)
+    expect(firstRow!.contentHash).toBe(hashText(textualContent(seedProducts[0])))
   })
 })

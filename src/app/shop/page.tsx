@@ -1,10 +1,12 @@
 import { catalog } from '@/server/catalog/adapter'
 import { availableSizesForSystem } from '@/server/catalog/size-charts'
 import { listProductsForMarket } from '@/server/catalog/service'
+import { giftItems } from '@/server/catalog/gifts'
 import { market } from '@/lib/market'
 import { parseShopParams } from '@/lib/shop-search-params'
 import { ProductFilterBar } from '@/components/shop/product-filter-bar'
 import { ProductGrid } from '@/components/shop/product-grid'
+import { GiftGallery } from '@/components/shop/gift-gallery'
 import { EmptyState } from './empty-state'
 import { pageMetadata } from '@/lib/seo'
 
@@ -50,6 +52,22 @@ export default async function ShopPage({
         </p>
       </header>
 
+      {/* 赠品活动条（决策 #16）：满 $50 赠一；软文案呈现 */}
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-neutral-200 bg-surface px-4 py-3">
+        <p className="text-sm text-neutral-700">
+          <span className="font-medium text-ink">Spend $50, get a free gift.</span>{' '}
+          <span className="text-neutral-500">
+            {giftItems.length} little buddies to choose from, made from leftover upper offcuts.
+          </span>
+        </p>
+        <a
+          href="#free-gifts"
+          className="text-sm font-medium text-brand underline-offset-4 transition-colors hover:underline"
+        >
+          See the gifts
+        </a>
+      </div>
+
       <ProductFilterBar
         initial={filter}
         collectionOptions={collectionOptions}
@@ -69,6 +87,8 @@ export default async function ShopPage({
           <EmptyState />
         </div>
       )}
+
+      <GiftGallery gifts={giftItems} />
     </div>
   )
 }

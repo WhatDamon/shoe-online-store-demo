@@ -18,7 +18,8 @@ describe('availableSizesForSystem', () => {
   it('lists every fixture row with a market label and its canonical EU', () => {
     const opts = availableSizesForSystem('US')
     expect(opts).toHaveLength(sizeRows.length)
-    expect(opts[0]).toEqual({ label: 'US 5', canonical: 36 })
+    expect(opts[0]).toEqual({ label: 'US 4.5', canonical: 35 })
+    expect(opts.find((o) => o.label === 'US 5')).toEqual({ label: 'US 5', canonical: 36 })
     expect(opts[opts.length - 1]).toEqual({ label: 'US 12.5', canonical: 48 })
     expect(opts.find((o) => o.label === 'US 9')).toEqual({
       label: 'US 9',

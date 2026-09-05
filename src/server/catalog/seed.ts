@@ -1,354 +1,126 @@
 import type { Product } from './types'
+import supplier from './data/supplier.json'
 
-// 16 双 3D 打印休闲鞋。顺序即 featured 默认序。
-// 每双描述/features 用 3D 打印卖点文案（格纹/蜂巢结构、按单生产、零废料）。
-export const seedProducts: Product[] = [
-  {
-    id: 'p01',
-    handle: 'daily-drift',
-    title: 'Daily Drift',
-    subtitle: 'Everyday knit-lattice sneaker',
-    description:
-      'A quiet everyday sneaker with a lattice-printed upper and a flexible printed midsole. Each pair is printed as a single piece, so there is no cutting-room waste — just one clean line from print to wear.',
-    price: { amount: 128, currencyCode: 'USD' },
+// 供应商真实目录（决策 #16）：源为 /Users/damon233/Downloads/萨洛丁款式集合.xlsx，
+// 经 scripts/import-catalog/import.py 抽取（图片 WebP → public/products/<handle>/，清单 → data/supplier.json）。
+// 本文件 = 策展层：营销名/集合/价格/文案为演示占位（图片、色系、码段、货号为真实数据），
+// 可随时按 code 覆写。尺码为 EU 整档并集（女 35-40# + 男 39-44# → 35-44），直读不换算。
+// 目录顺序即 featured 默认序（seed-adapter 按 id 排序 → 以序号前缀保证稳定）。
+
+export interface SupplierShoe {
+  handle: string
+  code: string
+  genders: 'women' | 'men' | 'both' | 'none'
+  sizes_eu: number[]
+  segments: { kind: 'women' | 'men'; lo: number; hi: number }[]
+  colors: { en: string; hex: string; cn: string }[]
+  images: string[]
+}
+
+// SAFETY: supplier.json 由 scripts/import-catalog/import.py 生成（结构固定：shoes/gifts/_meta），
+// TS 对 JSON 的推断是宽泛字面量类型，转成受检接口；运行时字段缺失会在 toProduct 抛错兜底。
+const shoes = (supplier as unknown as { shoes: SupplierShoe[] }).shoes
+
+// 策展表：code → { 营销名, 集合, 可选价格覆写 }。集合为站点策展桶（非供应商分类）。
+// 价格为演示占位（$98-178 价带内轮转，决策 #16）。
+interface Curation {
+  title: string
+  collections: string[]
+  price?: number
+}
+const CURATION: Record<string, Curation> = {
+  'DC-1001': { title: 'Urban Bloom', collections: ['everyday'] },
+  'DC-1002': { title: 'Fresh Field', collections: ['everyday'] },
+  'DC-1003': { title: 'Mint Canvas', collections: ['everyday'] },
+  'DC-1009': { title: 'Neon Pulse', collections: ['everyday'] },
+  'DC-1007': { title: 'Blush Slip', collections: ['comfort'] }, // 暂无尺码
+  'DC-1010': { title: 'Blush Low', collections: ['comfort'] },
+  'DC-1008': { title: 'Court Glow', collections: ['travel'] },
+  '26006-F': { title: 'Citrus Step', collections: ['travel'] },
+  '26015-M': { title: 'Monochrome Ace', collections: ['minimal'] },
+  'DC-26075': { title: 'Triple Tone', collections: ['minimal'] },
+  'JX119-X': { title: 'Noir Stealth', collections: ['minimal'] },
+  JX119: { title: 'Silver Swoop', collections: ['minimal'] },
+  'DC-1004': { title: 'Flash Green', collections: ['travel'] },
+  'DC-1005': { title: 'Midnight Walk', collections: ['comfort'] },
+  'DC-1006': { title: 'Cocoa Low', collections: ['comfort'] },
+  '26012-M': { title: 'Ivory Court', collections: ['minimal'] },
+  '26027-M': { title: 'Lime Sprint', collections: ['travel'] },
+  '26011-M': { title: 'Orange Blaze', collections: ['travel'] },
+  '26014-M': { title: 'Moss Runner', collections: ['travel'] },
+  '26013-M': { title: 'Silver Haze', collections: ['minimal'] },
+  '26018-M': { title: 'Yolk Runner', collections: ['travel'] },
+  '26019-M': { title: 'Blush Day', collections: ['everyday'] },
+  '26010-M': { title: 'Alpine Split', collections: ['comfort'] },
+  '26017-M': { title: 'Cocoa Glide', collections: ['comfort'] },
+  '26016-M': { title: 'Avocado Kick', collections: ['everyday'] },
+  '26037-M': { title: 'Party Bright', collections: ['everyday'] },
+  'DC-1011': { title: 'Night Flight', collections: ['minimal'] },
+  'DC-1012': { title: 'Parade Pop', collections: ['travel'] },
+  'DC-1013': { title: 'Cloud Mint', collections: ['travel'] },
+}
+
+const DEMO_PRICES = [108, 128, 148, 118, 138, 98, 158, 168, 178]
+
+const GENDER_WORD: Record<SupplierShoe['genders'], string> = {
+  women: "Women's",
+  men: "Men's",
+  both: 'Unisex',
+  none: '',
+}
+
+const colorNames = (s: SupplierShoe) => s.colors.map((c) => c.en)
+const sizeRunText = (s: SupplierShoe) =>
+  s.segments
+    .map((seg) => `${seg.kind === 'women' ? "Women's" : "Men's"} ${seg.lo}–${seg.hi}`)
+    .join(', ')
+
+const hex = (value: string) => (value || '').toLowerCase()
+
+function toProduct(s: SupplierShoe, index: number): Product {
+  const cur = CURATION[s.code]
+  if (!cur) throw new Error(`missing curation for ${s.code}`)
+  const names = colorNames(s)
+  const hasSizes = s.sizes_eu.length > 0
+  const genderWord = GENDER_WORD[s.genders]
+  const descParts = [
+    `A ${genderWord ? `${genderWord.toLowerCase()} ` : ''}everyday sneaker offered in ${s.colors.length} colorway${s.colors.length === 1 ? '' : 's'}: ${names.join(', ')}.`,
+    hasSizes ? `Available in ${sizeRunText(s)}.` : 'Size range to be confirmed by the studio.',
+  ]
+  const subtitleParts = [genderWord, `${names.length} colorways`].filter(Boolean)
+  return {
+    id: `evo-${String(index + 1).padStart(2, '0')}`,
+    handle: s.handle,
+    title: cur.title,
+    subtitle: subtitleParts.join(' · '),
+    description: descParts.join(' '),
+    price: { amount: cur.price ?? DEMO_PRICES[index % DEMO_PRICES.length], currencyCode: 'USD' },
     productType: 'Sneaker',
-    tags: ['everyday', 'lightweight', 'eco'],
-    collections: ['everyday', 'comfort'],
-    sizes: [40, 41, 42, 43, 44, 45],
-    features: [
-      'Lattice-printed upper',
-      'Printed as one piece — zero waste',
-      'Flexible TPU midsole',
-      'Machine washable',
-    ],
-    fitNotes: 'True to size with a medium width. If between sizes, we recommend sizing up.',
-    construction: { pattern: 'lattice', density: 0.75, printedUpper: true },
-    visual: { palette: ['#e8e6e0', '#d8d4cb'], accent: '#b87333', views: 3 },
-    createdAt: '2026-08-01T00:00:00Z',
-  },
-  {
-    id: 'p02',
-    handle: 'cloudwalk-slip',
-    title: 'Cloudwalk Slip',
-    subtitle: 'Cushioned slip-on for long days',
-    description:
-      'A laceless slip-on built on our wave-cushion midsole. The printed upper breathes where you need it and supports where you do not.',
-    price: { amount: 108, currencyCode: 'USD' },
-    productType: 'Slip-on',
-    tags: ['comfort', 'slip-on'],
-    collections: ['comfort', 'everyday'],
-    sizes: [38, 39, 40, 41, 42, 43],
-    features: ['Wave-cushion midsole', 'One-piece printed upper', 'Wide toe box'],
-    fitNotes: 'Roomy fit; consider half a size down for a snug feel.',
-    construction: { pattern: 'wave', density: 0.6, printedUpper: true },
-    visual: { palette: ['#dcd6cf', '#c9c2b8'], accent: '#5f6f52', views: 3 },
-    createdAt: '2026-08-05T00:00:00Z',
-  },
-  // Travel
-  {
-    id: 'p03',
-    handle: 'packable-loafer',
-    title: 'Packable Loafer',
-    subtitle: 'Collapses flat, springs back in your bag',
-    description:
-      'A travel loafer that packs into a third of its volume. The lattice-printed upper flexes open and closed, so it slips into a carry-on and reshapes itself on arrival.',
-    price: { amount: 118, currencyCode: 'USD' },
-    productType: 'Loafer',
-    tags: ['travel', 'packable', 'lightweight'],
-    collections: ['travel'],
-    sizes: [39, 40, 41, 42, 43, 44],
-    features: [
-      'Packs flat without creasing',
-      'Lattice-printed flex upper',
-      'Made to order in our print studio',
-    ],
-    fitNotes: 'Slim profile; true to size.',
-    construction: { pattern: 'lattice', density: 0.6, printedUpper: true },
-    visual: { palette: ['#d9d2c5', '#c4bbaa'], accent: '#8a6d3b', views: 3 },
-    createdAt: '2026-08-08T00:00:00Z',
-  },
-  {
-    id: 'p04',
-    handle: 'overnighter',
-    title: 'Overnighter',
-    subtitle: 'One-bag companion with a honeycomb core',
-    description:
-      'Built for single-bag trips. The honeycomb-printed midsole absorbs the pace of airport corridors, and the upper dries fast after a rainy connection.',
-    price: { amount: 138, currencyCode: 'USD' },
-    productType: 'Sneaker',
-    tags: ['travel', 'quick-dry', 'eco'],
-    collections: ['travel'],
-    sizes: [40, 41, 42, 43, 44, 45],
-    features: ['Honeycomb-cushion midsole', 'Quick-dry printed upper', 'One-piece construction'],
-    fitNotes: 'True to size with a standard width.',
-    construction: { pattern: 'honeycomb', density: 0.9, printedUpper: true },
-    visual: { palette: ['#cfd2d6', '#b9bec4'], accent: '#4a5d6e', views: 3 },
-    createdAt: '2026-08-11T00:00:00Z',
-  },
-  {
-    id: 'p05',
-    handle: 'gate-runner',
-    title: 'Gate Runner',
-    subtitle: 'Light sneaker for tight connections',
-    description:
-      'A feather-light sneaker for the sprint between gates. The wave-printed sole returns energy with every step, keeping landings soft even after a long day of travel.',
-    price: { amount: 148, currencyCode: 'USD' },
-    productType: 'Sneaker',
-    tags: ['travel', 'lightweight', 'performance'],
-    collections: ['travel'],
-    sizes: [40, 41, 42, 43, 44, 45, 46],
-    features: ['Wave-return printed sole', 'Ultralight lattice upper', 'Wipe-clean surface'],
-    fitNotes: 'Snug athletic fit; size up if you prefer room.',
-    construction: { pattern: 'wave', density: 0.75, printedUpper: true },
-    visual: { palette: ['#e2dfda', '#cfcac2'], accent: '#9c4a2f', views: 3 },
-    createdAt: '2026-08-15T00:00:00Z',
-  },
-  {
-    id: 'p06',
-    handle: 'transit-knit',
-    title: 'Transit Knit',
-    subtitle: 'Knit-lattice slip-on for the daily commute',
-    description:
-      'A transit-friendly slip-on whose knit-lattice upper stretches through security and long waits. Printed without seams, it follows your foot instead of fighting it.',
-    price: { amount: 128, currencyCode: 'USD' },
-    productType: 'Slip-on',
-    tags: ['travel', 'commute', 'slip-on'],
-    collections: ['travel'],
-    sizes: [39, 40, 41, 42, 43, 44],
-    features: [
-      'Seamless knit-lattice upper',
-      'Stretch zones printed where you need them',
-      'Zero-waste print process',
-    ],
-    fitNotes: 'Easy entry; medium width, true to size.',
-    construction: { pattern: 'lattice', density: 0.6, printedUpper: true },
-    visual: { palette: ['#d7d3cf', '#c3bdb6'], accent: '#6d6a5e', views: 3 },
-    createdAt: '2026-08-19T00:00:00Z',
-  },
-  // Comfort
-  {
-    id: 'p07',
-    handle: 'morning-glory',
-    title: 'Morning Glory',
-    subtitle: 'Soft wave-cushion sneaker for slow starts',
-    description:
-      'Your first step out of bed, improved. A wave-printed cushion sole and a forgiving upper make the morning easy on tired feet.',
-    price: { amount: 118, currencyCode: 'USD' },
-    productType: 'Sneaker',
-    tags: ['comfort', 'cushion', 'soft'],
-    collections: ['comfort'],
-    sizes: [38, 39, 40, 41, 42, 43],
-    features: ['Wave-cushion printed sole', 'Pillow-soft heel pocket', 'Machine washable'],
-    fitNotes: 'Soft and roomy; true to size.',
-    construction: { pattern: 'wave', density: 0.6, printedUpper: true },
-    visual: { palette: ['#f0e4d6', '#e3cfbb'], accent: '#c96f4a', views: 3 },
-    createdAt: '2026-08-22T00:00:00Z',
-  },
-  {
-    id: 'p08',
-    handle: 'soft-step',
-    title: 'Soft Step',
-    subtitle: 'Honeycomb comfort underfoot, all day',
-    description:
-      'A comfort-first sneaker with a honeycomb-printed midsole that compresses under load and springs back with each stride — engineered for hours on your feet.',
-    price: { amount: 128, currencyCode: 'USD' },
-    productType: 'Sneaker',
-    tags: ['comfort', 'standing', 'cushion'],
-    collections: ['comfort'],
-    sizes: [39, 40, 41, 42, 43, 44, 45],
-    features: ['Honeycomb comfort midsole', 'All-day pressure relief', 'Recyclable printed build'],
-    fitNotes: 'Generous toe box; true to size.',
-    construction: { pattern: 'honeycomb', density: 0.75, printedUpper: true },
-    visual: { palette: ['#e7e2dc', '#d5cdc4'], accent: '#7a5c3e', views: 3 },
-    createdAt: '2026-08-25T00:00:00Z',
-  },
-  {
-    id: 'p09',
-    handle: 'lounge-line',
-    title: 'Lounge Line',
-    subtitle: 'Printed indoor-ease slip-on',
-    description:
-      'Between work and home, this slip-on keeps feet easy. Its lightweight honeycomb sole gives just enough support for running to the door and back again.',
-    price: { amount: 98, currencyCode: 'USD' },
-    productType: 'Slip-on',
-    tags: ['comfort', 'indoor', 'slip-on'],
-    collections: ['comfort'],
-    sizes: [38, 39, 40, 41, 42, 43],
-    features: ['Featherlight printed sole', 'Breathable open lattice', 'Indoor-outdoor friendly'],
-    fitNotes: 'Relaxed fit; consider half a size down for a snug feel.',
-    construction: { pattern: 'honeycomb', density: 0.6, printedUpper: true },
-    visual: { palette: ['#efe7de', '#e2d5c8'], accent: '#b08d57', views: 3 },
-    createdAt: '2026-08-28T00:00:00Z',
-  },
-  {
-    id: 'p10',
-    handle: 'pillow-slip',
-    title: 'Pillow Slip',
-    subtitle: 'Plush wave-print slide-in sneaker',
-    description:
-      'A plush slip-in with a wave-printed bed underfoot. The upper molds to your instep while the dense wave sole cradles every step.',
-    price: { amount: 108, currencyCode: 'USD' },
-    productType: 'Slip-on',
-    tags: ['comfort', 'plush', 'slip-on'],
-    collections: ['comfort'],
-    sizes: [38, 39, 40, 41, 42, 43, 44],
-    features: ['Dense wave cushion bed', 'Molded instep fit', 'Zero-seam printed upper'],
-    fitNotes: 'Plush feel; true to size.',
-    construction: { pattern: 'wave', density: 0.9, printedUpper: true },
-    visual: { palette: ['#eae3f0', '#d9cfdd'], accent: '#6e5d8a', views: 3 },
-    createdAt: '2026-09-01T00:00:00Z',
-  },
-  // Minimal
-  {
-    id: 'p11',
-    handle: 'quiet-minimal',
-    title: 'Quiet Minimal',
-    subtitle: 'A clean white silhouette, printed in one pass',
-    description:
-      'The quietest shoe in the line. A plain white lattice upper and a thin printed sole keep the look simple while the one-piece print keeps the footprint small.',
-    price: { amount: 158, currencyCode: 'USD' },
-    productType: 'Sneaker',
-    tags: ['minimal', 'white', 'clean'],
-    collections: ['minimal'],
-    sizes: [40, 41, 42, 43, 44, 45],
-    features: [
-      'Monochrome lattice upper',
-      'Printed in one pass — zero waste',
-      'Subtle, low-profile sole',
-    ],
-    fitNotes: 'Slim cut; true to size.',
-    construction: { pattern: 'lattice', density: 0.75, printedUpper: true },
-    visual: { palette: ['#f4f4f1', '#e8e8e3'], accent: '#2f2f2e', views: 3 },
-    createdAt: '2026-09-03T00:00:00Z',
-  },
-  {
-    id: 'p12',
-    handle: 'monochrome',
-    title: 'Monochrome',
-    subtitle: 'All-black, printed seamless',
-    description:
-      'An all-black essential. The single-material print means no glue, no seams and no fading panels — just a seamless dark silhouette that goes with everything.',
-    price: { amount: 148, currencyCode: 'USD' },
-    productType: 'Sneaker',
-    tags: ['minimal', 'black', 'essential'],
-    collections: ['minimal'],
-    sizes: [40, 41, 42, 43, 44, 45, 46],
-    features: [
-      'All-black one-piece upper',
-      'Seamless single-material build',
-      'Recyclable at end of life',
-    ],
-    fitNotes: 'True to size with a standard width.',
-    construction: { pattern: 'wave', density: 0.75, printedUpper: true },
-    visual: { palette: ['#2b2b2b', '#3d3d3c'], accent: '#8a8a87', views: 3 },
-    createdAt: '2026-09-04T00:00:00Z',
-  },
-  {
-    id: 'p13',
-    handle: 'stone-gray',
-    title: 'Stone Gray',
-    subtitle: 'Grain-printed gray with a quiet sole',
-    description:
-      'A stone-toned sneaker with a honeycomb-printed cushion and a grain-textured upper. Minimal from across the room, detailed up close.',
-    price: { amount: 168, currencyCode: 'USD' },
-    productType: 'Sneaker',
-    tags: ['minimal', 'gray', 'grain'],
-    collections: ['minimal'],
-    sizes: [40, 41, 42, 43, 44, 45],
-    features: [
-      'Grain-textured printed upper',
-      'Honeycomb hidden cushion',
-      'Low-profile silhouette',
-    ],
-    fitNotes: 'Medium width; true to size.',
-    construction: { pattern: 'honeycomb', density: 0.75, printedUpper: true },
-    visual: { palette: ['#b9b6b0', '#a3a099'], accent: '#57544e', views: 3 },
+    tags: ['casual', 'real-catalog'],
+    collections: cur.collections,
+    sizes: s.sizes_eu,
+    // 促销性文案克制：仅事实（色系/码段）；材质/结构不做虚构声明。
+    features: hasSizes
+      ? [`${s.colors.length} colorways`, `Size run ${sizeRunText(s)}`, 'Fits true to size']
+      : ['Size range to be confirmed', 'Fits true to size'],
+    fitNotes: 'Fits true to size with a medium width; if between sizes, size up.',
+    construction: {
+      pattern: 'lattice',
+      density: 0.75,
+      printedUpper: false, // 真实供应链鞋款，不做 3D 打印字段声明
+    },
+    visual: {
+      // SVG 兜底：取自真实色系前/末两色（近似 hex，演示）
+      palette: [
+        hex(s.colors[0]?.hex ?? '#e7e5df'),
+        hex(s.colors[s.colors.length - 1]?.hex ?? '#d6d3cd'),
+      ],
+      accent: hex(s.colors[0]?.hex ?? '#0f766e'),
+      views: 3,
+    },
+    images: s.images,
     createdAt: '2026-09-06T00:00:00Z',
-  },
-  {
-    id: 'p14',
-    handle: 'sage-lite',
-    title: 'Sage Lite',
-    subtitle: 'A soft sage slip-on with a dense lattice',
-    description:
-      'A muted sage slip-on whose dense lattice upper keeps its shape while staying light. Printed to order, it arrives ready to wear with nothing to break in.',
-    price: { amount: 178, currencyCode: 'USD' },
-    productType: 'Slip-on',
-    tags: ['minimal', 'slip-on', 'soft-color'],
-    collections: ['minimal'],
-    sizes: [39, 40, 41, 42, 43, 44],
-    features: [
-      'Dense lattice shape-keeping upper',
-      'Printed to order, ready to wear',
-      'Breathable open structure',
-    ],
-    fitNotes: 'Snug elegant fit; size up for extra room.',
-    construction: { pattern: 'lattice', density: 0.9, printedUpper: true },
-    visual: { palette: ['#d7ddd0', '#c2cbb4'], accent: '#5c7352', views: 3 },
-    createdAt: '2026-09-08T00:00:00Z',
-  },
-  // Everyday
-  {
-    id: 'p15',
-    handle: 'commuter-one',
-    title: 'Commuter One',
-    subtitle: 'The daily sneaker, refined for the train',
-    description:
-      'Made for the daily round trip. A wave-printed sole shrugs off pavement miles while the lattice upper stays cool in summer and layers well in winter.',
-    price: { amount: 132, currencyCode: 'USD' },
-    productType: 'Sneaker',
-    tags: ['everyday', 'commute', 'durable'],
-    collections: ['everyday'],
-    sizes: [40, 41, 42, 43, 44, 45, 46],
-    features: ['Pavement-tuned wave sole', 'All-season lattice upper', 'Reinforced printed heel'],
-    fitNotes: 'True to size; medium–wide fit.',
-    construction: { pattern: 'wave', density: 0.75, printedUpper: true },
-    visual: { palette: ['#d8d5cf', '#c5c1b9'], accent: '#3f6c6b', views: 3 },
-    createdAt: '2026-09-10T00:00:00Z',
-  },
-  {
-    id: 'p16',
-    handle: 'second-skin',
-    title: 'Second Skin',
-    subtitle: 'A barely-there everyday fit',
-    description:
-      'A light everyday sneaker that fits like a second skin. The dense lattice upper moves with your foot, and the one-piece print means nothing to come apart.',
-    price: { amount: 128, currencyCode: 'USD' },
-    productType: 'Sneaker',
-    tags: ['everyday', 'lightweight', 'flexible'],
-    collections: ['everyday'],
-    sizes: [39, 40, 41, 42, 43, 44, 45],
-    features: [
-      'Dense lattice flexible upper',
-      'Sock-like one-piece fit',
-      'Made to order in our print studio',
-    ],
-    fitNotes: 'Close adaptive fit; true to size.',
-    construction: { pattern: 'lattice', density: 0.9, printedUpper: true },
-    visual: { palette: ['#e4e2dd', '#d2cfc8'], accent: '#7c8a99', views: 3 },
-    createdAt: '2026-09-12T00:00:00Z',
-  },
-  {
-    id: 'p17',
-    handle: '3d-shoes',
-    title: '3D Shoes',
-    subtitle: 'The Evoloop pair — printed as one piece',
-    description:
-      'Our signature 3D-printed shoe: the upper and sole print as a single closed-loop piece, so nothing is cut away and nothing is wasted. Printed only when you order it, in your exact size.',
-    price: { amount: 138, currencyCode: 'USD' },
-    productType: 'Sneaker',
-    tags: ['everyday', 'printed-to-order'],
-    collections: ['everyday'],
-    sizes: [40, 41, 42, 43, 44, 45],
-    features: [
-      'Single-piece printed construction',
-      'Printed to order — zero warehouse stock',
-      'Closed-loop recycled material',
-      'Machine washable',
-    ],
-    fitNotes: 'True to size with a medium width. If between sizes, we recommend sizing up.',
-    construction: { pattern: 'lattice', density: 0.75, printedUpper: true },
-    visual: { palette: ['#e6e4de', '#d6d3ca'], accent: '#0f766e', views: 3 },
-    createdAt: '2026-09-14T00:00:00Z',
-  },
-]
+  }
+}
+
+export const seedProducts: Product[] = shoes.map(toProduct)

@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import { catalog } from '@/server/catalog/adapter'
 import { ProductVisual } from '@/components/shop/product-visual'
@@ -14,6 +15,7 @@ interface SeriesCard {
       density: 0.6 | 0.75 | 0.9
       printedUpper: boolean
     }
+    cover?: string
   } | null
 }
 
@@ -36,6 +38,7 @@ export async function CollectionCards() {
               title: representative.title,
               visual: representative.visual,
               construction: representative.construction,
+              cover: representative.images?.[0],
             }
           : null,
       }
@@ -61,13 +64,25 @@ export async function CollectionCards() {
             >
               <div className="overflow-hidden bg-[#f3f1ea]">
                 {card.representative ? (
-                  <ProductVisual
-                    visual={card.representative.visual}
-                    name={card.representative.title}
-                    construction={card.representative.construction}
-                    view="side"
-                    className="aspect-[4/3] w-full transition-transform duration-300 group-hover:scale-[1.03]"
-                  />
+                  card.representative.cover ? (
+                    <div className="relative aspect-[4/3] w-full">
+                      <Image
+                        src={card.representative.cover}
+                        alt={card.representative.title}
+                        fill
+                        sizes="(min-width:1024px) 25vw, (min-width:640px) 50vw, 100vw"
+                        className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                      />
+                    </div>
+                  ) : (
+                    <ProductVisual
+                      visual={card.representative.visual}
+                      name={card.representative.title}
+                      construction={card.representative.construction}
+                      view="side"
+                      className="aspect-[4/3] w-full transition-transform duration-300 group-hover:scale-[1.03]"
+                    />
+                  )
                 ) : null}
               </div>
               <div className="flex flex-1 flex-col gap-1 p-4">

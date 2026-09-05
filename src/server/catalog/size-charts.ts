@@ -1,4 +1,4 @@
-// 尺码换算纯函数：canonical（EU 整档 36–48）↔ 显示系统，经 size-fixture 的 mm 锚单表换算。
+// 尺码换算纯函数：canonical（EU 整档 35–48）↔ 显示系统，经 size-fixture 的 mm 锚单表换算。
 import { sizeRows } from './size-fixture'
 import type { CanonicalSize, SizeSystem } from './types'
 
@@ -9,7 +9,7 @@ const rowByEU = (eu: CanonicalSize) => sizeRows.find((r) => r.systems.EU === eu)
 /**
  * canonical(EU) → 目标系统数值；目标为 EU 时接受 US 市场数值做 mm 锚往返
  * （EU42 → US8.5 → EU42 精确还原）。
- * 参数放宽为 number | null：表内 canonical(36–48) 恒可换算；null/表外值返回 null
+ * 参数放宽为 number | null：表内 canonical(35–48) 恒可换算；null/表外值返回 null
  * （供 EU↔显示系统往返链组成，见 golden round-trip 用例）。
  */
 export function convert(canonical: CanonicalSize | null, system: SizeSystem): number | null {

@@ -4,9 +4,9 @@ import { collections } from './collections'
 import { sizeRows } from './size-fixture'
 
 describe('seed integrity', () => {
-  it('has 16–20 products', () => {
-    expect(seedProducts.length).toBeGreaterThanOrEqual(16)
-    expect(seedProducts.length).toBeLessThanOrEqual(20)
+  it('has the real-catalog product count (29 supplier styles)', () => {
+    expect(seedProducts.length).toBeGreaterThanOrEqual(25)
+    expect(seedProducts.length).toBeLessThanOrEqual(35)
   })
   it('handles are unique slugs', () => {
     const hs = seedProducts.map((p) => p.handle)
@@ -33,5 +33,14 @@ describe('seed integrity', () => {
       p.visual.palette.forEach((c) => expect(c).toMatch(/^#[0-9a-f]{6}$/i))
       expect(p.visual.accent).toMatch(/^#[0-9a-f]{6}$/i)
     })
+  })
+})
+
+// 真实目录图片契约（决策 #16）：所有款带本地照片（首图即卡片封面）；无图款才允许走 SVG 兜底。
+// 当前 29 款供应商数据均含图 → 断言非空 + public/products 路径格式。
+it('every real-catalog product carries local product photos', () => {
+  seedProducts.forEach((p) => {
+    expect(p.images?.length).toBeGreaterThan(0)
+    p.images!.forEach((src) => expect(src).toMatch(/^\/products\/[a-z0-9-]+\/\d+\.webp$/))
   })
 })

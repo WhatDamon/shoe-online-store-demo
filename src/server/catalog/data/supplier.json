@@ -1,0 +1,1758 @@
+{
+  "_meta": {
+    "source": "萨洛丁款式集合.xlsx",
+    "note": "价格/营销名/描述为演示占位（决策 #16）；尺码数字直读 EU 整档；图片 WebP 化。",
+    "shoes": 29,
+    "gifts": 9,
+    "assets_bytes": 5539278
+  },
+  "shoes": [
+    {
+      "handle": "dc-1001",
+      "code": "DC-1001",
+      "segments": [
+        {
+          "kind": "women",
+          "lo": 35,
+          "hi": 40
+        },
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 44
+        }
+      ],
+      "genders": "both",
+      "sizes_eu": [
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "colors": [
+        {
+          "en": "Ink Black",
+          "hex": "#1a1a1a",
+          "cn": "暗黑"
+        },
+        {
+          "en": "Ivory",
+          "hex": "#f3ede2",
+          "cn": "象牙白"
+        },
+        {
+          "en": "Peach",
+          "hex": "#f5c8bd",
+          "cn": "桃粉色"
+        },
+        {
+          "en": "Blue",
+          "hex": "#3f7fd6",
+          "cn": "蓝色"
+        },
+        {
+          "en": "Green",
+          "hex": "#3f9d4a",
+          "cn": "绿色"
+        }
+      ],
+      "images": [
+        "/products/dc-1001/1.webp",
+        "/products/dc-1001/2.webp",
+        "/products/dc-1001/3.webp",
+        "/products/dc-1001/4.webp",
+        "/products/dc-1001/5.webp"
+      ]
+    },
+    {
+      "handle": "dc-1002",
+      "code": "DC-1002",
+      "segments": [
+        {
+          "kind": "women",
+          "lo": 35,
+          "hi": 40
+        },
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 44
+        }
+      ],
+      "genders": "both",
+      "sizes_eu": [
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "colors": [
+        {
+          "en": "Ivory",
+          "hex": "#f3ede2",
+          "cn": "象牙白"
+        },
+        {
+          "en": "Lake Blue",
+          "hex": "#6cc3d5",
+          "cn": "湖蓝"
+        },
+        {
+          "en": "Grass",
+          "hex": "#8fbf6a",
+          "cn": "草青"
+        },
+        {
+          "en": "Duckling Yellow",
+          "hex": "#f6c445",
+          "cn": "鹅蛋黄"
+        },
+        {
+          "en": "Vivid Orange",
+          "hex": "#ff6a00",
+          "cn": "爱马仕橙"
+        }
+      ],
+      "images": [
+        "/products/dc-1002/1.webp",
+        "/products/dc-1002/2.webp",
+        "/products/dc-1002/3.webp",
+        "/products/dc-1002/4.webp",
+        "/products/dc-1002/5.webp"
+      ]
+    },
+    {
+      "handle": "dc-1003",
+      "code": "DC-1003",
+      "segments": [
+        {
+          "kind": "women",
+          "lo": 35,
+          "hi": 40
+        },
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 44
+        }
+      ],
+      "genders": "both",
+      "sizes_eu": [
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "colors": [
+        {
+          "en": "Mint",
+          "hex": "#bfe3cd",
+          "cn": "薄荷绿"
+        },
+        {
+          "en": "Ivory",
+          "hex": "#f3ede2",
+          "cn": "象牙白"
+        },
+        {
+          "en": "Neon Orange",
+          "hex": "#ff8c1a",
+          "cn": "荧光橘"
+        },
+        {
+          "en": "Rose",
+          "hex": "#e84a5f",
+          "cn": "玫红"
+        }
+      ],
+      "images": [
+        "/products/dc-1003/1.webp",
+        "/products/dc-1003/2.webp",
+        "/products/dc-1003/3.webp",
+        "/products/dc-1003/4.webp"
+      ]
+    },
+    {
+      "handle": "dc-1009",
+      "code": "DC-1009",
+      "segments": [
+        {
+          "kind": "women",
+          "lo": 35,
+          "hi": 40
+        },
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 44
+        }
+      ],
+      "genders": "both",
+      "sizes_eu": [
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "colors": [
+        {
+          "en": "Ink Black",
+          "hex": "#1a1a1a",
+          "cn": "暗黑"
+        },
+        {
+          "en": "Rose",
+          "hex": "#e84a5f",
+          "cn": "玫红"
+        },
+        {
+          "en": "Mint",
+          "hex": "#bfe3cd",
+          "cn": "薄荷绿"
+        },
+        {
+          "en": "Snow White",
+          "hex": "#f4f4f0",
+          "cn": "雪白"
+        },
+        {
+          "en": "Purple",
+          "hex": "#8a63b8",
+          "cn": "紫色"
+        }
+      ],
+      "images": [
+        "/products/dc-1009/1.webp",
+        "/products/dc-1009/2.webp",
+        "/products/dc-1009/3.webp",
+        "/products/dc-1009/4.webp",
+        "/products/dc-1009/5.webp"
+      ]
+    },
+    {
+      "handle": "dc-1007",
+      "code": "DC-1007",
+      "segments": [],
+      "genders": "none",
+      "sizes_eu": [],
+      "colors": [
+        {
+          "en": "Snow White",
+          "hex": "#f4f4f0",
+          "cn": "雪白"
+        },
+        {
+          "en": "Vivid Orange",
+          "hex": "#ff6a00",
+          "cn": "爱马仕橙"
+        },
+        {
+          "en": "Ink Black",
+          "hex": "#1a1a1a",
+          "cn": "暗黑"
+        },
+        {
+          "en": "Rose",
+          "hex": "#e84a5f",
+          "cn": "玫红"
+        },
+        {
+          "en": "Blush",
+          "hex": "#f6d7d2",
+          "cn": "淡粉"
+        }
+      ],
+      "images": [
+        "/products/dc-1007/1.webp",
+        "/products/dc-1007/2.webp",
+        "/products/dc-1007/3.webp",
+        "/products/dc-1007/4.webp",
+        "/products/dc-1007/5.webp"
+      ]
+    },
+    {
+      "handle": "dc-1010",
+      "code": "DC-1010",
+      "segments": [
+        {
+          "kind": "women",
+          "lo": 35,
+          "hi": 40
+        },
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 44
+        }
+      ],
+      "genders": "both",
+      "sizes_eu": [
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "colors": [
+        {
+          "en": "Ivory",
+          "hex": "#f3ede2",
+          "cn": "象牙白"
+        },
+        {
+          "en": "Ink Black",
+          "hex": "#1a1a1a",
+          "cn": "暗黑"
+        },
+        {
+          "en": "Silver",
+          "hex": "#c8c9cd",
+          "cn": "银色"
+        },
+        {
+          "en": "Blush",
+          "hex": "#f6d7d2",
+          "cn": "淡粉"
+        }
+      ],
+      "images": [
+        "/products/dc-1010/1.webp",
+        "/products/dc-1010/2.webp",
+        "/products/dc-1010/3.webp",
+        "/products/dc-1010/4.webp"
+      ]
+    },
+    {
+      "handle": "dc-1008",
+      "code": "DC-1008",
+      "segments": [
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 44
+        }
+      ],
+      "genders": "men",
+      "sizes_eu": [
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "colors": [
+        {
+          "en": "Ink Black",
+          "hex": "#1a1a1a",
+          "cn": "暗黑"
+        },
+        {
+          "en": "Neon Green",
+          "hex": "#d6f542",
+          "cn": "荧光绿"
+        },
+        {
+          "en": "Snow White",
+          "hex": "#f4f4f0",
+          "cn": "雪白"
+        },
+        {
+          "en": "Blush",
+          "hex": "#f6d7d2",
+          "cn": "淡粉"
+        }
+      ],
+      "images": [
+        "/products/dc-1008/1.webp",
+        "/products/dc-1008/2.webp",
+        "/products/dc-1008/3.webp",
+        "/products/dc-1008/4.webp"
+      ]
+    },
+    {
+      "handle": "26006-f",
+      "code": "26006-F",
+      "segments": [
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 44
+        }
+      ],
+      "genders": "men",
+      "sizes_eu": [
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "colors": [
+        {
+          "en": "Cheese Yellow",
+          "hex": "#f0d06a",
+          "cn": "奶酪黄"
+        },
+        {
+          "en": "Ink Black",
+          "hex": "#1a1a1a",
+          "cn": "暗黑"
+        },
+        {
+          "en": "Mint",
+          "hex": "#bfe3cd",
+          "cn": "薄荷绿"
+        },
+        {
+          "en": "Snow White",
+          "hex": "#f4f4f0",
+          "cn": "雪白"
+        }
+      ],
+      "images": [
+        "/products/26006-f/1.webp",
+        "/products/26006-f/2.webp",
+        "/products/26006-f/3.webp",
+        "/products/26006-f/4.webp"
+      ]
+    },
+    {
+      "handle": "26015-m",
+      "code": "26015-M",
+      "segments": [
+        {
+          "kind": "women",
+          "lo": 35,
+          "hi": 40
+        },
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 44
+        }
+      ],
+      "genders": "both",
+      "sizes_eu": [
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "colors": [
+        {
+          "en": "Ink Black",
+          "hex": "#1a1a1a",
+          "cn": "暗黑"
+        },
+        {
+          "en": "Midnight Silver",
+          "hex": "#9aa1ab",
+          "cn": "暗夜银"
+        },
+        {
+          "en": "Ivory",
+          "hex": "#f3ede2",
+          "cn": "象牙白"
+        },
+        {
+          "en": "Snow White",
+          "hex": "#f4f4f0",
+          "cn": "雪白"
+        }
+      ],
+      "images": [
+        "/products/26015-m/1.webp",
+        "/products/26015-m/2.webp",
+        "/products/26015-m/3.webp",
+        "/products/26015-m/4.webp"
+      ]
+    },
+    {
+      "handle": "dc-26075",
+      "code": "DC-26075",
+      "segments": [
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 44
+        }
+      ],
+      "genders": "men",
+      "sizes_eu": [
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "colors": [
+        {
+          "en": "Ivory",
+          "hex": "#f3ede2",
+          "cn": "象牙白"
+        },
+        {
+          "en": "Ink Black",
+          "hex": "#1a1a1a",
+          "cn": "暗黑"
+        },
+        {
+          "en": "Silver",
+          "hex": "#c8c9cd",
+          "cn": "银色"
+        }
+      ],
+      "images": [
+        "/products/dc-26075/1.webp",
+        "/products/dc-26075/2.webp",
+        "/products/dc-26075/3.webp"
+      ]
+    },
+    {
+      "handle": "jx119-x",
+      "code": "JX119-X",
+      "segments": [
+        {
+          "kind": "women",
+          "lo": 35,
+          "hi": 40
+        },
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 45
+        }
+      ],
+      "genders": "both",
+      "sizes_eu": [
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45
+      ],
+      "colors": [
+        {
+          "en": "Midnight Silver",
+          "hex": "#9aa1ab",
+          "cn": "暗夜银"
+        },
+        {
+          "en": "Ink Black",
+          "hex": "#1a1a1a",
+          "cn": "暗黑"
+        }
+      ],
+      "images": [
+        "/products/jx119-x/1.webp",
+        "/products/jx119-x/2.webp"
+      ]
+    },
+    {
+      "handle": "jx119",
+      "code": "JX119",
+      "segments": [
+        {
+          "kind": "women",
+          "lo": 35,
+          "hi": 40
+        },
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 45
+        }
+      ],
+      "genders": "both",
+      "sizes_eu": [
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45
+      ],
+      "colors": [
+        {
+          "en": "Ink Black",
+          "hex": "#1a1a1a",
+          "cn": "暗黑"
+        },
+        {
+          "en": "Midnight Silver",
+          "hex": "#9aa1ab",
+          "cn": "暗夜银"
+        },
+        {
+          "en": "Silver",
+          "hex": "#c8c9cd",
+          "cn": "银色"
+        },
+        {
+          "en": "Beige-Orange",
+          "hex": "#e0b398",
+          "cn": "米橘"
+        },
+        {
+          "en": "Beige-Green",
+          "hex": "#d9d5b0",
+          "cn": "米绿"
+        }
+      ],
+      "images": [
+        "/products/jx119/1.webp",
+        "/products/jx119/2.webp",
+        "/products/jx119/3.webp",
+        "/products/jx119/4.webp",
+        "/products/jx119/5.webp"
+      ]
+    },
+    {
+      "handle": "dc-1004",
+      "code": "DC-1004",
+      "segments": [
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 44
+        }
+      ],
+      "genders": "men",
+      "sizes_eu": [
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "colors": [
+        {
+          "en": "Neon Green",
+          "hex": "#d6f542",
+          "cn": "荧光绿"
+        },
+        {
+          "en": "Midnight Silver",
+          "hex": "#9aa1ab",
+          "cn": "暗夜银"
+        },
+        {
+          "en": "Taro",
+          "hex": "#b7a5d8",
+          "cn": "香芋紫"
+        },
+        {
+          "en": "Ink Black",
+          "hex": "#1a1a1a",
+          "cn": "暗黑"
+        }
+      ],
+      "images": [
+        "/products/dc-1004/1.webp",
+        "/products/dc-1004/2.webp",
+        "/products/dc-1004/3.webp",
+        "/products/dc-1004/4.webp"
+      ]
+    },
+    {
+      "handle": "dc-1005",
+      "code": "DC-1005",
+      "segments": [
+        {
+          "kind": "women",
+          "lo": 35,
+          "hi": 40
+        },
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 45
+        }
+      ],
+      "genders": "both",
+      "sizes_eu": [
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45
+      ],
+      "colors": [
+        {
+          "en": "Ink Black",
+          "hex": "#1a1a1a",
+          "cn": "暗黑"
+        },
+        {
+          "en": "Vivid Orange",
+          "hex": "#ff6a00",
+          "cn": "爱马仕橙"
+        },
+        {
+          "en": "Chocolate",
+          "hex": "#5f3f2c",
+          "cn": "巧克力棕"
+        },
+        {
+          "en": "Snow White",
+          "hex": "#f4f4f0",
+          "cn": "雪白"
+        },
+        {
+          "en": "Ivory",
+          "hex": "#f3ede2",
+          "cn": "象牙白"
+        }
+      ],
+      "images": [
+        "/products/dc-1005/1.webp",
+        "/products/dc-1005/2.webp",
+        "/products/dc-1005/3.webp",
+        "/products/dc-1005/4.webp",
+        "/products/dc-1005/5.webp"
+      ]
+    },
+    {
+      "handle": "dc-1006",
+      "code": "DC-1006",
+      "segments": [
+        {
+          "kind": "women",
+          "lo": 35,
+          "hi": 40
+        },
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 44
+        }
+      ],
+      "genders": "both",
+      "sizes_eu": [
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "colors": [
+        {
+          "en": "Ink Black",
+          "hex": "#1a1a1a",
+          "cn": "暗黑"
+        },
+        {
+          "en": "Chocolate",
+          "hex": "#5f3f2c",
+          "cn": "巧克力棕"
+        },
+        {
+          "en": "Ivory",
+          "hex": "#f3ede2",
+          "cn": "象牙白"
+        },
+        {
+          "en": "Vivid Orange",
+          "hex": "#ff6a00",
+          "cn": "爱马仕橙"
+        },
+        {
+          "en": "Chinese Red",
+          "hex": "#c8102e",
+          "cn": "中国红"
+        }
+      ],
+      "images": [
+        "/products/dc-1006/1.webp",
+        "/products/dc-1006/2.webp",
+        "/products/dc-1006/3.webp",
+        "/products/dc-1006/4.webp",
+        "/products/dc-1006/5.webp"
+      ]
+    },
+    {
+      "handle": "26012-m",
+      "code": "26012-M",
+      "segments": [
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 44
+        }
+      ],
+      "genders": "men",
+      "sizes_eu": [
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "colors": [
+        {
+          "en": "Neon Green",
+          "hex": "#d6f542",
+          "cn": "荧光绿"
+        },
+        {
+          "en": "Ink Black",
+          "hex": "#1a1a1a",
+          "cn": "暗黑"
+        },
+        {
+          "en": "Vivid Orange",
+          "hex": "#ff6a00",
+          "cn": "爱马仕橙"
+        }
+      ],
+      "images": [
+        "/products/26012-m/1.webp",
+        "/products/26012-m/2.webp",
+        "/products/26012-m/3.webp"
+      ]
+    },
+    {
+      "handle": "26027-m",
+      "code": "26027-M",
+      "segments": [
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 44
+        }
+      ],
+      "genders": "men",
+      "sizes_eu": [
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "colors": [
+        {
+          "en": "Neon Green",
+          "hex": "#d6f542",
+          "cn": "荧光绿"
+        },
+        {
+          "en": "Neon Orange",
+          "hex": "#ff8c1a",
+          "cn": "荧光橘"
+        },
+        {
+          "en": "Ink Black",
+          "hex": "#1a1a1a",
+          "cn": "暗黑"
+        },
+        {
+          "en": "Snow White",
+          "hex": "#f4f4f0",
+          "cn": "雪白"
+        }
+      ],
+      "images": [
+        "/products/26027-m/1.webp",
+        "/products/26027-m/2.webp",
+        "/products/26027-m/3.webp",
+        "/products/26027-m/4.webp"
+      ]
+    },
+    {
+      "handle": "26011-m",
+      "code": "26011-M",
+      "segments": [
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 44
+        }
+      ],
+      "genders": "men",
+      "sizes_eu": [
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "colors": [
+        {
+          "en": "Ink Black",
+          "hex": "#1a1a1a",
+          "cn": "暗黑"
+        },
+        {
+          "en": "Vivid Orange",
+          "hex": "#ff6a00",
+          "cn": "爱马仕橙"
+        },
+        {
+          "en": "Silver",
+          "hex": "#c8c9cd",
+          "cn": "银色"
+        },
+        {
+          "en": "Midnight Purple",
+          "hex": "#5a4a7a",
+          "cn": "暗夜紫"
+        }
+      ],
+      "images": [
+        "/products/26011-m/1.webp",
+        "/products/26011-m/2.webp",
+        "/products/26011-m/3.webp",
+        "/products/26011-m/4.webp"
+      ]
+    },
+    {
+      "handle": "26014-m",
+      "code": "26014-M",
+      "segments": [
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 44
+        }
+      ],
+      "genders": "men",
+      "sizes_eu": [
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "colors": [
+        {
+          "en": "Snow White",
+          "hex": "#f4f4f0",
+          "cn": "雪白"
+        },
+        {
+          "en": "Neon Green",
+          "hex": "#d6f542",
+          "cn": "荧光绿"
+        },
+        {
+          "en": "Ink Black",
+          "hex": "#1a1a1a",
+          "cn": "暗黑"
+        },
+        {
+          "en": "Earth",
+          "hex": "#9a7b4f",
+          "cn": "土黄"
+        }
+      ],
+      "images": [
+        "/products/26014-m/1.webp",
+        "/products/26014-m/2.webp",
+        "/products/26014-m/3.webp",
+        "/products/26014-m/4.webp"
+      ]
+    },
+    {
+      "handle": "26013-m",
+      "code": "26013-M",
+      "segments": [
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 44
+        }
+      ],
+      "genders": "men",
+      "sizes_eu": [
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "colors": [
+        {
+          "en": "Ink Black",
+          "hex": "#1a1a1a",
+          "cn": "暗黑"
+        },
+        {
+          "en": "Snow White",
+          "hex": "#f4f4f0",
+          "cn": "雪白"
+        },
+        {
+          "en": "Silver",
+          "hex": "#c8c9cd",
+          "cn": "银色"
+        }
+      ],
+      "images": [
+        "/products/26013-m/1.webp",
+        "/products/26013-m/2.webp",
+        "/products/26013-m/3.webp"
+      ]
+    },
+    {
+      "handle": "26018-m",
+      "code": "26018-M",
+      "segments": [
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 44
+        }
+      ],
+      "genders": "men",
+      "sizes_eu": [
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "colors": [
+        {
+          "en": "Ink Black",
+          "hex": "#1a1a1a",
+          "cn": "暗黑"
+        },
+        {
+          "en": "Field Green",
+          "hex": "#66a83f",
+          "cn": "青草绿"
+        },
+        {
+          "en": "Snow White",
+          "hex": "#f4f4f0",
+          "cn": "雪白"
+        },
+        {
+          "en": "Duckling Yellow",
+          "hex": "#f6c445",
+          "cn": "鹅蛋黄"
+        }
+      ],
+      "images": [
+        "/products/26018-m/1.webp",
+        "/products/26018-m/2.webp",
+        "/products/26018-m/3.webp",
+        "/products/26018-m/4.webp"
+      ]
+    },
+    {
+      "handle": "26019-m",
+      "code": "26019-M",
+      "segments": [
+        {
+          "kind": "women",
+          "lo": 35,
+          "hi": 40
+        },
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 44
+        }
+      ],
+      "genders": "both",
+      "sizes_eu": [
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "colors": [
+        {
+          "en": "Soft Pink",
+          "hex": "#f2c6cf",
+          "cn": "柔雾粉"
+        },
+        {
+          "en": "Vivid Orange",
+          "hex": "#ff6a00",
+          "cn": "爱马仕橙"
+        },
+        {
+          "en": "Ink Black",
+          "hex": "#1a1a1a",
+          "cn": "暗黑"
+        },
+        {
+          "en": "Grass Green",
+          "hex": "#7cb342",
+          "cn": "草绿"
+        },
+        {
+          "en": "Duckling Yellow",
+          "hex": "#f6c445",
+          "cn": "鹅蛋黄"
+        }
+      ],
+      "images": [
+        "/products/26019-m/1.webp",
+        "/products/26019-m/2.webp",
+        "/products/26019-m/3.webp",
+        "/products/26019-m/4.webp",
+        "/products/26019-m/5.webp"
+      ]
+    },
+    {
+      "handle": "26010-m",
+      "code": "26010-M",
+      "segments": [
+        {
+          "kind": "women",
+          "lo": 35,
+          "hi": 40
+        },
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 44
+        }
+      ],
+      "genders": "both",
+      "sizes_eu": [
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "colors": [
+        {
+          "en": "White-Green",
+          "hex": "#eef2e4",
+          "cn": "白绿"
+        },
+        {
+          "en": "Ink Black",
+          "hex": "#1a1a1a",
+          "cn": "暗黑"
+        },
+        {
+          "en": "Midnight Silver",
+          "hex": "#9aa1ab",
+          "cn": "暗夜银"
+        },
+        {
+          "en": "White-Blue",
+          "hex": "#e6eef4",
+          "cn": "白蓝"
+        }
+      ],
+      "images": [
+        "/products/26010-m/1.webp",
+        "/products/26010-m/2.webp",
+        "/products/26010-m/3.webp",
+        "/products/26010-m/4.webp"
+      ]
+    },
+    {
+      "handle": "26017-m",
+      "code": "26017-M",
+      "segments": [
+        {
+          "kind": "women",
+          "lo": 35,
+          "hi": 40
+        },
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 44
+        }
+      ],
+      "genders": "both",
+      "sizes_eu": [
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "colors": [
+        {
+          "en": "Ink Black",
+          "hex": "#1a1a1a",
+          "cn": "暗黑"
+        },
+        {
+          "en": "Vivid Orange",
+          "hex": "#ff6a00",
+          "cn": "爱马仕橙"
+        },
+        {
+          "en": "Snow White",
+          "hex": "#f4f4f0",
+          "cn": "雪白"
+        },
+        {
+          "en": "Chocolate",
+          "hex": "#5f3f2c",
+          "cn": "巧克力棕"
+        }
+      ],
+      "images": [
+        "/products/26017-m/1.webp",
+        "/products/26017-m/2.webp",
+        "/products/26017-m/3.webp",
+        "/products/26017-m/4.webp"
+      ]
+    },
+    {
+      "handle": "26016-m",
+      "code": "26016-M",
+      "segments": [
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 44
+        }
+      ],
+      "genders": "men",
+      "sizes_eu": [
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "colors": [
+        {
+          "en": "Avocado",
+          "hex": "#9cb356",
+          "cn": "牛油果绿"
+        },
+        {
+          "en": "Vivid Orange",
+          "hex": "#ff6a00",
+          "cn": "爱马仕橙"
+        },
+        {
+          "en": "Ink Black",
+          "hex": "#1a1a1a",
+          "cn": "暗黑"
+        },
+        {
+          "en": "Ivory",
+          "hex": "#f3ede2",
+          "cn": "象牙白"
+        }
+      ],
+      "images": [
+        "/products/26016-m/1.webp",
+        "/products/26016-m/2.webp",
+        "/products/26016-m/3.webp",
+        "/products/26016-m/4.webp"
+      ]
+    },
+    {
+      "handle": "26037-m",
+      "code": "26037-M",
+      "segments": [
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 44
+        }
+      ],
+      "genders": "men",
+      "sizes_eu": [
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "colors": [
+        {
+          "en": "Snow White",
+          "hex": "#f4f4f0",
+          "cn": "雪白"
+        },
+        {
+          "en": "Neon Green",
+          "hex": "#d6f542",
+          "cn": "荧光绿"
+        },
+        {
+          "en": "Ink Black",
+          "hex": "#1a1a1a",
+          "cn": "暗黑"
+        },
+        {
+          "en": "Pale Yellow",
+          "hex": "#f5e6a3",
+          "cn": "淡黄"
+        },
+        {
+          "en": "Vivid Orange",
+          "hex": "#ff6a00",
+          "cn": "爱马仕橙"
+        }
+      ],
+      "images": [
+        "/products/26037-m/1.webp",
+        "/products/26037-m/2.webp",
+        "/products/26037-m/3.webp",
+        "/products/26037-m/4.webp",
+        "/products/26037-m/5.webp"
+      ]
+    },
+    {
+      "handle": "dc-1011",
+      "code": "DC-1011",
+      "segments": [
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 44
+        }
+      ],
+      "genders": "men",
+      "sizes_eu": [
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "colors": [
+        {
+          "en": "Midnight Purple",
+          "hex": "#5a4a7a",
+          "cn": "暗夜紫"
+        },
+        {
+          "en": "Ink Black",
+          "hex": "#1a1a1a",
+          "cn": "暗黑"
+        },
+        {
+          "en": "Vivid Orange",
+          "hex": "#ff6a00",
+          "cn": "爱马仕橙"
+        },
+        {
+          "en": "Wine",
+          "hex": "#722f37",
+          "cn": "酒红"
+        },
+        {
+          "en": "Olive",
+          "hex": "#6b6b3f",
+          "cn": "军绿"
+        }
+      ],
+      "images": [
+        "/products/dc-1011/1.webp",
+        "/products/dc-1011/2.webp",
+        "/products/dc-1011/3.webp",
+        "/products/dc-1011/4.webp",
+        "/products/dc-1011/5.webp"
+      ]
+    },
+    {
+      "handle": "dc-1012",
+      "code": "DC-1012",
+      "segments": [
+        {
+          "kind": "women",
+          "lo": 35,
+          "hi": 40
+        },
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 44
+        }
+      ],
+      "genders": "both",
+      "sizes_eu": [
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "colors": [
+        {
+          "en": "Ivory",
+          "hex": "#f3ede2",
+          "cn": "象牙白"
+        },
+        {
+          "en": "Neon Green",
+          "hex": "#d6f542",
+          "cn": "荧光绿"
+        },
+        {
+          "en": "Yellow",
+          "hex": "#ffd400",
+          "cn": "黄色"
+        },
+        {
+          "en": "Royal Blue",
+          "hex": "#2a52be",
+          "cn": "宝蓝"
+        },
+        {
+          "en": "Vivid Orange",
+          "hex": "#ff6a00",
+          "cn": "爱马仕橙"
+        }
+      ],
+      "images": [
+        "/products/dc-1012/1.webp",
+        "/products/dc-1012/2.webp",
+        "/products/dc-1012/3.webp",
+        "/products/dc-1012/4.webp",
+        "/products/dc-1012/5.webp"
+      ]
+    },
+    {
+      "handle": "dc-1013",
+      "code": "DC-1013",
+      "segments": [
+        {
+          "kind": "men",
+          "lo": 39,
+          "hi": 44
+        }
+      ],
+      "genders": "men",
+      "sizes_eu": [
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "colors": [
+        {
+          "en": "Ink Black",
+          "hex": "#1a1a1a",
+          "cn": "暗黑"
+        },
+        {
+          "en": "Mint",
+          "hex": "#bfe3cd",
+          "cn": "薄荷绿"
+        },
+        {
+          "en": "Light Blue",
+          "hex": "#a8d3e8",
+          "cn": "浅蓝"
+        },
+        {
+          "en": "Ivory",
+          "hex": "#f3ede2",
+          "cn": "象牙白"
+        },
+        {
+          "en": "Bright Yellow",
+          "hex": "#ffe01a",
+          "cn": "亮黄"
+        }
+      ],
+      "images": [
+        "/products/dc-1013/1.webp",
+        "/products/dc-1013/2.webp",
+        "/products/dc-1013/3.webp",
+        "/products/dc-1013/4.webp",
+        "/products/dc-1013/5.webp"
+      ]
+    }
+  ],
+  "gifts": [
+    {
+      "handle": "dino-pal",
+      "title": "Dino Pal",
+      "title_cn": "小恐龙",
+      "colors": [
+        {
+          "en": "Multi",
+          "hex": "#9aa1ab",
+          "cn": "多色可选"
+        }
+      ],
+      "images": [
+        "/products/dino-pal/1.webp",
+        "/products/dino-pal/2.webp",
+        "/products/dino-pal/3.webp",
+        "/products/dino-pal/4.webp",
+        "/products/dino-pal/5.webp",
+        "/products/dino-pal/6.webp",
+        "/products/dino-pal/7.webp",
+        "/products/dino-pal/8.webp"
+      ],
+      "rows": [
+        32,
+        35
+      ]
+    },
+    {
+      "handle": "turtle-pal",
+      "title": "Turtle Pal",
+      "title_cn": "杰尼龟",
+      "colors": [
+        {
+          "en": "Multi",
+          "hex": "#9aa1ab",
+          "cn": "多色可选"
+        }
+      ],
+      "images": [
+        "/products/turtle-pal/1.webp",
+        "/products/turtle-pal/2.webp",
+        "/products/turtle-pal/3.webp"
+      ],
+      "rows": [
+        33
+      ]
+    },
+    {
+      "handle": "duck-pal",
+      "title": "Duck Pal",
+      "title_cn": "可达鸭",
+      "colors": [
+        {
+          "en": "Multi",
+          "hex": "#9aa1ab",
+          "cn": "多色可选"
+        }
+      ],
+      "images": [
+        "/products/duck-pal/1.webp",
+        "/products/duck-pal/2.webp",
+        "/products/duck-pal/3.webp",
+        "/products/duck-pal/4.webp"
+      ],
+      "rows": [
+        34
+      ]
+    },
+    {
+      "handle": "spark-pal",
+      "title": "Spark Pal",
+      "title_cn": "比卡丘",
+      "colors": [
+        {
+          "en": "Multi",
+          "hex": "#9aa1ab",
+          "cn": "多色可选"
+        }
+      ],
+      "images": [
+        "/products/spark-pal/1.webp",
+        "/products/spark-pal/2.webp",
+        "/products/spark-pal/3.webp",
+        "/products/spark-pal/4.webp"
+      ],
+      "rows": [
+        36
+      ]
+    },
+    {
+      "handle": "ultra-dino-pal",
+      "title": "Ultra Dino Pal",
+      "title_cn": "奥特曼小恐龙",
+      "colors": [
+        {
+          "en": "Multi",
+          "hex": "#9aa1ab",
+          "cn": "多色可选"
+        }
+      ],
+      "images": [
+        "/products/ultra-dino-pal/1.webp",
+        "/products/ultra-dino-pal/2.webp",
+        "/products/ultra-dino-pal/3.webp",
+        "/products/ultra-dino-pal/4.webp"
+      ],
+      "rows": [
+        37
+      ]
+    },
+    {
+      "handle": "sprout-pal",
+      "title": "Sprout Pal",
+      "title_cn": "奇妙种子",
+      "colors": [
+        {
+          "en": "Multi",
+          "hex": "#9aa1ab",
+          "cn": "多色可选"
+        }
+      ],
+      "images": [
+        "/products/sprout-pal/1.webp",
+        "/products/sprout-pal/2.webp",
+        "/products/sprout-pal/3.webp"
+      ],
+      "rows": [
+        38
+      ]
+    },
+    {
+      "handle": "bounce-ball",
+      "title": "Bounce Ball",
+      "title_cn": "功能球",
+      "colors": [
+        {
+          "en": "Multi",
+          "hex": "#9aa1ab",
+          "cn": "多色可选"
+        }
+      ],
+      "images": [
+        "/products/bounce-ball/1.webp",
+        "/products/bounce-ball/2.webp",
+        "/products/bounce-ball/3.webp",
+        "/products/bounce-ball/4.webp",
+        "/products/bounce-ball/5.webp",
+        "/products/bounce-ball/6.webp",
+        "/products/bounce-ball/7.webp",
+        "/products/bounce-ball/8.webp"
+      ],
+      "rows": [
+        39,
+        40
+      ]
+    },
+    {
+      "handle": "lucky-horse",
+      "title": "Lucky Horse",
+      "title_cn": "发财马",
+      "colors": [
+        {
+          "en": "Multi",
+          "hex": "#9aa1ab",
+          "cn": "多色可选"
+        }
+      ],
+      "images": [
+        "/products/lucky-horse/1.webp",
+        "/products/lucky-horse/2.webp",
+        "/products/lucky-horse/3.webp"
+      ],
+      "rows": [
+        41
+      ]
+    },
+    {
+      "handle": "grip-ring",
+      "title": "Grip Ring",
+      "title_cn": "握力器",
+      "colors": [
+        {
+          "en": "Multi",
+          "hex": "#9aa1ab",
+          "cn": "多色可选"
+        }
+      ],
+      "images": [
+        "/products/grip-ring/1.webp",
+        "/products/grip-ring/2.webp",
+        "/products/grip-ring/3.webp"
+      ],
+      "rows": [
+        42
+      ]
+    }
+  ]
+}

@@ -92,14 +92,13 @@ describe('events SSE 帧往返', () => {
 describe('chat mock 编排', () => {
   it('find-shoes：检索命中 → productCards（含真实 handle）→ 总结 delta → done', async () => {
     const g = fresh()
-    const evs = await collect(
-      chat(req({ mode: 'find-shoes', text: 'cloudwalk' }), { guardrails: g }),
-    )
+    // avocado 仅在 26016-m（Avocado Kick）的标题/描述出现 → 单命中
+    const evs = await collect(chat(req({ mode: 'find-shoes', text: 'avocado' }), { guardrails: g }))
     const cards = evs.find((e) => e.type === 'productCards')
     expect(cards?.type).toBe('productCards')
     if (cards?.type === 'productCards') {
       expect(cards.items.length).toBeGreaterThan(0)
-      expect(cards.items[0].handle).toBe('cloudwalk-slip')
+      expect(cards.items[0].handle).toBe('26016-m')
       expect(cards.items[0]).toMatchObject({ imageKind: 'local' })
     }
     expect(evs[evs.length - 1]).toEqual({ type: 'done' })
@@ -108,8 +107,8 @@ describe('chat mock 编排', () => {
 
   it('shopping：delta 文本引用检索注入的真实商品名（RAG-lite 接地）', async () => {
     const g = fresh()
-    const evs = await collect(chat(req({ mode: 'shopping', text: 'cloudwalk' }), { guardrails: g }))
-    expect(deltasOf(evs)).toContain('Cloudwalk Slip')
+    const evs = await collect(chat(req({ mode: 'shopping', text: 'avocado' }), { guardrails: g }))
+    expect(deltasOf(evs)).toContain('Avocado Kick')
     expect(evs[evs.length - 1]).toEqual({ type: 'done' })
   })
 
@@ -120,7 +119,7 @@ describe('chat mock 编排', () => {
         req({
           mode: 'size-fit',
           text: 'I wear US 9',
-          product: { handle: 'daily-drift', title: 'Daily Drift' },
+          product: { handle: 'dc-1001', title: 'Urban Bloom' }, // 35-44 含 43
         }),
         { guardrails: g },
       ),
