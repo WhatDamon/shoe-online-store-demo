@@ -1,23 +1,15 @@
-import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowDownIcon } from 'lucide-react'
 import { site } from '@/lib/site'
-import heroImage from '@/assets/hero-home.webp'
+import { HeroBackground } from './hero-background'
 
-// Landing hero 本地图片资产（src/assets/hero-home.webp，源自品牌 3D 鞋视觉）。
-// 资产随包内联、SSR 恒可用；深色渐变 + 遮罩保证白字高对比，无需客户端失败降级。
+// Landing hero：HeroBackground 客户端组件负责背景轮播（静态图 6s → 视频已缓存则交叉淡化播放 → 淡回静态图，循环）
+// 文字/CTA/遮罩保持 RSC；深底 + 渐变遮罩保证白字高对比
 
 export function Hero() {
   return (
     <section className="relative flex min-h-dvh items-end overflow-hidden bg-[#111111]">
-      <Image
-        src={heroImage}
-        alt=""
-        fill
-        priority
-        sizes="100vw"
-        className="object-cover opacity-55"
-      />
+      <HeroBackground />
       {/* 顶部较深，保证透明 AppBar 上的白色文字可读 */}
       <div
         aria-hidden="true"
