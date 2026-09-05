@@ -62,7 +62,7 @@ export async function CollectionCards() {
               href={`/shop?collection=${card.handle}`}
               className="group flex flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-surface transition-shadow hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
             >
-              <div className="overflow-hidden bg-[#f3f1ea]">
+              <div className="overflow-hidden bg-white">
                 {card.representative ? (
                   card.representative.cover ? (
                     <div className="relative aspect-[4/3] w-full">
@@ -71,7 +71,7 @@ export async function CollectionCards() {
                         alt={card.representative.title}
                         fill
                         sizes="(min-width:1024px) 25vw, (min-width:640px) 50vw, 100vw"
-                        className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                        className="object-contain transition-transform duration-300 group-hover:scale-[1.03]"
                       />
                     </div>
                   ) : (

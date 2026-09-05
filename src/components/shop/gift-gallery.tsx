@@ -54,13 +54,13 @@ export function GiftGallery({ gifts }: { gifts: GiftItem[] }) {
               aria-label={`View ${gift.title} photos`}
               className="group flex w-full flex-col rounded-2xl border border-neutral-200 bg-surface text-left transition-shadow hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
             >
-              <span className="relative aspect-square w-full overflow-hidden rounded-t-2xl bg-[#f3f1ea]">
+              <span className="relative aspect-square w-full overflow-hidden rounded-t-2xl bg-white">
                 <Image
                   src={gift.images[0]}
                   alt=""
                   fill
                   sizes="(min-width:1024px) 20vw, (min-width:640px) 33vw, 50vw"
-                  className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                  className="object-contain transition-transform duration-300 group-hover:scale-[1.03]"
                 />
               </span>
               <span className="flex flex-col gap-1 p-3">
@@ -96,13 +96,13 @@ export function GiftGallery({ gifts }: { gifts: GiftItem[] }) {
             >
               <XIcon aria-hidden="true" className="size-4" />
             </button>
-            <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-[#f3f1ea]">
+            <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-white">
               <Image
                 src={active.gift.images[active.idx]}
                 alt={`${active.gift.title} photo ${active.idx + 1}`}
                 fill
                 sizes="(min-width:640px) 672px, 100vw"
-                className="object-cover"
+                className="object-contain"
               />
             </div>
             <p className="px-2 pb-2 pt-3 text-center text-sm font-medium text-neutral-900">

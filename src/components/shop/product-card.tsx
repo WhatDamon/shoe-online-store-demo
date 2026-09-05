@@ -23,16 +23,17 @@ export function ProductCard({ product }: { product: ProductView }) {
         href={href}
         className="flex h-full flex-col focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
       >
-        <div className="relative overflow-hidden bg-[#f3f1ea]">
+        <div className="relative overflow-hidden bg-white">
           {cover ? (
-            // 真实商品照（决策 #16）：首图作封面；无图产品回落到 SVG 3D 视觉
-            <div className="relative aspect-square w-full">
+            // 真实商品照（决策 #16）：首图作封面；无图产品回落到 SVG 3D 视觉。
+            // 白底 + object-contain：任意宽高比照片完整入框居中，不裁剪（用户指定）。
+            <div className="relative aspect-square w-full bg-white">
               <Image
                 src={cover}
                 alt={product.title}
                 fill
                 sizes="(max-width:640px) 100vw, (max-width:1024px) 50vw, 25vw"
-                className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                className="object-contain transition-transform duration-300 group-hover:scale-[1.03]"
               />
             </div>
           ) : (

@@ -23,7 +23,7 @@ export function ProductGallery({ product }: { product: ProductView }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="relative aspect-square w-full overflow-hidden rounded-2xl border border-neutral-200 bg-[#f3f1ea]">
+      <div className="relative aspect-square w-full overflow-hidden rounded-2xl border border-neutral-200 bg-white">
         {hasPhotos && activePhoto ? (
           <Image
             key={activePhoto}
@@ -32,7 +32,7 @@ export function ProductGallery({ product }: { product: ProductView }) {
             fill
             priority={photoIdx === 0}
             sizes="(min-width:1024px) 50vw, 100vw"
-            className="object-cover"
+            className="object-contain"
           />
         ) : (
           <ProductVisual
@@ -64,9 +64,9 @@ export function ProductGallery({ product }: { product: ProductView }) {
                 >
                   <span
                     aria-hidden="true"
-                    className="pointer-events-none relative block h-14 w-14 sm:h-16 sm:w-16"
+                    className="pointer-events-none relative block h-14 w-14 overflow-hidden rounded-lg bg-white sm:h-16 sm:w-16"
                   >
-                    <Image src={src} alt="" fill sizes="64px" className="rounded-lg object-cover" />
+                    <Image src={src} alt="" fill sizes="64px" className="object-contain" />
                   </span>
                 </button>
               )
