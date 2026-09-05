@@ -238,3 +238,141 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ===== PDP 打印规格（Print / Save as PDF）=====
+   决策：PDP 内打印区块。打印时隐藏全部站点 UI 与非打印内容，只显示专属打印 sheet。
+   结构约定：PDP 页面把可交互内容包在 .print-hidden 容器内，.print-spec-sheet 以同层
+   sibling 渲染于其外（均位于 main 内）；@media print 时隐藏 header/footer/nav/iframe
+   与 .print-hidden，令 sheet display:block。普通屏幕 sheet 为 display:none。
+   真实数据原则：sheet 内容只含实有字段（货号/描述/特性/尺码换算/护理口径）。 */
+.print-spec-sheet {
+  display: none;
+}
+
+@media print {
+  @page {
+    margin: 14mm;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #111111 !important;
+  }
+
+  /* 站点 UI：壳（skip link/header/footer/nav）与 SDK/iframe 一律不打印。 */
+  header,
+  footer,
+  nav,
+  iframe {
+    display: none !important;
+  }
+
+  /* 页面可交互内容（画廊/actions/相关推荐等，PDP 中已包 .print-hidden）隐藏。 */
+  .print-hidden {
+    display: none !important;
+  }
+
+  /* main 去掉站点上下留白，避免打印出现空白页眉/页脚。 */
+  main {
+    padding: 0 !important;
+  }
+
+  /* 打印 sheet：main 内唯一可见内容。 */
+  .print-spec-sheet {
+    display: block !important;
+    color: #111111;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .print-sheet-header {
+    margin-bottom: 18px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #111111;
+  }
+
+  .print-brand {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  .print-tagline {
+    margin: 2px 0 0;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #525252;
+  }
+
+  .print-title {
+    margin: 0 0 2px;
+    font-size: 22px;
+    font-weight: 700;
+  }
+
+  .print-code {
+    margin: 0 0 10px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #525252;
+  }
+
+  .print-desc {
+    margin: 0 0 16px;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  .print-block {
+    margin: 0 0 16px;
+  }
+
+  .print-block h2 {
+    margin: 0 0 6px;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .print-block p {
+    margin: 0 0 6px;
+  }
+
+  .print-block ul {
+    margin: 0;
+    padding-left: 16px;
+  }
+
+  .print-block li {
+    margin-bottom: 2px;
+  }
+
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+
+  .print-table th,
+  .print-table td {
+    border: 1px solid #d4d4d4;
+    padding: 3px 8px;
+    text-align: left;
+  }
+
+  .print-table th {
+    background: #f5f5f4;
+    font-weight: 600;
+  }
+
+  .print-note {
+    margin-top: 6px;
+    font-size: 10px;
+    color: #525252;
+  }
+}
