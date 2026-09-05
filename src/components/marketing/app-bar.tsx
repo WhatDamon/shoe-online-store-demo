@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { HeartIcon, MenuIcon, SearchIcon, XIcon } from 'lucide-react'
 import { site } from '@/lib/site'
 import { useWishlist } from '@/components/shop/wishlist-provider'
@@ -30,9 +30,7 @@ export function AppBar({
   const { items } = useWishlist()
   const count = items.length
   const [scrolled, setScrolled] = useState(false)
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
-  // 移动菜单用原生 <details>（零 JS 也可展开，见下方说明），ref 仅用于 JS
-  // 可用时点击链接后收起面板（渐进增强，缺 JS 时无害）。
+  // 移动菜单/搜索均用原生 <details>（零 JS 也可展开，见菜单注释）。
   const mobileMenuRef = useRef<HTMLDetailsElement>(null)
 
   // 初始恒为 false（SSR/水合一致）；监听 scroll 事件切换磨砂态。
@@ -51,11 +49,7 @@ export function AppBar({
     }
   }, [])
 
-  // 搜索行常驻桌面（lg+）；手机展开态只在 <lg 显示。Escape 关闭。
-  const closeMobileSearch = () => setMobileSearchOpen(false)
-  const onMobileSearchRowKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') closeMobileSearch()
-  }
+  // 搜索行常驻桌面（lg+）；手机展开态只在 <lg 显示。
 
   const searchSolid = scrolled || tone === 'solid'
   const wishlistLabel = `Wishlist, ${count} ${count === 1 ? 'item' : 'items'}`
@@ -151,18 +145,40 @@ export function AppBar({
             />
           </form>
 
-          {/* 移动/平板搜索开关（<lg）：展开整行搜索 */}
-          <div className="lg:hidden">
-            <button
-              type="button"
+          {/* 移动/平板搜索（<lg）：原生 details 下拉搜索卡，零 JS 可展开。
+              与桌面内联框功能一致（Enter 提交 /shop?q=）；真机 JS 未水合时
+              React 版开关按钮会失效（同汉堡菜单根因），details 由浏览器原
+              生切换。JS 可用时点击链接/回车即提交（原生 form GET）。 */}
+          <details className="group relative lg:hidden">
+            <summary
               aria-label="Search"
-              aria-expanded={mobileSearchOpen}
-              onClick={() => setMobileSearchOpen((v) => !v)}
-              className={iconLinkClass}
+              className="flex h-11 w-11 list-none cursor-pointer select-none items-center justify-center rounded-full text-current transition-opacity hover:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current [&::-webkit-details-marker]:hidden"
             >
-              <SearchIcon className="size-5" />
-            </button>
-          </div>
+              <SearchIcon className="size-5 group-open:hidden" />
+              <XIcon className="hidden size-5 group-open:block" />
+              <span className="sr-only">Search</span>
+            </summary>
+            <div
+              role="search"
+              className="absolute right-0 top-full z-50 mt-2 w-[min(26rem,calc(100vw-3.5rem))] border border-ink/10 bg-canvas p-2 text-ink shadow-lg"
+            >
+              <form action="/shop" className="flex items-center gap-2">
+                <Input
+                  name="q"
+                  type="search"
+                  placeholder="Search styles"
+                  aria-label="Search products"
+                  className="h-10 min-w-0 flex-1 rounded-full border-neutral-300 bg-surface pl-4 text-ink placeholder:text-neutral-400"
+                />
+                <button
+                  type="submit"
+                  className="h-10 shrink-0 rounded-full bg-ink px-4 text-sm font-medium text-canvas transition-opacity hover:opacity-80"
+                >
+                  Search
+                </button>
+              </form>
+            </div>
+          </details>
 
           <Link href="/shop" aria-label={wishlistLabel} className={cn(iconLinkClass, 'relative')}>
             <HeartIcon className="size-5" />
@@ -176,45 +192,7 @@ export function AppBar({
         </div>
       </div>
 
-      {/* 移动展开搜索行：独立实底（header 可能为透明 overlay），autoFocus 即开即输 */}
-      {mobileSearchOpen ? (
-        <div
-          role="search"
-          onKeyDown={onMobileSearchRowKeyDown}
-          className="border-t border-ink/10 bg-canvas px-4 pb-3 pt-2 text-ink lg:hidden"
-        >
-          <form action="/shop" className="mx-auto flex w-full max-w-6xl items-center gap-2">
-            <div className="relative min-w-0 flex-1">
-              <SearchIcon
-                aria-hidden="true"
-                className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-ink opacity-70"
-              />
-              <Input
-                name="q"
-                type="search"
-                autoFocus
-                placeholder="Search styles"
-                aria-label="Search products"
-                className="h-10 w-full rounded-full border-neutral-300 bg-surface pl-10 pr-4 text-ink placeholder:text-neutral-400"
-              />
-            </div>
-            <button
-              type="submit"
-              className="h-10 shrink-0 rounded-full bg-ink px-5 text-sm font-medium text-canvas transition-opacity hover:opacity-80"
-            >
-              Search
-            </button>
-            <button
-              type="button"
-              aria-label="Close search"
-              onClick={closeMobileSearch}
-              className={cn(iconLinkClass, 'shrink-0 text-ink')}
-            >
-              <XIcon className="size-5" />
-            </button>
-          </form>
-        </div>
-      ) : null}
+      {/* （移动搜索行已并入上方原生 details，此处不再需要条件渲染行） */}
     </header>
   )
 }
