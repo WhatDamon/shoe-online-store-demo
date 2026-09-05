@@ -163,3 +163,65 @@
     @apply font-sans;
   }
 }
+
+/* Blog 文章正文排版（.article-body，react-markdown 输出直接作用域）：
+   颜色全走主题令牌（var(--ink)/var(--brand)…），深色模式自动翻转；
+   字重/字号与全站克制排版一致。 */
+@layer components {
+  .article-body {
+    @apply text-[15px] leading-7 text-ink;
+  }
+  .article-body > :first-child {
+    margin-top: 0;
+  }
+  .article-body h2 {
+    font-family: var(--font-newsreader);
+    @apply mt-10 text-2xl font-semibold tracking-tight text-ink;
+  }
+  .article-body h3 {
+    font-family: var(--font-newsreader);
+    @apply mt-8 text-xl font-semibold tracking-tight text-ink;
+  }
+  .article-body p {
+    @apply my-4;
+  }
+  .article-body a {
+    @apply text-brand underline decoration-brand/40 underline-offset-4 transition-colors hover:decoration-brand;
+  }
+  .article-body ul,
+  .article-body ol {
+    @apply my-4 space-y-1.5 pl-6;
+  }
+  .article-body ul {
+    @apply list-disc;
+  }
+  .article-body ol {
+    @apply list-decimal;
+  }
+  .article-body blockquote {
+    @apply my-6 border-l-[3px] border-brand py-0.5 pl-4 italic text-neutral-500;
+  }
+  .article-body hr {
+    @apply my-8 border-neutral-200;
+  }
+  .article-body code {
+    font-family: var(--font-geist-mono);
+    @apply rounded-md bg-neutral-100 px-1.5 py-0.5 text-[0.85em] text-ink;
+  }
+  .article-body pre {
+    @apply my-6 overflow-x-auto rounded-xl bg-[#111111] p-4 text-[13px] leading-6 text-[#fafaf8];
+  }
+  .article-body pre code {
+    @apply bg-transparent p-0 text-[#fafaf8];
+  }
+  .article-body table {
+    @apply my-6 w-full border-collapse text-sm;
+  }
+  .article-body th,
+  .article-body td {
+    @apply border-b border-neutral-200 p-2 text-left align-top;
+  }
+  .article-body th {
+    @apply font-semibold text-ink;
+  }
+}

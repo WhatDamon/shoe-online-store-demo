@@ -36,6 +36,9 @@ describe('AppBar', () => {
     const story = within(mainNav).getByRole('link', { name: 'Our Story' })
     expect(story).toHaveAttribute('href', '/#story')
 
+    const blog = within(mainNav).getByRole('link', { name: 'Blog' })
+    expect(blog).toHaveAttribute('href', '/blog')
+
     const wishlist = screen.getByRole('link', { name: /wishlist/i })
     expect(wishlist).toHaveAttribute('href', '/shop')
     expect(within(wishlist).getByText('0')).toBeInTheDocument()
@@ -65,6 +68,7 @@ describe('AppBar', () => {
       ['Shop', '/shop'],
       ['Collections', '/#collections'],
       ['Our Story', '/#story'],
+      ['Blog', '/blog'],
     ] as const) {
       const link = within(nav).getByRole('link', { name: label })
       expect(link).toHaveAttribute('href', href)

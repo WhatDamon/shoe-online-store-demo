@@ -8,6 +8,7 @@ export const site = {
     { label: 'Shop', href: '/shop' },
     { label: 'Collections', href: '/#collections' },
     { label: 'Our Story', href: '/#story' },
+    { label: 'Blog', href: '/blog' },
   ],
   hero: {
     kicker: 'A new kind of footwear',
