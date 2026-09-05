@@ -1,12 +1,7 @@
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
-  images: {
-    remotePatterns: [
-      // Landing hero 编辑感 lifestyle 图（离线/失效时 Hero 静默降级为 ink 底色块）
-      { protocol: 'https', hostname: 'images.unsplash.com' },
-    ],
-  },
+  // 产品与 hero 视觉均为本地资产（SVG / src/assets WebP），无需远程图片白名单。
 }
 
 export default nextConfig

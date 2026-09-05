@@ -1,32 +1,23 @@
-'use client'
-
 import Image from 'next/image'
 import Link from 'next/link'
-import { useState } from 'react'
 import { ArrowDownIcon } from 'lucide-react'
 import { site } from '@/lib/site'
+import heroImage from '@/assets/hero-home.webp'
 
-// Landing hero lifestyle 图（远程精选 + ink 底色静默兜底：图片失效即降级为深色面板，
-// 文案始终保持白色高对比）。加载失败仅在客户端触发，SSR 恒为白色文字，无 mismatch。
-const HERO_IMAGE =
-  'https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=2200&q=80'
+// Landing hero 本地图片资产（src/assets/hero-home.webp，源自品牌 3D 鞋视觉）。
+// 资产随包内联、SSR 恒可用；深色渐变 + 遮罩保证白字高对比，无需客户端失败降级。
 
 export function Hero() {
-  const [imageFailed, setImageFailed] = useState(false)
-
   return (
     <section className="relative flex min-h-dvh items-end overflow-hidden bg-[#111111]">
-      {imageFailed ? null : (
-        <Image
-          src={HERO_IMAGE}
-          alt=""
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover opacity-55"
-          onError={() => setImageFailed(true)}
-        />
-      )}
+      <Image
+        src={heroImage}
+        alt=""
+        fill
+        priority
+        sizes="100vw"
+        className="object-cover opacity-55"
+      />
       {/* 顶部较深，保证透明 AppBar 上的白色文字可读 */}
       <div
         aria-hidden="true"
