@@ -4,6 +4,50 @@ import { useEffect, useId, useRef, useState } from 'react'
 import buyOptions from './shopify-buy-options.json'
 import type { ShopifyBuyConfig } from '@/server/catalog/shopify-buy'
 
+// SDK 加载去重：多个 PDP 实例 / StrictMode 双跑 effect 共享同一份加载 Promise，
+// 避免重复注入 <script> 或对同一 mount 节点二次 createComponent（曾致页面出现两套 Buy now）。
+let sdkLoadPromise: Promise<ShopifyBuySdk> | null = null
+function loadSdk(): Promise<ShopifyBuySdk> {
+  if (!sdkLoadPromise) {
+    sdkLoadPromise = new Promise<ShopifyBuySdk>((resolve, reject) => {
+      if (typeof window === 'undefined') {
+        reject(new Error('no window'))
+        return
+      }
+      if (window.ShopifyBuy) {
+        resolve(window.ShopifyBuy)
+        return
+      }
+      const existing = document.querySelector<HTMLScriptElement>(`script[src="${SDK_URL}"]`)
+      const script =
+        existing ??
+        (() => {
+          const s = document.createElement('script')
+          s.async = true
+          s.src = SDK_URL
+          document.head.appendChild(s)
+          return s
+        })()
+      // SDK 加载两次（dev StrictMode 双跑 effect）时同一 script 只挂一次 load 监听
+      if (!script.dataset.bbReady) {
+        script.dataset.bbReady = '1'
+        script.addEventListener(
+          'load',
+          () => {
+            if (window.ShopifyBuy) resolve(window.ShopifyBuy)
+            else reject(new Error('SDK loaded without ShopifyBuy'))
+          },
+          { once: true },
+        )
+        script.addEventListener('error', () => reject(new Error('SDK script load failed')), {
+          once: true,
+        })
+      }
+    })
+  }
+  return sdkLoadPromise
+}
+
 // Shopify Buy Button 统一挂载组件（决策 #15 重启用，2026-09-06 全目录重建）。
 // 读取 admin 生成的 snippet（shopify_buy_button.txt，28 块 options 逐字一致）的参数化结论：
 // 26 个挂载块的唯一差别是商品 numeric id，其余（domain/token/moneyFormat/options）每块相同 →
@@ -31,7 +75,7 @@ export function ShopifyBuyButton({ config }: { config: ShopifyBuyConfig }) {
   const mountRef = useRef<HTMLDivElement>(null)
   const [started, setStarted] = useState(false)
 
-  // SDK 注入采用 Promise 化 script 加载（async，无阻塞）。
+  // SDK 注入采用共享 loadSdk() Promise（async，无阻塞，跨实例/StrictMode 幂等）。
   // react-hooks/set-state-in-effect 禁 render/effect 体直接 setState：
   // 所有 setStarted 只发生在 async 回调（load 完成 / init 后）与按钮 onClick（重试）。
   useEffect(() => {
@@ -40,14 +84,17 @@ export function ShopifyBuyButton({ config }: { config: ShopifyBuyConfig }) {
     if (!node) return
 
     const init = async () => {
-      const sdk = window.ShopifyBuy
-      if (!sdk || !sdk.UI) return
       try {
+        const sdk = await loadSdk()
+        // StrictMode 双跑：首遍 cleanup 后不得再注入（防同一节点两套 Buy now）
+        if (cancelled || !mountRef.current) return
         const client = sdk.buildClient({
           domain: config.domain,
           storefrontAccessToken: config.storefrontAccessToken,
         })
         const ui = await sdk.UI.onReady(client)
+        // 幂等：即使前序 init 已注入（如双跑竞态），也绝不对同一节点二次 createComponent
+        if (cancelled || !mountRef.current || node.childElementCount > 0) return
         ui.createComponent('product', {
           id: config.productId,
           node,
@@ -56,26 +103,13 @@ export function ShopifyBuyButton({ config }: { config: ShopifyBuyConfig }) {
         })
         if (!cancelled) setStarted(true)
       } catch (err) {
+        if (cancelled) return
         // 诚实失败：console 诊断，界面保持空容器（不假渲染成功）。
         console.warn('Shopify Buy Button init failed:', err)
       }
     }
 
-    if (window.ShopifyBuy) {
-      void init()
-      return
-    }
-    const existing = document.querySelector<HTMLScriptElement>(`script[src="${SDK_URL}"]`)
-    if (existing) {
-      existing.addEventListener('load', () => void init(), { once: true })
-      return
-    }
-    const script = document.createElement('script')
-    script.async = true
-    script.src = SDK_URL
-    script.addEventListener('load', () => void init(), { once: true })
-    document.head.appendChild(script)
-
+    void init()
     return () => {
       cancelled = true
     }
