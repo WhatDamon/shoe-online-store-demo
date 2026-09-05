@@ -1,6 +1,6 @@
 // AI 事件行 = SSE `data:` 帧内 JSON（规格 §8.4）。chat() 产出，客户端 parseEvent 消费。
 // 本模块必须保持客户端可导入：只含类型与纯函数，禁止引入任何 server-only 依赖
-// （任务 17 的 use-chat-stream 位于 'use client' 中 import 本模块）。
+// （消费方：'use client' 的 use-chat-stream 在客户端 import 本模块）。
 import type { CanonicalSize } from '@/server/catalog/types'
 
 export type ProductCard = {
@@ -16,7 +16,7 @@ export type Mode = 'shopping' | 'size-fit' | 'outfit' | 'find-shoes'
 
 // error code：护栏三类（rate_limited/budget/turns，文案一律温和消费者措辞）
 // + provider（真实调用失败，P3 不静默降级）+ invalid（请求本身不可处理）。
-// 'turns' 由 GuardrailError code 1:1 透传（任务 15 审查裁决，计划 events union 增补）。
+// 'turns' 由 GuardrailError code 1:1 透传，已含在本 union。
 export type ChatErrorCode = 'rate_limited' | 'budget' | 'turns' | 'provider' | 'invalid'
 
 export type ChatEvent =

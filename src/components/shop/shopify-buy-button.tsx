@@ -3,13 +3,18 @@
 import { useEffect, useRef } from 'react'
 import type { ShopifyBuyButtonConfig } from '@/lib/shopify-buy'
 
-// 极简 SDK 类型（Buy Button storefront SDK 无官方类型）。
+// 极简 SDK 类型（Buy Button storefront SDK 无官方类型）：client 是只在
+// buildClient → UI.onReady 间传递的不透明句柄，方法参数都在 I/O 边界解码。
+interface ShopifyClient {
+  /** 不透明标记：SDK 内部对象，调用方不解引用。 */
+  readonly __shopifyClient?: true
+}
 interface ShopifyBuySdk {
-  buildClient(config: { domain: string; storefrontAccessToken: string }): unknown
+  buildClient(config: { domain: string; storefrontAccessToken: string }): ShopifyClient
   UI: {
-    onReady(
-      client: unknown,
-    ): Promise<{ createComponent(kind: string, config: unknown): void | Promise<void> }>
+    onReady(client: ShopifyClient): Promise<{
+      createComponent(kind: 'product', config: { id: string | number }): void | Promise<void>
+    }>
   }
 }
 

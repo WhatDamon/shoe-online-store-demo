@@ -12,7 +12,7 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 
 export type AppDb = BunSQLiteDatabase<typeof schema>
 export type PgAppDb = PostgresJsDatabase<typeof pgSchema>
-export type AnyDb = AppDb | PgAppDb
+type AnyDb = AppDb | PgAppDb
 
 export function createDb(file: string = process.env.DATABASE_URL ?? './data/local.db'): AppDb {
   const sqlite = new Database(file)
@@ -67,17 +67,15 @@ export function createPostgresDb(url: string = process.env.DATABASE_URL ?? ''): 
 // 启动自动建表（零迁移 DX，两侧一致）：每个 pg 实例只执行一次，失败可重试。
 const pgTablesReady = new WeakMap<object, Promise<void>>()
 
-export function ensurePgTables(db: PgAppDb): Promise<void> {
-  if (!pgTablesReady.has(db)) {
-    pgTablesReady.set(
-      db,
-      runPgDdl(db).catch((e) => {
-        pgTablesReady.delete(db)
-        throw e
-      }),
-    )
-  }
-  return pgTablesReady.get(db)!
+export function ensurePgTables(database: PgAppDb): Promise<void> {
+  const pending = pgTablesReady.get(database)
+  if (pending) return pending
+  const run = runPgDdl(database).catch((e) => {
+    pgTablesReady.delete(database)
+    throw e
+  })
+  pgTablesReady.set(database, run)
+  return run
 }
 
 async function runPgDdl(db: PgAppDb): Promise<void> {

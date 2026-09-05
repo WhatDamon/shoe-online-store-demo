@@ -2,23 +2,11 @@
 
 import Link from 'next/link'
 import { formatPrice } from '@/lib/format'
+import { sizeRangeLabel } from '@/lib/size-range'
 import type { ProductView } from '@/server/catalog/service'
 import { ProductVisual } from './product-visual'
 import { WishlistButton } from './wishlist-button'
 import { useOptionalWishlist } from './wishlist-provider'
-
-// 首/末档尺码标签 → "US 8.5–9.5"（共享的市场前缀只保留一次）；单档则只显示该标签。
-function sizeRangeLabel(sizeOptions: ProductView['sizeOptions']): string | null {
-  if (sizeOptions.length === 0) return null
-  const sorted = [...sizeOptions].sort((a, b) => a.value - b.value)
-  const first = sorted[0].label
-  const last = sorted[sorted.length - 1].label
-  if (first === last) return first
-  let i = 0
-  while (i < first.length && i < last.length && first[i] === last[i]) i++
-  if (i === 0 || i >= last.length) return `${first}–${last}`
-  return `${first}–${last.slice(i)}`
-}
 
 export function ProductCard({ product }: { product: ProductView }) {
   const href = `/product/${product.handle}`

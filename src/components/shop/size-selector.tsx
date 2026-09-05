@@ -2,7 +2,7 @@
 
 import type { CanonicalSize } from '@/server/catalog/types'
 
-export interface SizeOption {
+interface SizeOption {
   value: CanonicalSize
   label: string
 }

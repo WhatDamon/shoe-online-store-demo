@@ -1,7 +1,7 @@
 // 跨任务统一的领域契约（禁改名）。canonical 尺码存储：EU 整档 36–48。
 export type SizeSystem = 'US' | 'EU' | 'UK' | 'JP' | 'CN'
 export type CanonicalSize = number // EU 整档，36–48（唯一 canonical 存储）
-export type CurrencyCode = 'USD' // 市场决策 #9：本版锁定 USD
+type CurrencyCode = 'USD' // 市场决策 #9：本版锁定 USD
 
 export interface Price {
   amount: number

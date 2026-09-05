@@ -1,9 +1,9 @@
 import { eq, sql } from 'drizzle-orm'
 import { productEmbeddings, aiUsage } from '@/db/schema'
-import { sqliteDb, createPostgresDb } from '@/db/client'
+import { db } from '@/db/client'
+import type { AppDb, PgAppDb } from '@/db/client'
 import { resolveDbDriver } from '@/db/dialect'
 import { parseVector } from './vector'
-import type { AppDb } from '@/db/client'
 import { createPostgresRepository } from './repository-postgres'
 
 export interface EmbeddingRow {
@@ -88,11 +88,11 @@ export function createRepository(db: AppDb) {
 
 export type Repository = ReturnType<typeof createRepository>
 
-/** 决策 #13：按 DB_DRIVER 返回默认驱动实现（sqlite 本地 / postgres 云端）。 */
+/** 决策 #13：按 DB_DRIVER 返回默认驱动实现（sqlite 本地 / postgres 云端）。
+ * db() 负责 driver 分派并缓存两种连接；此处仅做类型收窄到对应驱动接口。 */
 export function createDefaultRepository(): Repository {
-  if (resolveDbDriver() === 'postgres') {
-    const pg = createPostgresDb()
-    return createPostgresRepository(pg)
-  }
-  return createRepository(sqliteDb())
+  const connection = db()
+  return resolveDbDriver() === 'postgres'
+    ? createPostgresRepository(connection as PgAppDb)
+    : createRepository(connection as AppDb)
 }

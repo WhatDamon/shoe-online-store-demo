@@ -8,14 +8,15 @@ import { useChatStream } from './use-chat-stream'
 import { AssistantFabSlot } from './fab'
 import { AssistantPanel } from './assistant-panel'
 
-/** 导购控制器：PDP 的 "Find my size"（task 12）等消费方调用的契约。 */
+/** 导购控制器：PDP 的 "Find my size" 等消费方调用的契约。 */
 export interface AssistantHandle {
   /** 打开面板并设置模式（size-fit 带商品 → 预置上下文并自动询问尺码）。 */
   open: (mode: Mode, product?: ProductView | null) => void
   close: () => void
 }
 
-// 根 layout 挂载一次；FAB + Sheet 面板随 Provider 渲染（落地页 FAB 自隐）。
+// 根 layout 挂载一次；FAB + Sheet 面板随 Provider 渲染（落地页 FAB 自隐；
+// FAB 以受控注入方式拿到 open/close，避免 provider↔fab 循环导入）。
 // 会话状态存于 provider（仅客户端，页面刷新即重置——规格 §8"仅当次记忆"）。
 const AssistantContext = createContext<AssistantHandle | null>(null)
 
@@ -80,7 +81,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   return (
     <AssistantContext.Provider value={value}>
       {children}
-      <AssistantFabSlot />
+      <AssistantFabSlot assistant={value} />
       <AssistantPanel
         isOpen={isOpen}
         onClose={close}

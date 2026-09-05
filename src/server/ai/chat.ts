@@ -75,8 +75,7 @@ async function retrieveProducts(query: string, limit = 4): Promise<Product[]> {
 const productContextOf = (v: Product): string =>
   `Product: ${v.title}. ${v.description} Upper palette: ${v.visual.palette[0]} and ${v.visual.palette[1]}; accent: ${v.visual.accent}.`
 
-/** 护栏顺序（任务 15 审查裁决 B）：rate → budget → turns；
- * 被 rate/budget 拒的请求不消耗回合（assertTurn 的 claim 最后执行）。 */
+/** 护栏顺序：rate → budget → turns；被 rate/budget 拒的请求不消耗回合（回合 claim 最后执行）。 */
 export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGenerator<ChatEvent> {
   const guardrails = opts.guardrails ?? sharedGuardrails()
   const provider = opts.provider ?? aiProvider()

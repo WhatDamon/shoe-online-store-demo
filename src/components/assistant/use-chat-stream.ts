@@ -1,20 +1,19 @@
 'use client'
 
 // SSE 会话消费 hook：管理消息流、流式增量、结构化事件（productCards/sizeFit）
-// 与错误恢复。fetch /api/ai/chat 并解析 data: 帧；服务端事件契约见
-// src/server/ai/events.ts（纯函数 parseEvent，客户端直接复用，不在 UI 侧重复造解析）。
+// 与错误恢复。帧解析委托 events.ts 的 parseEvent（客户端可导入纯函数，不在 UI 侧重复造解析）。
 import { useCallback, useRef, useState } from 'react'
 import { parseEvent } from '@/server/ai/events'
 import type { ChatErrorCode, ChatEvent, Mode, ProductCard } from '@/server/ai/events'
 import type { CanonicalSize } from '@/server/catalog/types'
 
 /** 发给服务端的最小商品引用（只需 handle + title，规格 §8.4 ChatRequest.product）。 */
-export interface ChatProductRef {
+interface ChatProductRef {
   handle: string
   title: string
 }
 
-export interface SizeFitResult {
+interface SizeFitResult {
   recommended: CanonicalSize
   alternatives: CanonicalSize[]
   rationale: string
