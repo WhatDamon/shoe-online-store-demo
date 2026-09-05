@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { SendIcon, XIcon } from 'lucide-react'
+import { SendIcon, Volume2Icon, XIcon } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,6 +11,8 @@ import type { CanonicalSize } from '@/server/catalog/types'
 import type { ProductView } from '@/server/catalog/service'
 import { convert } from '@/server/catalog/size-charts'
 import { market } from '@/lib/market'
+import { isSpeechSupported } from '@/lib/speech'
+import { cn } from 'cn'
 import type { ChatMessage } from './use-chat-stream'
 import { MessageList } from './message-list'
 import {
@@ -31,6 +33,9 @@ export interface AssistantPanelProps {
   onRetry: () => void
   messages: ChatMessage[]
   isStreaming: boolean
+  /** 朗读开关（记住偏好）：开 → 每条完成的 AI 回复自动整段朗读。 */
+  speakOn: boolean
+  onToggleSpeak: (next: boolean) => void
 }
 
 // 导购浮层面板（克制呈现 P1：头部/开场/chips 全为消费端措辞，不出现 "AI"）。
@@ -44,6 +49,8 @@ export function AssistantPanel({
   onRetry,
   messages,
   isStreaming,
+  speakOn,
+  onToggleSpeak,
 }: AssistantPanelProps) {
   const [draft, setDraft] = useState('')
   const trimmed = draft.trim()
@@ -75,7 +82,28 @@ export function AssistantPanel({
     >
       <SheetContent side="right" className="flex h-full flex-col gap-0 p-0">
         <SheetHeader className="shrink-0 border-b border-neutral-200 pr-12">
-          <SheetTitle>Need a hand?</SheetTitle>
+          <div className="flex items-center justify-between gap-2">
+            <SheetTitle>Need a hand?</SheetTitle>
+            {isSpeechSupported() ? (
+              <button
+                type="button"
+                onClick={() => onToggleSpeak(!speakOn)}
+                aria-pressed={speakOn}
+                aria-label="Read replies aloud"
+                title={speakOn ? 'Stop reading replies aloud' : 'Read replies aloud'}
+                className={cn(
+                  'inline-flex size-9 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400 hover:bg-neutral-100',
+                  speakOn && 'bg-neutral-100',
+                )}
+              >
+                <Volume2Icon
+                  className={cn('size-4', speakOn ? 'text-brand' : 'text-neutral-500')}
+                  aria-hidden="true"
+                />
+                <span className="sr-only">{speakOn ? 'On' : 'Off'}</span>
+              </button>
+            ) : null}
+          </div>
           <p className="text-xs text-neutral-500">
             Ask about sizing, styles, shipping &amp; returns, or what&rsquo;s in the shop.
           </p>

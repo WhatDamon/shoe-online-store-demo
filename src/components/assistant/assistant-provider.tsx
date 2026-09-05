@@ -1,9 +1,25 @@
 'use client'
 
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 import type { ReactNode } from 'react'
 import type { Mode } from '@/server/ai/events'
 import type { ProductView } from '@/server/catalog/service'
+import {
+  getSpeakServerSnapshot,
+  getSpeakSnapshot,
+  setSpeakPreference,
+  subscribeSpeakPreference,
+} from '@/lib/speak-preference'
+import { readAloud, stopSpeaking, toSpeechText } from '@/lib/speech'
 import { useChatStream } from './use-chat-stream'
 import { AssistantFabSlot } from './fab'
 import { AssistantPanel } from './assistant-panel'
@@ -26,7 +42,40 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   const [mode, setMode] = useState<Mode>('shopping')
   const [product, setProduct] = useState<ProductView | null>(null)
 
-  const close = useCallback(() => setIsOpen(false), [])
+  // 朗读偏好：外部 store（SSR 首帧常量 false → 无 hydration mismatch）。
+  const speakOn = useSyncExternalStore(
+    subscribeSpeakPreference,
+    getSpeakSnapshot,
+    getSpeakServerSnapshot,
+  )
+  // 已朗读/已略过的最后一条助手消息 id：同一回复只在完成瞬间朗读一次
+  // （开关开启时已完成的历史回复不补读）。
+  const lastSpokenIdRef = useRef<string | null>(null)
+
+  // 触发朗读：观察到「新完成的助手回复」（无 error、有正文）且开关开 → 整段朗读。
+  // 纯副作用（readAloud/写 ref），非 setState，符合 react-hooks 规则。
+  useEffect(() => {
+    let last: (typeof messages)[number] | null = null
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i]
+      if (m.role !== 'assistant') continue
+      last = m
+      break
+    }
+    if (!last || last.streaming || last.error) return
+    // 先记录 id 再决定是否读：开关关闭期间完成的回复被标记为已读 → 之后
+    // 打开开关也不补读；开关开着时到达的完成回复才会走到朗读。
+    if (last.id === lastSpokenIdRef.current) return
+    lastSpokenIdRef.current = last.id
+    if (!speakOn) return
+    const text = toSpeechText(last.content)
+    if (text) readAloud(text)
+  }, [messages, speakOn])
+
+  const close = useCallback(() => {
+    stopSpeaking() // 人已离开面板：不再空放
+    setIsOpen(false)
+  }, [])
 
   // size-fit 是否已结算：最近一条助手消息为含结构化推荐的已结束消息。
   // 已结算后自由输入再走 size-fit 只会让确定性核心再次追问尺码（死循环），
@@ -42,6 +91,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
 
   const handleChip = useCallback(
     (chipMode: Mode, label: string) => {
+      stopSpeaking() // 新回合开始：停掉上一回复的朗读
       const needsProduct = chipMode === 'size-fit' || chipMode === 'outfit'
       const ref = needsProduct && product ? { handle: product.handle, title: product.title } : null
       setMode(chipMode)
@@ -59,6 +109,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       // PDP "Find my size"：商品上下文齐备时直接开场问尺码（消费端自然流），
       // 由服务端 size-fit 确定性核心应答（askedForInput → 追问）。
       if (nextMode === 'size-fit' && p) {
+        stopSpeaking() // 自动开场即新回合
         send('size-fit', '', { handle: p.handle, title: p.title })
       }
     },
@@ -67,6 +118,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
 
   const handleSend = useCallback(
     (text: string) => {
+      stopSpeaking() // 新回合开始：停掉上一回复的朗读
       // size-fit 已结算后的自由输入自动转 shopping；同时落定 mode，避免下一条仍粘滞 size-fit。
       const nextMode = mode === 'size-fit' && sizeFitSettled ? 'shopping' : mode
       if (nextMode !== mode) setMode(nextMode)
@@ -75,6 +127,11 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     },
     [mode, product, send, sizeFitSettled],
   )
+
+  const handleToggleSpeak = useCallback((next: boolean) => {
+    if (!next) stopSpeaking() // 关开关即静音
+    setSpeakPreference(next)
+  }, [])
 
   const value = useMemo<AssistantHandle>(() => ({ open, close }), [open, close])
 
@@ -97,6 +154,8 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         onRetry={retry}
         messages={messages}
         isStreaming={isStreaming}
+        speakOn={speakOn}
+        onToggleSpeak={handleToggleSpeak}
       />
     </AssistantContext.Provider>
   )
