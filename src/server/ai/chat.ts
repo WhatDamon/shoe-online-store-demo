@@ -60,6 +60,9 @@ const sharedGuardrails = (): Guardrails => (shared ??= createGuardrails(createDe
 /** GuardrailError → 对应 code + 温和文案（code 1:1 透传，含 'turns'）；其余 → provider 错误。 */
 const toErrorEvent = (e: unknown): ChatEvent => {
   if (e instanceof GuardrailError) return { type: 'error', code: e.code, message: e.message }
+  // 根因上浮到部署日志（Vercel 函数日志可见）；UI 只显示通用 Try Again 文案，不向访客泄露细节。
+  // 护栏拒绝（限流/预算/回合）是设计内软拒绝，不在此记录。
+  console.error('[ai/chat] provider failure', e)
   return { type: 'error', code: 'provider', message: FALLBACK_ERROR_TEXT }
 }
 
