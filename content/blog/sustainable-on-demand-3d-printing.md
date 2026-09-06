@@ -1,6 +1,7 @@
 ---
 title: 'Why We Prefer "Made-to-Order": The Eco-Logic of Zero Inventory'
 date: '2026-09-05'
+cover: '/blog/covers/sustainable-on-demand-3d-printing.webp'
 description: Why do we embrace "out of stock"? Discover how on-demand 3D printing eliminates deadstock waste and creates a more sustainable footwear manufacturing model.
 tags:
   - Sustainability
@@ -28,5 +29,9 @@ Yes, this means popular sizes might show a "3-5 day lead time." But those few da
 From a purely environmental standpoint, 3D printing (additive) only uses the material needed to build the part. Unlike traditional cutting (subtractive), there are no off-cuts or scrap margins.
 
 When you see "Ships in 5 Days" on our site, don't be frustrated. It means your shoes are currently being printed and hand-finished in our Wenzhou workshop, specifically for you. That is our most honest definition of sustainable fashion.
+
+![Evoloop brand cover: "New Life, Circular Steps"](/blog/covers/sustainable-on-demand-3d-printing.webp)
+
+_"New Life, Circular Steps" — what made-to-order really means to us._
 
 _Join the zero-waste movement. Browse our made-to-order collection._

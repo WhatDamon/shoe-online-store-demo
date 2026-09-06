@@ -214,6 +214,12 @@
   .article-body pre code {
     @apply bg-transparent p-0 text-[#fafaf8];
   }
+  .article-body img {
+    @apply my-6 block w-full rounded-2xl border border-neutral-200/80;
+  }
+  .article-body em {
+    @apply text-neutral-500;
+  }
   .article-body table {
     @apply my-6 w-full border-collapse text-sm;
   }
