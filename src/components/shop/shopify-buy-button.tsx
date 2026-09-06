@@ -56,10 +56,23 @@ function loadSdk(): Promise<ShopifyBuySdk> {
 //
 // 克制 P1 / 诚实降级：sdk 加载失败不弹错，仅静默留空容器（页面其余 PDP 内容不受影响），
 // 控制台 console.warn 一条便于诊断；组件不渲染任何 "Powered by"/AI 类文案。
+interface ShopifyBuyProductOptions {
+  id: string
+  node: HTMLDivElement
+  moneyFormat: string
+  options: typeof buyOptions
+}
+
+// SDK client 句柄：真实类型未知且此处只透传给 onReady（从不解构其内部），
+// 用 object（比 unknown 精确：保证非空值）而非空 interface。
+type ShopifyBuyClient = object
+interface ShopifyBuyUI {
+  createComponent(kind: 'product', opts: ShopifyBuyProductOptions): void
+}
 interface ShopifyBuySdk {
-  buildClient(config: { domain: string; storefrontAccessToken: string }): unknown
+  buildClient(config: { domain: string; storefrontAccessToken: string }): ShopifyBuyClient
   UI: {
-    onReady(client: unknown): Promise<{ createComponent(kind: 'product', opts: unknown): unknown }>
+    onReady(client: ShopifyBuyClient): Promise<ShopifyBuyUI>
   }
 }
 

@@ -1,11 +1,12 @@
 import { pageMetadata } from '@/lib/seo'
+import type { Metadata } from 'next'
 import { SavedPairs } from '@/components/shop/saved-pairs'
 
 // /saved：愿望单清单页（决策：AI Save pair / PDP 心形共用同一 localStorage 单源）。
 // RSC 壳只做 metadata + 头部；数据完全来自客户端 wishlist 快照 → 经只读
 // /api/catalog 拉摘要（DB/seed 在 server，客户端无目录副本）。收藏为空时
 // SavedPairs 自渲染空态（含去 /shop 逛的 CTA）。
-export const metadata = pageMetadata({
+export const metadata: Metadata = pageMetadata({
   title: 'Saved pairs',
   description: 'Your saved pairs — pick up where you left off.',
 })

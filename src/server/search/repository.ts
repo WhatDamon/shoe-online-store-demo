@@ -6,13 +6,7 @@ import { resolveDbDriver } from '@/db/dialect'
 import type { ProductRecord } from '@/db/product-row'
 import { parseVector } from './vector'
 import { createPostgresRepository } from './repository-postgres'
-
-export interface EmbeddingRow {
-  productId: string
-  contentHash: string
-  model: string
-  vector: number[]
-}
+import type { EmbeddingRow } from './embedding-row'
 
 export function createRepository(db: AppDb) {
   return {

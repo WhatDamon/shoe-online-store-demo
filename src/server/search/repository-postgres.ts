@@ -4,7 +4,7 @@ import { ensurePgTables } from '@/db/client'
 import type { PgAppDb } from '@/db/client'
 import type { ProductRecord } from '@/db/product-row'
 import { parseVector } from './vector'
-import type { EmbeddingRow } from './repository'
+import type { EmbeddingRow } from './embedding-row'
 
 /** Postgres 实现（决策 #13）：方法形状与 sqlite 版完全一致 → 可当 Repository 用。 */
 export function createPostgresRepository(db: PgAppDb) {

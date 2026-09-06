@@ -1,4 +1,5 @@
 import { catalog } from '@/server/catalog/adapter'
+import type { Metadata } from 'next'
 import { availableSizesForSystem } from '@/server/catalog/size-charts'
 import { listProductsForMarket } from '@/server/catalog/service'
 import { giftItems } from '@/server/catalog/gifts'
@@ -12,7 +13,7 @@ import { pageMetadata } from '@/lib/seo'
 
 export const dynamic = 'force-dynamic'
 
-export const metadata = pageMetadata({
+export const metadata: Metadata = pageMetadata({
   title: 'Shop',
   description: 'Shop all styles — every pair is printed to order around your size.',
 })
