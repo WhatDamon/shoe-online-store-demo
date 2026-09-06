@@ -1,0 +1,13 @@
+# Local gitleaks config (extended by pi-lens' scoped scan config).
+#
+# .env.local deliberately holds the developer's REAL ModelScope credentials and a
+# public Shopify storefront token for local run. It is covered by .gitignore
+# (.env*) and never committed; allowlist it so the secrets scanner does not keep
+# flagging a file that cannot reach the repo.
+[extend]
+useDefault = true
+
+[allowlist]
+paths = [
+  '''\.env\.local$''',
+]
