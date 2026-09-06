@@ -1,9 +1,11 @@
+import { envInt } from './env-int'
+
 export interface SessionMessage {
   role: 'user' | 'assistant'
   content: string
 }
 
-export const MAX_TURNS = Number(process.env.AI_MAX_TURNS ?? 20)
+export const MAX_TURNS = envInt('AI_MAX_TURNS', 20)
 export const HISTORY_TURNS = 6
 export const SESSION_TTL_MS = 30 * 60_000
 
