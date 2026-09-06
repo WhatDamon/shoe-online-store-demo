@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { ExternalLink } from 'lucide-react'
 import { site } from '@/lib/site'
 
 export function Footer() {
@@ -36,6 +37,16 @@ export function Footer() {
         <p className="mx-auto mt-3 max-w-2xl text-xs leading-5 text-[#fafaf8]/60">
           {site.projectNote}
         </p>
+        {/* 项目开源仓库：学生作品，公开代码（克制：小字号、低对比、尾行） */}
+        <a
+          href="https://github.com/WhatDamon/shoe-online-store-demo"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-4 inline-flex items-center gap-1.5 text-xs text-[#fafaf8]/60 transition-colors hover:text-[#fafaf8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#fafaf8]"
+        >
+          <ExternalLink aria-hidden="true" className="size-3.5" />
+          View source on GitHub
+        </a>
       </div>
     </footer>
   )
