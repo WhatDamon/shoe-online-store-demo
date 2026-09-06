@@ -1,20 +1,27 @@
-# Evoloop — 3D-Printed Casual Shoes (Demo)
+# Evoloop — 3D-Printed Casual Shoes
 
-A consumer-facing storefront demo for a fictional brand of **3D-printed casual / lifestyle shoes**
-(digitally crafted, printed to order in your size). Built with **Next.js (App Router), Tailwind
-and shadcn/ui on the Node runtime (Bun is the package manager only)** — with a server-side
-shopping assistant that stays understated: consumer wording only, never "AI"-branded.
+**Evoloop** began as a student hackathon project and has grown into an **independent footwear
+project**. This repository is its consumer-facing storefront front-end — landing page, `/shop`
+browsing, product pages, a Markdown blog and a restrained, consumer-worded shopping assistant —
+and the **code is open source (MIT)** with the long-term goal of evolving into a reusable
+**open-source shopping landing-site framework**. All supplier-derived demo assets (photos,
+catalog data, care poster, demo artwork) stay **All Rights Reserved** — fine to keep and run
+in-repo as a demo, but not for redistribution without written authorization (see `LICENSE` +
+`LICENSE-ASSETS`). Evoloop claims **no trademark** on its name.
 
-This is a **product prototype / frontend demo**: there is no real checkout on this site. PDPs
-run a **custom demo flow** — demo price (placeholder **$59–79** band), size/color pickers and a
-**Buy now** CTA that opens a **payment-QR checkout dialog** (a placeholder demo QR; no real
-payment is initiated). A **Shopify Buy Button** channel (`SHOPIFY_BUY_*` env + handle map) is
-retained in the codebase but deliberately **dormant** — the demo never configures it (a switchable
-catalog adapter also remains for a future direct Storefront read). The catalog is a local seed of
-**29 real supplier styles**
-(imported from the supplier's workbook) with **real product photos** (WebP in `public/products/`);
-image-less entries fall back to programmatic SVG visuals. `/shop` also carries the
-"spend $50, get a free gift" offer with a gallery of leftover-offcut trinkets.
+Built with **Next.js (App Router), Tailwind and shadcn/ui on the Node runtime (Bun is the package
+manager only)** — with a server-side shopping assistant that stays understated: consumer wording
+only, never "AI"-branded.
+
+The storefront has **no real checkout**: PDPs run a **custom demo flow** — demo price (placeholder
+**$59–79** band), size/color pickers and a **Buy now** CTA that opens a **payment-QR checkout
+dialog** (a placeholder demo QR; no real payment is initiated). A **Shopify Buy Button** channel
+(`SHOPIFY_BUY_*` env + handle map) is retained in the codebase but deliberately **dormant** — the
+demo never configures it (a switchable catalog adapter also remains for a future direct Storefront
+read). The catalog is a local seed of **29 real supplier styles** (imported from the supplier's
+workbook) with **real product photos** (WebP in `public/products/`); image-less entries fall back
+to programmatic SVG visuals. `/shop` also carries the "spend $50, get a free gift" offer with a
+gallery of leftover-offcut trinkets.
 
 ## Tech stack
 
@@ -71,7 +78,7 @@ tests); `SHOPIFY_*` still takes priority over both.
 | `bun run start` | Serve the production build (Node runtime). |
 | `bun run typecheck` | `tsc --noEmit` |
 | `bun run lint` | ESLint over the repo |
-| `bun run test` | Vitest (54 files, 279 tests) on Node via the `better-sqlite3` driver. |
+| `bun run test` | Vitest (56 files, 294 tests) on Node via the `better-sqlite3` driver. |
 | `bun run verify` | One-shot acceptance gate: `format:check` + `typecheck` + `lint` + `test`. |
 | `bun run test:watch` | Vitest watch mode |
 
@@ -184,10 +191,11 @@ src/
 
 ## Disclaimer
 
-Demo / prototype. Brand: **Evoloop** (decided). Supplier product codes, photos, colors and size
-segments are real (from the brand supply-chain workbook); English marketing names, prices and copy
-are demo placeholders, as is the size conversion table (foot-length-mm anchored, canonical EU
-35–48). The free-gift offer is a demo promotion. No real purchase flow is connected.
+Independent project (born at a hackathon); the order flow, pricing and copy are demo. Supplier
+product codes, photos, colors and size segments are real (from the brand supply-chain workbook);
+English marketing names, prices and copy are demo placeholders, as is the size conversion table
+(foot-length-mm anchored, canonical EU 35–48). The free-gift offer is a demo promotion. No real
+purchase flow is connected.
 
 ## License
 
