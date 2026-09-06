@@ -2,29 +2,25 @@
 
 A consumer-facing storefront demo for a fictional brand of **3D-printed casual / lifestyle shoes**
 (digitally crafted, printed to order in your size). Built with **Next.js (App Router), Tailwind
-and shadcn/ui on the Node runtime (Bun is the package manager only)** — with a server-side AI
-shopping guide that stays deliberately subtle
-(spec principle P1: consumer language only, no "AI" branding).
+and shadcn/ui on the Node runtime (Bun is the package manager only)** — with a server-side
+shopping assistant that stays understated: consumer wording only, never "AI"-branded.
 
 This is a **product prototype / frontend demo**: there is no checkout on this site. PDPs whose
 product exists in the linked Shopify store switch to a **Shopify Buy Button** (real store variants,
 currency and checkout in an embedded widget) when `SHOPIFY_BUY_*` env is configured; without it
 they stay an "Available soon" placeholder (a switchable catalog adapter is also ready for a
 future direct Storefront read). The catalog is a local seed of **29 real supplier styles**
-(imported from the brand supply-chain workbook, spec decision #16) with **real product photos**
-(WebP in `public/products/`); image-less entries fall back to programmatic SVG visuals. `/shop`
-also carries the "spend $50, get a free gift" offer with a gallery of leftover-offcut trinkets.
-
-> Docs: [design spec](docs/superpowers/specs/2026-09-04-shoe-store-ai-design.md) ·
-> [implementation plan](docs/superpowers/plans/2026-09-04-shoe-store-frontend-ai.md) ·
-> [implementation report](docs/implementation-report.md)
+(imported from the supplier's workbook) with **real product photos** (WebP in `public/products/`);
+image-less entries fall back to programmatic SVG visuals. `/shop` also carries the
+"spend $50, get a free gift" offer with a gallery of leftover-offcut trinkets.
 
 ## Tech stack
 
 - **Next.js 16.3.4** (App Router, Turbopack) + React 19 + TypeScript 5
-- **Bun ≥ 1.3** as the package manager only (Next runs on the Node runtime — spec decision #18)
+- **Bun ≥ 1.3** as the package manager only (the `next` CLI and every gate script run on Node)
 - **Tailwind CSS v4** + **shadcn/ui** (Base UI preset)
-- **Drizzle ORM**, dual-driver (spec decision #13): **SQLite** (`better-sqlite3`, default, zero-setup) or **Postgres** (`postgres.js`, Cloud SQL-ready) — chosen by `DB_DRIVER` in the environment
+- **Drizzle ORM**, dual-driver: **SQLite** (`better-sqlite3`, default, zero-setup) or
+  **Postgres** (`postgres.js`, Cloud SQL-ready) — chosen by `DB_DRIVER` in the environment
 - **Vitest** (unit + React Testing Library), **ESLint**, `tsc --noEmit`
 - AI: OpenAI-compatible streaming client with a deterministic **Mock mode** when no key is set
 
@@ -41,7 +37,7 @@ cp .env.example .env.local      # defaults are fine — empty AI_API_KEY = Mock 
 bun run dev               # http://localhost:3000
 ```
 
-> **Node runtime for Next (spec decision #18).** The `next` CLI runs on Node; the SQLite driver is
+> **Node runtime for Next.** The `next` CLI runs on Node; the SQLite driver is
 > `better-sqlite3` (Node native, works on Bun too) — no Bun runtime needed for dev/build/start.
 > Bun is the package manager only. `DB_DRIVER=postgres` (with a `DATABASE_URL=postgres://…`)
 > switches to `postgres.js` — both drivers run on Node, Vercel-ready.
@@ -50,8 +46,8 @@ First run auto-creates the schema (**three** tables: `products` + `product_embed
 `ai_usage`) via idempotent `CREATE TABLE IF NOT EXISTS` on **either** driver — SQLite file at
 `./data/local.db`, or the Postgres database behind `DATABASE_URL`. No migration step.
 
-**Catalog lives in `products` (spec decision #17).** The catalog adapter defaults to reading the
-table; when it is empty the first request auto-seeds it from the import layer (supplier JSON +
+**Catalog lives in the `products` table.** The catalog adapter defaults to reading the table;
+when it is empty the first request auto-seeds it from the import layer (supplier JSON +
 curation). `CATALOG_SOURCE=seed` switches back to the pure in-memory import layer (used by unit
 tests); `SHOPIFY_*` still takes priority over both.
 
@@ -68,7 +64,7 @@ tests); `SHOPIFY_*` still takes priority over both.
 
 | Command | Meaning |
 |---|---|
-| `bun run dev` | Next dev server (Turbopack) on the **Node** runtime (spec decision #18). |
+| `bun run dev` | Next dev server (Turbopack) on the **Node** runtime. |
 | `bun run build` | Production build (Node runtime). |
 | `bun run start` | Serve the production build (Node runtime). |
 | `bun run typecheck` | `tsc --noEmit` |
@@ -96,8 +92,8 @@ See [`.env.example`](.env.example) for the annotated template. Summary:
 | `AI_MAX_MESSAGE_CHARS` | `800` | Max characters per incoming user message |
 | `AI_DAILY_TOKEN_CAP` | `1000000` | Daily token budget (SUM over `ai_usage` per UTC day) |
 | `AI_DISABLE_REAL` | `0` | `1` forces Mock mode even with a key (abuse kill switch) |
-| `DB_DRIVER` | `sqlite` | `sqlite` (default) or `postgres` — selects the app DB driver (decision #13) |
-| `CATALOG_SOURCE` | `db` | Runtime catalog source (decision #17): `db` = `products` table (default, auto-seeded when empty); `seed` = in-memory import layer (tests); `SHOPIFY_*` still wins |
+| `DB_DRIVER` | `sqlite` | `sqlite` (default) or `postgres` — selects the app DB driver |
+| `CATALOG_SOURCE` | `db` | Runtime catalog source: `db` = `products` table (default, auto-seeded when empty); `seed` = in-memory import layer (tests); `SHOPIFY_*` still wins |
 | `DATABASE_URL` | `./data/local.db` | sqlite: local file; postgres: `postgres://…` connection string |
 | `SHOPIFY_DOMAIN`, `SHOPIFY_STOREFRONT_TOKEN` | *(empty)* | Reserved. Catalog adapter switches seed → Shopify only when **both** are set (not yet active). |
 | `SHOPIFY_BUY_DOMAIN`, `SHOPIFY_BUY_TOKEN` | *(empty)* | **PDP Shopify Buy Button channel** (2026-09): when **both** are set, every PDP mapped in `src/server/catalog/shopify-buy.ts` (29/29 store products, handle-keyed) renders a real Buy Button that takes over variant selection + checkout; unset keeps the demo pickers/price. Independent of the two vars above on purpose (setting those would trip the catalog stub). |
@@ -133,7 +129,7 @@ src/
     assistant/             # FAB + Sheet chat panel, SSE hook, chips, message list
     ui/                    # shadcn/ui primitives
   server/                  # Server-only layers (never imported by client code except `type`)
-  catalog/               # Seed/DB adapter + market-aware service + Shopify Buy map (handle → store id)
+    catalog/               # Seed/DB adapter + market-aware service + Shopify Buy map (handle → store id)
     search/                # embedder, keyword search, retrieval (embedding cache + cosine), vector
     ai/                    # providers (Mock/OpenAI-compatible), chat orchestration, SSE events, prompts
     guardrails/            # rate limit, session state (turns/TTL/trim), token budget, soft copy
@@ -144,21 +140,21 @@ src/
 
 ## Architecture notes
 
-- **Catalog**: runtime source is the `products` DB table (spec decision #17) — auto-seeded from
-  the import layer (29 supplier styles across 4 collections, curation in `seed.ts` over
-  `data/supplier.json`) when empty; `/shop`, PDP and search all read the table, so edits (title,
-  price, collection…) apply on the next dynamic request. `CATALOG_SOURCE=seed` keeps the pure
-  in-memory layer for tests. Product cards and PDP galleries use real photos (`Product.images`,
-  WebP under `public/products/<handle>/`) and fall back to SVG visuals only when image-less. A
-  separate `gifts.ts` module feeds the `/shop` free-gift gallery (gifts are display-only, never in
-  the sellable catalog).
-- **Store buy channel** (2026-09, replacing the #19 rollback): the linked Shopify store holds the
-  same 29 products under matching handles. `src/server/catalog/shopify-buy.ts` is a **low-coupling
-  static map** (local `handle` → store numeric id, no Product/DB/schema changes) read by the PDP
-  page; when `SHOPIFY_BUY_DOMAIN` + `SHOPIFY_BUY_TOKEN` are set, the store-mapped PDP hides the
-  demo price/pickers and mounts one parameterized `ShopifyBuyButton` (SDK `createComponent`
-  loading the admin-generated options verbatim), letting the store own variants, price and
-  checkout. Unset → all PDPs stay demo (P1 zero buy UI).
+- **Catalog**: runtime source is the `products` DB table — auto-seeded from the import layer
+  (29 supplier styles across 4 collections, curation in `seed.ts` over `data/supplier.json`)
+  when empty; `/shop`, PDP and search all read the table, so edits (title, price, collection…)
+  apply on the next dynamic request. `CATALOG_SOURCE=seed` keeps the pure in-memory layer for
+  tests. Product cards and PDP galleries use real photos (`Product.images`, WebP under
+  `public/products/<handle>/`) and fall back to SVG visuals only when image-less. A separate
+  `gifts.ts` module feeds the `/shop` free-gift gallery (gifts are display-only, never in the
+  sellable catalog).
+- **Store buy channel** (2026-09): the linked Shopify store holds the same 29 products under
+  matching handles. `src/server/catalog/shopify-buy.ts` is a **low-coupling static map** (local
+  `handle` → store numeric id, no Product/DB/schema changes) read by the PDP page; when
+  `SHOPIFY_BUY_DOMAIN` + `SHOPIFY_BUY_TOKEN` are set, the store-mapped PDP hides the demo
+  price/pickers and mounts one parameterized `ShopifyBuyButton` (SDK `createComponent` loading
+  the admin-generated options verbatim), letting the store own variants, price and checkout.
+  Unset → all PDPs stay demo.
 - **AI**: RAG-lite, zero tool-calling — every real/gateway model only needs chat completions.
   Retrieved product cards are injected into the system prompt; the model must answer from that
   injected content only. Modes: `shopping`, `size-fit` (deterministic), `outfit`, `find-shoes`,
@@ -166,12 +162,13 @@ src/
 - **Guardrails** (all anonymous, no PII): in-memory token bucket rate limit (IP + session),
   per-session turn cap + history trim + idle TTL, output-token cap + timeout, and a **persisted**
   daily token budget on `ai_usage`. Soft copy everywhere ("taking a short break"), never
-  "rate limited". Runs entirely in-process (single-instance assumption, spec P7).
+  "rate limited". Runs entirely in-process (single-instance assumption — adequate for this demo
+  deployment; revisit before multi-instance hosting).
 - **Search**: embedding vectors cached in `product_embeddings` (contentHash-validated), keyed by
   `Product.id` (unchanged by the DB move), cosine in
   app code (fine below ~2k products — beyond that, move to a native vector backend).
 
-## Known limitations (see `docs/implementation-report.md` for the full list)
+## Known limitations
 
 - Checkout lives on the Shopify store behind the Buy Button; **this site has no cart/checkout**.
   Without `SHOPIFY_BUY_*` env, the detail CTA is an "Available soon" placeholder driven by a
