@@ -188,3 +188,11 @@ Demo / prototype. Brand: **Evoloop** (decided). Supplier product codes, photos, 
 segments are real (from the brand supply-chain workbook); English marketing names, prices and copy
 are demo placeholders, as is the size conversion table (foot-length-mm anchored, canonical EU
 35–48). The free-gift offer is a demo promotion. No real purchase flow is connected.
+
+## License
+
+Source code is released under the **MIT License** (see `LICENSE`). All resource / demo assets
+(supplier photos under `public/products/`, the supplier catalog import under
+`src/server/catalog/data/`, hero image & care poster under `src/assets/`, blog posts under
+`content/blog/`, demo artwork under `public/`) are **All Rights Reserved** and may not be
+redistributed without written authorization (see `LICENSE-ASSETS`).

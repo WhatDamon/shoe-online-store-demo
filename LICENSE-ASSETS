@@ -1,0 +1,41 @@
+Resource Assets — All Rights Reserved
+
+The MIT license in LICENSE covers the software source code of this repository.
+Everything listed below is resource / demo content: it stays in the repository so the
+project can be viewed and run as a demo, but it is All Rights Reserved (ARR) and must
+not be redistributed without prior written authorization from the copyright holders
+(the Evoloop team and, for supplier-derived material, the original supplier).
+
+Evoloop is not a trademark. This project claims no trademark or brand-name rights: the
+Evoloop name and tagline may be used freely in forks, derivatives and other projects under the
+MIT license terms. Only the logo / favicon image files themselves remain demo artwork under
+this notice.
+
+Covered files
+
+- public/products/ — real supplier product photography (imported from the supplier
+  supply-chain workbook, WebP-optimised).
+- src/server/catalog/data/ — the supplier catalog import data (product codes, colors,
+  size segments, and the internal provenance metadata).
+- src/assets/ — demo hero image and the universal product-care poster.
+- public/blog/ — demo cover artwork.
+- public/payments/ — demo checkout QR placeholder.
+- content/blog/ — demo marketing articles.
+- Logo and favicon artwork files (where present) are demo artwork and stay under this notice
+  like the other assets.
+
+What is allowed without permission
+
+- Cloning / forking this repository and running it locally or on your own hosting to
+  evaluate or demo the project as-is.
+- Modifying the source code under the MIT terms.
+
+What requires prior written authorization
+
+- Republishing or redistributing the covered files outside this repository — including
+  inside another template, starter, package, product, or standalone asset collection —
+  whether modified or unmodified.
+- Reusing supplier photography or catalog data for any purpose other than demonstrating
+  this project.
+
+Contact the maintainers via the repository (GitHub issues) to request permission.
