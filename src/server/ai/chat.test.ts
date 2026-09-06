@@ -7,6 +7,7 @@ import { createGuardrails, GUARDRAIL_MESSAGE, type Guardrails } from '@/server/g
 import { encodeEvent, parseEvent, type ChatEvent } from './events'
 import { REDIRECT_TEXT } from './mock'
 import * as retrievalModule from '@/server/search/retrieval'
+import type { AiContext, AiProvider } from './provider'
 
 // 屏蔽真实 embedder（含网络探测）：chat 内部 retrieve 一律走关键词降级。
 const { mockEmbed, mockEmbeddingsAvailable } = vi.hoisted(() => ({
@@ -214,5 +215,59 @@ describe('chat mock 编排', () => {
       code: 'turns',
       message: GUARDRAIL_MESSAGE,
     })
+  })
+})
+
+describe('shopping PDP 锚定（FAB 带入当前鞋）', () => {
+  const captureProvider = (captured: { system: string }): AiProvider => ({
+    async *stream(ctx: AiContext & { system: string; maxTokens: number }) {
+      captured.system = ctx.system
+      yield 'anchored ok'
+      return 'anchored ok'
+    },
+  })
+
+  it('带真实 handle → system 注入该鞋事实块（货号/配色/码段），仍含目录 digest，不带价', async () => {
+    const g = fresh()
+    const captured = { system: '' }
+    const evs = await collect(
+      chat(
+        req({
+          mode: 'shopping',
+          text: 'avocado',
+          product: { handle: 'dc-1001', title: 'Urban Bloom' },
+        }),
+        { guardrails: g, provider: captureProvider(captured) },
+      ),
+    )
+    expect(captured.system).toContain('Product: Urban Bloom.')
+    expect(captured.system).toContain('Code: DC-1001.')
+    expect(captured.system).toContain('Colors:')
+    expect(captured.system).toContain('Available sizes:')
+    expect(captured.system).toContain('Catalog:')
+    expect(captured.system).toContain('Avocado Kick') // digest 仍注入（可推荐别的鞋）
+    expect(captured.system).not.toMatch(/\d+\.\d{2}/) // 无产品价格金额（尺码区间 4.5 等一位小数不误判）
+    expect(evs[evs.length - 1]).toEqual({ type: 'done' })
+    expect(evs.some((e) => e.type === 'error')).toBe(false)
+  })
+
+  it('未知 handle → 静默回退纯 digest（不报错、无产品块）', async () => {
+    const g = fresh()
+    const captured = { system: '' }
+    const evs = await collect(
+      chat(
+        req({
+          mode: 'shopping',
+          text: 'avocado',
+          product: { handle: 'no-such-handle', title: 'Ghost' },
+        }),
+        { guardrails: g, provider: captureProvider(captured) },
+      ),
+    )
+    expect(captured.system).not.toContain('Code:')
+    expect(captured.system).toContain('Catalog:')
+    expect(captured.system).toContain('Avocado Kick')
+    expect(evs[evs.length - 1]).toEqual({ type: 'done' })
+    expect(evs.some((e) => e.type === 'error')).toBe(false)
   })
 })

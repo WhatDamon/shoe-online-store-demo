@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import type { Mode } from '@/server/ai/events'
 import type { CanonicalSize } from '@/server/catalog/types'
 import type { ProductView } from '@/server/catalog/service'
+import type { PageProductRef } from '@/lib/page-product'
 import { convert } from '@/server/catalog/size-charts'
 import { market } from '@/lib/market'
 import { isSpeechSupported } from '@/lib/speech'
@@ -25,7 +26,9 @@ import {
 export interface AssistantPanelProps {
   isOpen: boolean
   onClose: () => void
-  product: ProductView | null
+  /** 商品上下文：完整 ProductView 或 FAB 锚定轻引用 {handle,title}（面板只用 handle/title，
+   * sizeLabelFor 对缺失 sizeOptions 有 convert 回退）。 */
+  product: ProductView | PageProductRef | null
   onRemoveProduct: () => void
   /** 发送当前模式下的用户文本（provider 已带 mode/product 上下文）。 */
   onSend: (text: string) => void
@@ -64,8 +67,11 @@ export function AssistantPanel({
 
   // 决策 #20：码段/附近尺码一律走市场标签（同 Select size chips）；
   // 无商品上下文时也无 sizeOptions，回退同口径市场标签（默认 US，经换算表）。
+  // FAB 锚定轻引用缺 sizeOptions（页面内 Find my size 才传全 ProductView），同样回退。
   const sizeLabelFor = (eu: CanonicalSize): string =>
-    product?.sizeOptions.find((o) => o.value === eu)?.label ??
+    (product && 'sizeOptions' in product
+      ? product.sizeOptions.find((o) => o.value === eu)?.label
+      : undefined) ??
     (() => {
       const v = convert(eu, market.sizeSystem)
       return v == null ? `EU ${eu}` : `${market.sizeSystem} ${v}`
@@ -138,7 +144,11 @@ export function AssistantPanel({
           {showWelcome ? (
             <div className="flex h-full flex-col gap-4 overflow-y-auto px-4 py-4">
               <div className="max-w-[85%] rounded-2xl rounded-bl-sm border border-neutral-200 bg-surface px-3.5 py-2.5 text-sm leading-6 text-neutral-800">
-                Hi — need a hand finding your pair?
+                {/* 锚定欢迎语：FAB 在 PDP 打开 / 面板带商品上下文时认出当前鞋（设计：PDP
+                  针对性介绍，克制——不自动发送、不消耗预算；移除商品后回通用开场）。 */}
+                {product
+                  ? `Hi — this is the ${product.title}. Ask me about it, find your size, or tell me what you're looking for.`
+                  : 'Hi — need a hand finding your pair?'}
               </div>
               {/* size-fit/outfit 需商品上下文；无商品时不渲染死路入口（服务端会回
                   "Pick a product first"）。welcome 与商品共存不可达，防御性取全量。 */}

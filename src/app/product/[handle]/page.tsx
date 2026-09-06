@@ -11,6 +11,7 @@ import { CareInstructionsButton } from '@/components/shop/care-instructions'
 import { PrintSpecSheetButton } from '@/components/shop/print-spec-sheet-button'
 import { PrintSpecSheet } from '@/components/shop/print-spec-sheet'
 import { ProductGrid } from '@/components/shop/product-grid'
+import { AssistantPageAnchor } from '@/components/assistant/assistant-page-anchor'
 import { WishlistButton } from '@/components/shop/wishlist-button'
 import {
   Accordion,
@@ -60,6 +61,8 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:py-8">
+      {/* 页面锚点（渲染 null）：FAB 打开时把当前鞋带给助手（设计：PDP 针对性介绍）。 */}
+      <AssistantPageAnchor handle={product.handle} title={product.title} />
       {/* 打印规格说明：可交互主体包 .print-hidden，@media print 只保留 .print-spec-sheet。 */}
       <div className="print-hidden">
         <Link

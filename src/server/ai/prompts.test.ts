@@ -62,3 +62,23 @@ describe('support 店务客服 prompt', () => {
     expect(sys).toMatch(/never invent shipping times/i)
   })
 })
+
+describe('shopping PDP 锚定 prompt', () => {
+  it('带 product 块 → 指示针对当前鞋作答，同时保留目录 digest 与赠品条款', () => {
+    const sys = systemFor('shopping', {
+      catalogDigest: '- Avocado Kick (Sneaker): …',
+      product: 'Product: Urban Bloom. … Code: DC-1001.',
+    })
+    expect(sys).toContain('looking at the product below')
+    expect(sys).toContain('Product: Urban Bloom.')
+    expect(sys).toContain('Catalog:')
+    expect(sys).toContain('- Avocado Kick')
+    for (const m of OFFER_MARKERS) expect(sys).toContain(m)
+  })
+
+  it('无 product 块 → 不提"当前商品"，纯目录推荐', () => {
+    const sys = systemFor('shopping', { catalogDigest: '- Avocado Kick (Sneaker): …' })
+    expect(sys).not.toContain('looking at the product below')
+    expect(sys).toContain('Catalog:')
+  })
+})

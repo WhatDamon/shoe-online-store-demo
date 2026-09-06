@@ -23,8 +23,14 @@ export function systemFor(
 ): string {
   const base = `${PERSONA}\n\n`
   switch (mode) {
-    case 'shopping':
-      return `${base}The customer wants help picking shoes. Use ONLY the catalog digest below and recommend one to three of the listed products, referencing them by name with a short reason. Never mention products outside the digest.\n\n${GIFT_OFFER_FACT}\n\n${GIFT_OFFER_RULES}\n\nCatalog:\n${ctx.catalogDigest ?? ''}`
+    case 'shopping': {
+      // PDP 锚定（FAB 打开带当前鞋）：有 product 块时先说明顾客正看这双鞋，用其事实回答；
+      // 无则纯目录推荐。目录/商品均限注入内容，绝不提及未给出的商品。
+      const anchor = ctx.product
+        ? `The customer is currently looking at the product below — answer questions about that product using its facts. You may also recommend other styles from the catalog digest.\n\n${ctx.product}\n\n`
+        : ''
+      return `${base}The customer wants help picking shoes. Use only the product and catalog details given to you, and recommend one to three products by name with a short reason. Never mention products you were not given.\n\n${GIFT_OFFER_FACT}\n\n${GIFT_OFFER_RULES}\n\n${anchor}Catalog:\n${ctx.catalogDigest ?? ''}`
+    }
     case 'find-shoes':
       return `${base}The customer asked to browse the catalog and a grid of matching styles is already shown to them. Write a single short sentence summarizing the matching styles. Do not repeat prices or list every product.\n\nMatches:\n${ctx.catalogDigest ?? ''}`
     case 'outfit':

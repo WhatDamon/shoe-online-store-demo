@@ -102,8 +102,31 @@ async function retrieveProducts(query: string, limit = 4): Promise<Product[]> {
   return ps.filter((p): p is Product => p !== null)
 }
 
-const productContextOf = (v: Product): string =>
-  `Product: ${v.title}. ${v.description} Upper palette: ${v.visual.palette[0]} and ${v.visual.palette[1]}; accent: ${v.visual.accent}.`
+// 注入给模型的商品事实（size-fit / outfit / shopping 锚定共用）。口径与 AI 卡片一致：
+// 只含可核实原始数据——真实货号（handle 大写，29/29 等于供应商码）、描述、真实配色名清单
+// （超 6 色截断保留总数）、码段市场标签、照片数、真实特性前 5 条；绝不携带价格
+// （价格只存在于详情页/店铺，AI 不传播 demo 价段），也不虚构材质/3D 声明（实拍目录）。
+const productContextOf = (v: Product): string => {
+  const colors = (v.colors ?? []).map((c) => c.name)
+  const facts: string[] = [
+    `Product: ${v.title}.`,
+    v.description,
+    `Code: ${v.handle.toUpperCase()}.`,
+  ]
+  if (colors.length > 0) {
+    const shown =
+      colors.length > 6
+        ? `${colors.slice(0, 6).join(', ')}, … (${colors.length} total)`
+        : colors.join(', ')
+    facts.push(`Colors: ${shown}.`)
+  }
+  if (v.sizes.length > 0) {
+    facts.push(`Available sizes: ${sizeRangeText(v.sizes) ?? v.sizes.join(', ')}.`)
+  }
+  if (v.images?.length) facts.push(`Photos: ${v.images.length}.`)
+  if (v.features.length > 0) facts.push(`Details: ${v.features.slice(0, 5).join('; ')}.`)
+  return facts.join(' ')
+}
 
 /** 护栏顺序：rate → budget → turns；被 rate/budget 拒的请求不消耗回合（回合 claim 最后执行）。 */
 export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGenerator<ChatEvent> {
@@ -247,7 +270,15 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
       return
     }
     const digest = digestLines(products)
-    const system = systemFor(req.mode, { catalogDigest: digest })
+    // PDP 锚定（设计：FAB 打开带上当前鞋，shopping 自由提问也能针对该鞋回答）：
+    // req.product.handle 可查 → 注入该鞋真实事实块（productContextOf，同 size-fit/outfit）；
+    // handle 无效/未知 → 静默回退纯 digest（shopping 无强商品依赖，不报错）。
+    let productCtx: string | undefined
+    if (req.mode === 'shopping' && req.product?.handle) {
+      const anchored = await getProductForMarket(req.product.handle)
+      if (anchored) productCtx = productContextOf(anchored)
+    }
+    const system = systemFor(req.mode, { catalogDigest: digest, product: productCtx })
     const messages: AiContext['messages'] = [...history, { role: 'user', content: text }]
     if (req.mode === 'find-shoes') {
       yield { type: 'productCards', items: products.map(toCard) }

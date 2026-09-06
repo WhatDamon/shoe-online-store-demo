@@ -13,6 +13,7 @@ import {
 import type { ReactNode } from 'react'
 import type { Mode } from '@/server/ai/events'
 import type { ProductView } from '@/server/catalog/service'
+import type { PageProductRef } from '@/lib/page-product'
 import {
   getSpeakServerSnapshot,
   getSpeakSnapshot,
@@ -25,10 +26,12 @@ import { useChatStream } from './use-chat-stream'
 import { AssistantFabSlot } from './fab'
 import { AssistantPanel } from './assistant-panel'
 
-/** 导购控制器：PDP 的 "Find my size" 等消费方调用的契约。 */
+/** 导购控制器：PDP 的 "Find my size"、FAB 锚定等消费方调用的契约。
+ * product 可为完整 ProductView（页面内入口）或轻引用 {handle,title}（FAB 页面锚点）：
+ * 服务端均按 handle 回取全量事实，UI 侧只用 handle/title（面板对缺失 sizeOptions 有兜底）。 */
 export interface AssistantHandle {
   /** 打开面板并设置模式（size-fit 带商品 → 预置上下文并自动询问尺码）。 */
-  open: (mode: Mode, product?: ProductView | null) => void
+  open: (mode: Mode, product?: ProductView | PageProductRef | null) => void
   close: () => void
 }
 
@@ -41,7 +44,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   const { messages, isStreaming, send, retry } = useChatStream()
   const [isOpen, setIsOpen] = useState(false)
   const [mode, setMode] = useState<Mode>('shopping')
-  const [product, setProduct] = useState<ProductView | null>(null)
+  const [product, setProduct] = useState<ProductView | PageProductRef | null>(null)
 
   // 朗读偏好：外部 store（SSR 首帧常量 false → 无 hydration mismatch）。
   const speakOn = useSyncExternalStore(
@@ -104,7 +107,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   )
 
   const open = useCallback(
-    (nextMode: Mode, nextProduct?: ProductView | null) => {
+    (nextMode: Mode, nextProduct?: ProductView | PageProductRef | null) => {
       const p = nextProduct ?? null
       setMode(nextMode)
       setProduct(p)

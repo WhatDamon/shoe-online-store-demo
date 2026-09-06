@@ -3,6 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AssistantProvider, useAssistant } from './assistant-provider'
 import type { ProductView } from '@/server/catalog/service'
+import { registerPageProduct } from '@/lib/page-product'
 
 // FAB 用 usePathname 判断落地页隐藏；测试可控 pathname，并避免真实 router 依赖。
 const nav = vi.hoisted(() => ({ pathname: '/' }))
@@ -80,6 +81,8 @@ function OpenSizeFit() {
 beforeEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
+  // 页面锚点 store 是模块级单例：每测重置，防跨用例残留（FAB 在 PDP 会读锚点）。
+  registerPageProduct(null)
 })
 
 describe('assistant FAB + panel', () => {
@@ -439,5 +442,52 @@ describe('assistant FAB + panel', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3))
     const body = JSON.parse((fetchMock.mock.calls[2][1] as RequestInit).body as string)
     expect(body.mode).toBe('shopping')
+  })
+})
+
+describe('assistant PDP 锚定（FAB 认识当前鞋）', () => {
+  it('PDP 上打开 FAB → Looking at 当前鞋 + 针对欢迎语 + size/outfit chips 直接可达', async () => {
+    nav.pathname = '/product/dc-1001'
+    render(
+      <AssistantProvider>
+        <></>
+      </AssistantProvider>,
+    )
+    // 锚点水合后才注册：render 之后才写 store，验证 FAB 在点击时（而非渲染时）读取——
+    // 渲染期闭包捕获会让生产页永远 null（回归防线）。
+    registerPageProduct({ handle: 'dc-1001', title: 'Urban Bloom' })
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: 'Open shopping assistant' }))
+
+    // 锚定欢迎语认出当前鞋（克制：不自动发送——welcome 停留，无 fetch 依赖）。
+    expect(await screen.findByText(/this is the Urban Bloom/i)).toBeInTheDocument()
+    expect(screen.getByText(/Looking at:/)).toBeInTheDocument()
+    expect(screen.getByText('Urban Bloom')).toBeInTheDocument()
+    // 商品上下文 chips 直接可达（此前只点页内 Find my size 后才出现）。
+    for (const label of ['Find my size', 'Style it with']) {
+      expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
+    }
+    for (const label of ['Help me pick', 'Shipping & returns', 'Care guide']) {
+      expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
+    }
+    registerPageProduct(null)
+  })
+
+  it('轻引用锚点（无 sizeOptions）打开不崩、移除后欢迎语回通用', async () => {
+    nav.pathname = '/product/dc-1001'
+    render(
+      <AssistantProvider>
+        <></>
+      </AssistantProvider>,
+    )
+    registerPageProduct({ handle: 'dc-1001', title: 'Urban Bloom' }) // 同上：点击时才读
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Open shopping assistant' }))
+
+    expect(await screen.findByText(/this is the Urban Bloom/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Remove Urban Bloom' }))
+    expect(screen.getByText(/need a hand finding your pair/i)).toBeInTheDocument()
+    registerPageProduct(null)
   })
 })
