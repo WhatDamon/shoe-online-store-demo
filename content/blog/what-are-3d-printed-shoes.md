@@ -1,6 +1,6 @@
 ---
-title: "What Are 3D Printed Shoes? Beyond the Sci-Fi Hype"
-date: '2026-09-06'
+title: 'What Are 3D Printed Shoes? Beyond the Sci-Fi Hype'
+date: '2026-09-05'
 description: Demystifying 3D printed shoes. Forget the sci-fi hype—learn how lattice structures and additive manufacturing are solving traditional footwear problems.
 tags:
   - Guide
@@ -36,4 +36,4 @@ Early 3D printed shoes felt like hard plastic shells. However, by 2025/2026, mat
 
 3D printed shoes aren't magic. They are a digital solution to legacy industry problems: glue pollution, high mold costs, and the inability to offer precision zonal support.
 
-*Want to see the real structure? Check out our unretouched cross-section gallery.*
+_Want to see the real structure? Check out our unretouched cross-section gallery._

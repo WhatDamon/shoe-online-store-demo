@@ -1,6 +1,6 @@
 ---
 title: 'Stop "Sizing Up": The Ultimate Guide to Choosing Shoes for Wide Feet'
-date: '2026-09-06'
+date: '2026-09-05'
 description: Stop sizing up! Learn why the "Shoe Last" matters for wide feet and high insteps, and how 3D printed lattice structures offer a custom-like fit for Asian foot shapes.
 tags:
   - Sizing
@@ -31,4 +31,4 @@ If you have a typical Asian wide-foot / high-instep profile, wearing a standard 
 
 At Evoloop, we engineered our shoe last using 3D scan data from thousands of wide-foot profiles. We adjusted the lattice density in the forefoot to allow for greater lateral expansion without sacrificing structural integrity.
 
-*Find your perfect fit. Check out our wide-foot last transparency guide.*
+_Find your perfect fit. Check out our wide-foot last transparency guide._

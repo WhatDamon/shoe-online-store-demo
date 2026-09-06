@@ -1,6 +1,6 @@
 ---
 title: How to find your Evoloop size
-date: 2026-09-07
+date: 2026-09-06
 description: Every pair is built around your foot length in millimetres. Here is how our EU sizing works — and why there is no one-size-fits-all shortcut.
 tags:
   - Guide

@@ -1,6 +1,6 @@
 ---
-title: "3D Printed Shoes for the Daily Commute: What to Actually Expect"
-date: '2026-09-06'
+title: '3D Printed Shoes for the Daily Commute: What to Actually Expect'
+date: '2026-09-05'
 description: Are 3D printed shoes good for walking and commuting? We break down the real-world foot feel, breathability, and maintenance of lattice structure shoes.
 tags:
   - Commuting
@@ -17,7 +17,7 @@ When positioning 3D printed shoes as urban commute footwear, we get these practi
 
 Many people chase the "walking on clouds" feel. But for a 10,000-step commute, overly soft shoes are a disaster — they lack arch support, leading to calf and knee fatigue.
 
-The foot feel of 3D printed lattice shoes is best described as *resilient*. When you step down, the grid compresses to absorb impact; when you lift off, it snaps back. This clear feedback reduces plantar fascia fatigue during long periods of standing or power walking.
+The foot feel of 3D printed lattice shoes is best described as _resilient_. When you step down, the grid compresses to absorb impact; when you lift off, it snaps back. This clear feedback reduces plantar fascia fatigue during long periods of standing or power walking.
 
 ## Fact 2: The Breathability vs. Waterproof Paradox
 
@@ -33,4 +33,4 @@ Resin materials do not absorb water or stains like canvas. If they get muddy, yo
 
 If you need a breathable, washable, supportive shoe for dry urban commutes, 3D printing is a top-tier tool. If you need a waterproof hiking boot or a formal dress shoe, look elsewhere. We provide the optimal solution for a specific scenario, not a magic bullet.
 
-*Experience the "resilient bounce" for yourself — claim your commuter trial voucher.*
+_Experience the "resilient bounce" for yourself — claim your commuter trial voucher._

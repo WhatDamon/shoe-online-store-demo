@@ -1,6 +1,6 @@
 ---
 title: 'Why We Prefer "Made-to-Order": The Eco-Logic of Zero Inventory'
-date: '2026-09-06'
+date: '2026-09-05'
 description: Why do we embrace "out of stock"? Discover how on-demand 3D printing eliminates deadstock waste and creates a more sustainable footwear manufacturing model.
 tags:
   - Sustainability
@@ -29,4 +29,4 @@ From a purely environmental standpoint, 3D printing (additive) only uses the mat
 
 When you see "Ships in 5 Days" on our site, don't be frustrated. It means your shoes are currently being printed and hand-finished in our Wenzhou workshop, specifically for you. That is our most honest definition of sustainable fashion.
 
-*Join the zero-waste movement. Browse our made-to-order collection.*
+_Join the zero-waste movement. Browse our made-to-order collection._
