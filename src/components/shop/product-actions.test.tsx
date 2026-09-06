@@ -38,7 +38,7 @@ describe('ProductActions layout order (spec §9)', () => {
     const sizeLegend = screen.getByText('Select size')
     const findSize = screen.getByRole('button', { name: 'Find my size' })
     const slot = screen.getByTestId('accordion-slot')
-    const cta = screen.getByRole('button', { name: 'Available soon' })
+    const cta = screen.getByRole('button', { name: 'Buy now' })
 
     const before = (a: Element, b: Element) =>
       (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
@@ -120,8 +120,13 @@ describe('ProductActions store-live takeover (Shopify Buy Button)', () => {
     // 本站选择器与 demo 购买条不渲染
     expect(screen.queryByText('Select size')).not.toBeInTheDocument()
     expect(screen.queryByText('Color')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Available soon' })).not.toBeInTheDocument()
-    expect(screen.queryByText(/selected — we open checkout/)).not.toBeInTheDocument()
+    // demo 购买条（ProductBuyBar）未渲染：其特征 role=status 不存在；同名 "Buy now"
+    // 只能是休眠 ShopifyBuyButton 的 SDK 未加载兜底按钮（禁用态），故所有 Buy now 均禁用。
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    for (const b of screen.queryAllByRole('button', { name: 'Buy now' })) {
+      expect(b).toBeDisabled()
+    }
+    expect(screen.queryByText(/selected/)).not.toBeInTheDocument()
 
     // 保留：Find my size、children 插槽、Buy Button 挂载点
     expect(screen.getByRole('button', { name: 'Find my size' })).toBeInTheDocument()
@@ -132,6 +137,6 @@ describe('ProductActions store-live takeover (Shopify Buy Button)', () => {
   it('keeps demo UI when buyConfig is null', () => {
     render(<ProductActions product={multiColor} buyUrl={null} buyConfig={null} />)
     expect(screen.getByText('Select size')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Available soon' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Buy now' })).toBeInTheDocument()
   })
 })

@@ -5,11 +5,13 @@ A consumer-facing storefront demo for a fictional brand of **3D-printed casual /
 and shadcn/ui on the Node runtime (Bun is the package manager only)** — with a server-side
 shopping assistant that stays understated: consumer wording only, never "AI"-branded.
 
-This is a **product prototype / frontend demo**: there is no checkout on this site. PDPs whose
-product exists in the linked Shopify store switch to a **Shopify Buy Button** (real store variants,
-currency and checkout in an embedded widget) when `SHOPIFY_BUY_*` env is configured; without it
-they stay an "Available soon" placeholder (a switchable catalog adapter is also ready for a
-future direct Storefront read). The catalog is a local seed of **29 real supplier styles**
+This is a **product prototype / frontend demo**: there is no real checkout on this site. PDPs
+run a **custom demo flow** — demo price (placeholder **$59–79** band), size/color pickers and a
+**Buy now** CTA that opens a **payment-QR checkout dialog** (a placeholder demo QR; no real
+payment is initiated). A **Shopify Buy Button** channel (`SHOPIFY_BUY_*` env + handle map) is
+retained in the codebase but deliberately **dormant** — the demo never configures it (a switchable
+catalog adapter also remains for a future direct Storefront read). The catalog is a local seed of
+**29 real supplier styles**
 (imported from the supplier's workbook) with **real product photos** (WebP in `public/products/`);
 image-less entries fall back to programmatic SVG visuals. `/shop` also carries the
 "spend $50, get a free gift" offer with a gallery of leftover-offcut trinkets.
@@ -154,7 +156,8 @@ src/
   `SHOPIFY_BUY_DOMAIN` + `SHOPIFY_BUY_TOKEN` are set, the store-mapped PDP hides the demo
   price/pickers and mounts one parameterized `ShopifyBuyButton` (SDK `createComponent` loading
   the admin-generated options verbatim), letting the store own variants, price and checkout.
-  Unset → all PDPs stay demo.
+  Unset → all PDPs run the custom demo flow (**Buy now** → demo payment-QR dialog, placeholder
+  `public/payments/checkout-demo-qr.png`; swap in a live QR image for a real payment demo).
 - **AI**: RAG-lite, zero tool-calling — every real/gateway model only needs chat completions.
   Retrieved product cards are injected into the system prompt; the model must answer from that
   injected content only. Modes: `shopping`, `size-fit` (deterministic), `outfit`, `find-shoes`,
@@ -170,9 +173,10 @@ src/
 
 ## Known limitations
 
-- Checkout lives on the Shopify store behind the Buy Button; **this site has no cart/checkout**.
-  Without `SHOPIFY_BUY_*` env, the detail CTA is an "Available soon" placeholder driven by a
-  `getBuyUrl` adapter contract (returns `null` until configured).
+- **This site has no cart or checkout.** The detail CTA is a demo **Buy now** that opens a
+  payment-QR dialog (`public/payments/checkout-demo-qr.png`, a placeholder that never charges) to
+  demonstrate the order flow; a dormant `getBuyUrl` adapter contract returns `null` and the
+  dormant Shopify Buy Button only activates if `SHOPIFY_BUY_*` env is ever configured.
 - Unknown product handles return the not-found UI with **HTTP 200 + `noindex`** under the current
   `dynamicParams` SSG setting (a deliberate, documented tradeoff; revisit if SEO on 404s matters).
 - Compliance: no cookies, no tracking, no personal data sent to AI providers. Anonymous `ai_usage`

@@ -6,6 +6,7 @@ import type { ProductView } from '@/server/catalog/service'
 import type { ShopifyBuyConfig } from '@/server/catalog/shopify-buy'
 import { footMmToEU } from '@/lib/my-size'
 import { getMySizeServerSnapshot, getMySizeSnapshot, subscribeMySize } from '@/lib/my-size'
+import { formatPrice } from '@/lib/format'
 import { useAssistant } from '@/components/assistant/assistant-provider'
 import { SizeSelector } from './size-selector'
 import { ProductBuyBar } from './product-buy-bar'
@@ -132,6 +133,8 @@ export function ProductActions({
         availableSoon={buyUrl == null}
         selectedLabel={selectedLabel}
         colorName={colorName}
+        productTitle={product.title}
+        priceLabel={formatPrice(product.price.amount)}
       />
     </div>
   )

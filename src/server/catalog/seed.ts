@@ -23,7 +23,7 @@ export interface SupplierShoe {
 const shoes = (supplier as unknown as { shoes: SupplierShoe[] }).shoes
 
 // 策展表：code → { 营销名, 集合, 可选价格覆写 }。集合为站点策展桶（非供应商分类）。
-// 价格为演示占位（$98-178 价带内轮转，决策 #16）。
+// 价格为演示占位（2026-09 用户决策：价带收窄至 $59–79，均匀梯度轮转）。
 interface Curation {
   title: string
   collections: string[]
@@ -61,7 +61,7 @@ const CURATION: Record<string, Curation> = {
   'DC-1013': { title: 'Cloud Mint', collections: ['travel'] },
 }
 
-const DEMO_PRICES = [108, 128, 148, 118, 138, 98, 158, 168, 178]
+const DEMO_PRICES = [59, 63, 65, 67, 69, 71, 73, 75, 79]
 
 const GENDER_WORD: Record<SupplierShoe['genders'], string> = {
   women: "Women's",
