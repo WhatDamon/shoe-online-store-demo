@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, beforeEach } from 'vitest'
-import { createDb } from './client'
+import { createDb, pgConnectOptions } from './client'
 import { createRepository } from '@/server/search/repository'
 import { cosine } from '@/server/search/vector'
 
@@ -53,6 +53,19 @@ describe('db', () => {
     })
     expect(await repo.dayTokenUsage('2026-09-04')).toBe(40)
     expect(await repo.dayTokenUsage('2026-09-05')).toBe(0)
+  })
+})
+
+describe('pgConnectOptions', () => {
+  it('off by default / when unset or zero (Vercel empty-string injection)', () => {
+    expect(pgConnectOptions({})).toBeNull()
+    expect(pgConnectOptions({ PG_SSL: '' })).toBeNull()
+    expect(pgConnectOptions({ PG_SSL: '0' })).toBeNull()
+    expect(pgConnectOptions({ PG_SSL: '   ' })).toBeNull()
+  })
+  it('enables TLS-without-verification for Cloud SQL public IP when PG_SSL set', () => {
+    expect(pgConnectOptions({ PG_SSL: '1' })).toEqual({ rejectUnauthorized: false })
+    expect(pgConnectOptions({ PG_SSL: 'require' })).toEqual({ rejectUnauthorized: false })
   })
 })
 

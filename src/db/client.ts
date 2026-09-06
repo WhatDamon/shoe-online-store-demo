@@ -80,8 +80,20 @@ export function db(): AnyDb {
 
 export function createPostgresDb(url: string = process.env.DATABASE_URL ?? ''): PgAppDb {
   if (!url) throw new Error('DB_DRIVER=postgres requires DATABASE_URL (postgres://…) URL')
-  const client = postgres(url, { max: 10 })
+  const ssl = pgConnectOptions()
+  const client = ssl ? postgres(url, { max: 10, ssl }) : postgres(url, { max: 10 })
   return drizzlePg(client, { schema: pgSchema })
+}
+
+// Cloud SQL（公网 IP）强制 TLS。serverless（Vercel）无法随部署携带 CA 证书文件、
+// Cloud SQL 公网证书链也不在 Node 系统根链内，故等价 sslmode=require（加密但跳过证书验证），
+// 配合强密码 + 授权网段收紧使用（详见 docs/shopify-store-setup 同款取舍文档/README env 表）。
+// PG_SSL 非空且非 '0' 即开启（Vercel 注入空串的安全默认：不误开）。
+export function pgConnectOptions(
+  env: Record<string, string | undefined> = process.env,
+): { rejectUnauthorized: false } | null {
+  const ssl = (env.PG_SSL ?? '').trim()
+  return ssl !== '' && ssl !== '0' ? { rejectUnauthorized: false } : null
 }
 
 // 启动自动建表（零迁移 DX，两侧一致）：每个 pg 实例只执行一次，失败可重试。
