@@ -1,8 +1,9 @@
 # Evoloop — 3D-Printed Casual Shoes (Demo)
 
 A consumer-facing storefront demo for a fictional brand of **3D-printed casual / lifestyle shoes**
-(digitally crafted, printed to order in your size). Built with **Next.js (App Router) + Bun +
-Tailwind + shadcn/ui**, with a server-side AI shopping guide that stays deliberately subtle
+(digitally crafted, printed to order in your size). Built with **Next.js (App Router), Tailwind
+and shadcn/ui on the Node runtime (Bun is the package manager only)** — with a server-side AI
+shopping guide that stays deliberately subtle
 (spec principle P1: consumer language only, no "AI" branding).
 
 This is a **product prototype / frontend demo**: there is no checkout on this site. PDPs whose
@@ -21,9 +22,9 @@ also carries the "spend $50, get a free gift" offer with a gallery of leftover-o
 ## Tech stack
 
 - **Next.js 16.3.4** (App Router, Turbopack) + React 19 + TypeScript 5
-- **Bun 1.3** as package manager and runtime (required — see below)
+- **Bun ≥ 1.3** as the package manager only (Next runs on the Node runtime — spec decision #18)
 - **Tailwind CSS v4** + **shadcn/ui** (Base UI preset)
-- **Drizzle ORM**, dual-driver (spec decision #13): **SQLite** (`bun:sqlite`, default, zero-setup) or **Postgres** (`postgres.js`, Cloud SQL-ready) — chosen by `DB_DRIVER` in the environment
+- **Drizzle ORM**, dual-driver (spec decision #13): **SQLite** (`better-sqlite3`, default, zero-setup) or **Postgres** (`postgres.js`, Cloud SQL-ready) — chosen by `DB_DRIVER` in the environment
 - **Vitest** (unit + React Testing Library), **ESLint**, `tsc --noEmit`
 - AI: OpenAI-compatible streaming client with a deterministic **Mock mode** when no key is set
 
@@ -59,7 +60,7 @@ tests); `SHOPIFY_*` still takes priority over both.
 - Landing page, `/shop` (URL-driven filters), product detail pages (SSG, 29 products)
 - Wishlist (localStorage), size picker with market conversion (US system by default)
 - Floating assistant (right-bottom "Need a hand?" FAB on non-landing pages):
-  chips `Find my size` / `Style it with` / `Help me pick` / `Everyday sneakers under $150`,
+  chips `Find my size` / `Style it with` / `Help me pick` / `Everyday sneakers`,
   streamed answers, product result cards, deterministic size recommendation — all in Mock mode.
 - PDP → "Find my size" opens the assistant pre-seeded with the current shoe.
 
@@ -67,15 +68,16 @@ tests); `SHOPIFY_*` still takes priority over both.
 
 | Command | Meaning |
 |---|---|
-| `bun run dev` | Next dev server (Turbopack) on the Bun runtime (script bakes in `bun --bun`). |
-| `bun run build` | Production build on the Bun runtime. |
-| `bun run start` | Serve the production build on the Bun runtime. |
+| `bun run dev` | Next dev server (Turbopack) on the **Node** runtime (spec decision #18). |
+| `bun run build` | Production build (Node runtime). |
+| `bun run start` | Serve the production build (Node runtime). |
 | `bun run typecheck` | `tsc --noEmit` |
 | `bun run lint` | ESLint over the repo |
-| `bun run test` | Vitest (35 files, 158 tests) — runs on Node; DB tests use a `node:sqlite` test compat shim aliased in `vitest.config.mts`, production code still imports real `bun:sqlite`. |
+| `bun run test` | Vitest (54 files, 279 tests) on Node via the `better-sqlite3` driver. |
+| `bun run verify` | One-shot acceptance gate: `format:check` + `typecheck` + `lint` + `test`. |
 | `bun run test:watch` | Vitest watch mode |
 
-The acceptance gate is **lint + typecheck + test + build**, all green on `feat/shoe-store` (HEAD).
+The acceptance gate is **format:check + typecheck + lint + test + build**, all green on `main` (HEAD).
 
 ## Environment variables
 
@@ -137,7 +139,7 @@ src/
     guardrails/            # rate limit, session state (turns/TTL/trim), token budget, soft copy
   db/                      # Drizzle dual-driver schemas (3 tables each: sqlite-core + pg-core), clients, product-row codec
   lib/                     # shared pure helpers (site, market, wishlist, size charts, formats, SEO)
-  test/                    # bun:sqlite → node:sqlite test compat shim (test-only)
+  test/                    # test scaffolding (vitest setup + a11y axe gate)
 ```
 
 ## Architecture notes
@@ -159,7 +161,8 @@ src/
   checkout. Unset → all PDPs stay demo (P1 zero buy UI).
 - **AI**: RAG-lite, zero tool-calling — every real/gateway model only needs chat completions.
   Retrieved product cards are injected into the system prompt; the model must answer from that
-  injected content only. Modes: `shopping`, `size-fit` (deterministic), `outfit`, `find-shoes`.
+  injected content only. Modes: `shopping`, `size-fit` (deterministic), `outfit`, `find-shoes`,
+  and `support` (store-policy Q&A from the shared `src/lib/store-policy` facts).
 - **Guardrails** (all anonymous, no PII): in-memory token bucket rate limit (IP + session),
   per-session turn cap + history trim + idle TTL, output-token cap + timeout, and a **persisted**
   daily token budget on `ai_usage`. Soft copy everywhere ("taking a short break"), never
