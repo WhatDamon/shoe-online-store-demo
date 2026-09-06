@@ -33,7 +33,7 @@ describe('SiteShell', () => {
     // 项目性质声明：学生黑客松作品、非商业服务（页脚全站一行）
     expect(
       within(footer).getByText(
-        'A student hackathon project — a design showcase, not a commercial store. Availability and features are not guaranteed.',
+        'Born at a student hackathon. Built since as an independent project.',
       ),
     ).toBeInTheDocument()
   })

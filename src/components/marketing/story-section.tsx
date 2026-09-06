@@ -35,10 +35,11 @@ export function StorySection() {
             Cushioning is tuned where your foot needs it most: softer under the heel, more
             responsive under the ball of the foot. No guesswork, no long break-in.
           </p>
-          {/* 团队来历：学生黑客松作品（真实叙事，非营销承诺） */}
+          {/* 项目起源：黑客松起步 → 独立项目（真实叙事，非营销承诺）；尾句为轻量诚实注脚 */}
           <p className="mt-6 text-sm leading-6 text-neutral-500">
-            Evoloop started as a student hackathon project. We build it as a student team — this
-            storefront is our working showcase of the idea, not a permanent commercial service.
+            Evoloop began at a student hackathon — what started as a weekend idea has grown into an
+            independent project we keep building. Orders aren&apos;t live yet: prices and checkout
+            are demo for now.
           </p>
           <dl className="mt-10 grid gap-8 text-left sm:grid-cols-3 sm:gap-6">
             {storyPoints.map((point) => (
