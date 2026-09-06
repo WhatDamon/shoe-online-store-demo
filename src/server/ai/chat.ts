@@ -145,6 +145,25 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
     }
   }
 
+  /** 流式转发 provider 输出：把每段 delta 透传为 SSE 'delta' 帧，返回完整回复文本供落库。
+   * 三处分支（outfit / support / find-shoes·shopping）共用同一逐字结构——yield 不能出现在
+   * 箭头闭包内，但内嵌 async function* + yield* 可以安全复用，不必复制粘贴这段流式循环。 */
+  async function* streamAssistantReplies(
+    system: string,
+    messages: AiContext['messages'],
+  ): AsyncGenerator<{ type: 'delta'; text: string }, string> {
+    let assistant = ''
+    for await (const delta of provider.stream({
+      system,
+      maxTokens: MAX_OUTPUT_TOKENS,
+      messages,
+    })) {
+      assistant += delta
+      yield { type: 'delta', text: delta }
+    }
+    return assistant
+  }
+
   try {
     // ---- size-fit：确定性建议（不调 provider；推荐/追问/无货三分支）----
     if (req.mode === 'size-fit') {
@@ -196,15 +215,7 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
         ...history,
         { role: 'user', content: text || 'Give me outfit ideas.' },
       ]
-      let assistant = ''
-      for await (const delta of provider.stream({
-        system,
-        maxTokens: MAX_OUTPUT_TOKENS,
-        messages,
-      })) {
-        assistant += delta
-        yield { type: 'delta', text: delta }
-      }
+      const assistant = yield* streamAssistantReplies(system, messages)
       await record(system, messages[messages.length - 1].content, assistant)
       yield { type: 'done' }
       return
@@ -214,15 +225,7 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
     if (req.mode === 'support') {
       const system = systemFor('support', {})
       const messages: AiContext['messages'] = [...history, { role: 'user', content: text }]
-      let assistant = ''
-      for await (const delta of provider.stream({
-        system,
-        maxTokens: MAX_OUTPUT_TOKENS,
-        messages,
-      })) {
-        assistant += delta
-        yield { type: 'delta', text: delta }
-      }
+      const assistant = yield* streamAssistantReplies(system, messages)
       await record(system, text, assistant)
       yield { type: 'done' }
       return
@@ -242,15 +245,7 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
     if (req.mode === 'find-shoes') {
       yield { type: 'productCards', items: products.map(toCard) }
     }
-    let assistant = ''
-    for await (const delta of provider.stream({
-      system,
-      maxTokens: MAX_OUTPUT_TOKENS,
-      messages,
-    })) {
-      assistant += delta
-      yield { type: 'delta', text: delta }
-    }
+    const assistant = yield* streamAssistantReplies(system, messages)
     await record(system, text, assistant)
     yield { type: 'done' }
   } catch (e) {
