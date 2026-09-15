@@ -499,12 +499,12 @@ bun run build     # 批次 1 / 3 / 4 / 6 需要（涉及 RSC、SSG、route handl
 
 - [x] 删除 `oven-sh/setup-bun` 步骤；保留 `actions/setup-node@v6` 并加 `cache: npm`。
 - [x] `bun install --frozen-lockfile` → `npm ci`；`bun run verify` → `npm run verify`。
-- [x] 加 `node-version` 矩阵 `[20, 22, 24]` 与 `fail-fast: false`。
+- [x] 加 `node-version` 矩阵与 `fail-fast: false`（初版 `[20, 22, 24]`，后收窄为 `[22, 24]`，见 ⑧）。
 - [x] 追加：两个 action 由可变标签钉死为提交 SHA（见执行记录 ⑤）。
 
 ### 任务 7.5 —— 文档同步
 
-- [x] `README.md`：前置要求 → Node ≥ 20.9 + npm；`bun install` → `npm ci`；命令表 9 行改为 `npm run x`（保留「Node runtime」说明）。
+- [x] `README.md`：前置要求 → Node ≥ 22 + npm；`bun install` → `npm ci`；命令表 9 行改为 `npm run x`（保留「Node runtime」说明）。
 - [x] 全仓 `grep -rn "bun" README.md docs/ AGENTS.md`：README 与 AGENTS.md 已 **0** 命中；
       `.github/` 唯一命中是 `ubuntu-latest`（含子串）；`docs/` 残留仅存在于归档、ADR 0006 与历史报告。
 - [x] `docs/implementation-report.md` 时效标注补记包管理器现状。
@@ -544,6 +544,15 @@ bun run build     # 批次 1 / 3 / 4 / 6 需要（涉及 RSC、SSG、route handl
 ⑦ **计划的风险行「批次 7 与批次 3 同时改 package.json」未造成冲突**：两者改的是 `package.json`
    的不同区域（批次 3 加 `check:boundary` 脚本，本批改 `packageManager` 并删两个字段），
    且本批基点已含批次 3 的结果。
+⑧ **矩阵当场证伪了 `engines` 声明 —— 这正是计划预期的收益。** 计划给矩阵写的理由是
+   「`engines` 声明了 `>=20.9.0` 却至今只在 Node 24 上验证过，矩阵能证明该声明成立，或暴露它是谎话」。
+   首次 CI 运行即 **Node 20 fail / 22 pass / 24 pass**。根因是 `jsdom@30` 自身声明
+   `node: "^22.22.2 || ^24.15.0 || >=26.0.0"`，被提升的 `undici@8` 要 `>=22.19.0`，
+   而 **Node 20 已于 2026-04-30 EOL**。故 `engines.node` 由 `>=20.9.0` 修正为 `>=22`，
+   矩阵收窄为 `[22, 24]`。
+   值得记下：这个错误与 `bun → npm` 迁移**毫无关系**（jsdom/undici 的限制在迁移前就存在），
+   它之所以现在才暴露，是因为矩阵把「只在单一 Node 上验证」这个盲区改成了必须多版本验证 ——
+   **这是本批真正的新增收益，且它当场抓到了一个仓库里长期存在的假声明。**
 
 **回滚点：** `git commit -m "chore(toolchain): move package manager from bun to npm (isolated, src/ untouched)"`
 （实际按任务拆成 5 个提交，见 7.6）
@@ -574,7 +583,7 @@ bun run build     # 批次 1 / 3 / 4 / 6 需要（涉及 RSC、SSG、route handl
 | 4    | `verify` + `build`                               | `context.test.ts`、每 mode 单测、注入式 `retrieval.test.ts` | 每个 mode 独立可测                            |
 | 5    | `verify`                                         | `session.test.ts`、`applyEvent` 单测、`use-modal.test.ts`   | 焦点陷阱单点实现                              |
 | 6    | `verify` + `build`                               | ADR / CONTEXT 文档                                          | 死接口面收缩或显式记账                        |
-| 7    | `npm ci` 冷启动 `verify` + Node 20/22/24 CI 矩阵 | 无（工具链层，不新增测试）                                  | `src/` 零改动                                 |
+| 7    | `npm ci` 冷启动 `verify` + Node 22/24 CI 矩阵            | 无（工具链层，不新增测试）                                  | `src/` 零改动                                 |
 
 ## 风险与缓解
 

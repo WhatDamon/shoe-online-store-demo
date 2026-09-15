@@ -56,7 +56,8 @@ CI 在 Node 20/22/24 矩阵上全绿、且 `src/` 相对重构基线 `git diff` 
 
 1. **冷启动**：`rm -rf node_modules && npm ci` 后 `npm run verify` 绿（63 文件 / 375 用例）、
    `npm run build` 绿（42/42 静态页）。
-2. **CI 矩阵**：Node 20/22/24 三档。
+2. **CI 矩阵**：Node **22 / 24** 两档。计划写的是 20/22/24，但矩阵**当场证伪了 `engines` 声明**，
+   故收窄为 22/24，并将 `engines.node` 由 `>=20.9.0` 修正为 `>=22` —— 详见下方「矩阵证伪了 engines」。
 3. **代码零改动**：`git diff --stat <批次 7 基点>..HEAD -- src/` 为**空**。
    迁移改动只落在 6 个文件：锁文件、`package.json`、CI、README、本报告。
 
@@ -113,6 +114,42 @@ unrs-resolver@1.12.2, fsevents@2.3.3
 983 条 `resolved` 全部指向 `registry.npmjs.org`。
 顺带实测到镜像当时严重降速（二进制 36 KB/s 且 90s 未下完，官方 1.38 MB/s；
 `next` 元数据镜像 60s 超时、官方 9.3s），相差约 38 倍 —— 这是必须走官方源的第二个理由。
+
+### 矩阵证伪了 `engines` 声明（计划预期的收益，确实发生了）
+
+计划给矩阵写的理由是：「`engines` 声明了 `>=20.9.0` 却至今只在 Node 24 上验证过，矩阵能证明
+该声明成立，或暴露它是谎话。」
+
+**结果是后者。** CI 首次运行即出现 Node 20 失败、Node 22 与 24 通过：
+
+```text
+verify (20)  fail  56s
+verify (22)  pass  1m25s
+verify (24)  pass  1m20s
+```
+
+Node 20 的失败根因：
+
+```text
+TypeError: webidl.util.markAsUncloneable is not a function
+    at new CacheStorage node_modules/undici/lib/web/cache/cachestorage.js:20:17
+    at Object.<anonymous> node_modules/jsdom/lib/api.js:12:33
+```
+
+依赖自己就写明了不支持 Node 20：
+
+- `jsdom@30.0.1` → `engines: { node: "^22.22.2 || ^24.15.0 || >=26.0.0" }`
+- 被提升的 `undici@8.10.2` → `engines: { node: ">=22.19.0" }`
+
+而 **Node 20 已于 2026-04-30 EOL**（Node 22 维护至 2027-04，Node 24 为 Active LTS）。
+
+因此 `engines.node: ">=20.9.0"` 是一个**从未成立过的声明**：旧 CI 只跑 Node 24，所以从未被证伪；
+任何 Node 20 用户 clone 后跑 `npm run verify` 都会在 jsdom 加载时失败。
+
+**处置：** `engines.node` 修正为 `>=22`，矩阵收窄为 `[22, 24]`。
+此处还有一个值得记下的设计副产品：这个错误与 `bun → npm` 迁移**毫无关系**（jsdom/undici 的限制
+在迁移前就存在），而它之所以现在才暴露，是因为矩阵把「只在单一 Node 上验证」这个盲区改成了
+必须多版本验证。**这是本批真正的新增收益。**
 
 ## 相关
 

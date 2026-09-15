@@ -35,7 +35,9 @@ gallery of leftover-offcut trinkets.
 
 ## Prerequisites
 
-- **Node ≥ 20.9** with npm (project ships `packageManager: npm@12.0.1`). Verify with `node --version`.
+- **Node ≥ 22** with npm (project ships `packageManager: npm@12.0.1`). Verify with `node --version`.
+  Node 20 is **not** supported: `jsdom@30` requires `^22.22.2 || ^24.15.0 || >=26.0.0`, and Node 20
+  itself reached EOL on 2026-04-30.
 - No API keys are required to run the demo — the AI assistant works in Mock mode.
 
 ## Quick start
@@ -85,7 +87,7 @@ tests); `SHOPIFY_*` still takes priority over both.
 
 The acceptance gate is **format:check + typecheck + check:boundary + lint + test** (`npm run verify`),
 with **`npm run build`** run alongside it — all green on `main` (HEAD), and verified across
-**Node 20 / 22 / 24** in CI.
+**Node 22 / 24** in CI.
 
 ## Environment variables
 
