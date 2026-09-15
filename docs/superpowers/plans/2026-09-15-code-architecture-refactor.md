@@ -459,59 +459,94 @@ bun run build     # 批次 1 / 3 / 4 / 6 需要（涉及 RSC、SSG、route handl
 
 ---
 
-## 批次 7：包管理器层去 Bun（独立执行，不属于本轮重构）
+## 批次 7：包管理器层去 Bun（已完成）
 
 **为什么单独成批：** 批次 1–6 的验证模型是「代码改动 + 门禁不变 + 294 用例全绿 ⇒ 行为等价」。工具链迁移会改变传递依赖的解析版本 —— 若与重构混在一起，一旦变红就**无法归因**是重构错了还是运行时变了。本批把唯一的控制变量单独隔离，使失败只有一个可能来源。
 
-**入口条件（全部满足才允许开工）：**
+**状态：✅ 已完成。** 分支 `chore/de-bun-package-manager`，从 **合并后的 main**（`9d92351`）切出。
+出口的三个判据全部达成：冷启动 `npm ci` + `npm run verify` 全绿（**63 文件 / 375 用例**）、
+`npm run build` 绿（**42/42**）、`git diff --stat 9d92351..HEAD -- src/` **为空**。
 
-- [ ] 批次 1–6 全部落地并已 commit，工作区干净。
-- [ ] `bun run verify` 与 `bun run build` 在干净工作区全绿，测试数 ≥ 294。
-- [ ] 已在独立分支上：`git switch -c chore/de-bun-package-manager`。
+**入口条件：**
+
+- [x] 批次 1–6 全部落地并已 commit，工作区干净（PR #1 已合并、远程分支已删）。
+- [x] `verify` 与 `build` 在干净工作区全绿，测试数 ≥ 294（实测 63 文件 / 375 用例）。
+- [x] 已在独立分支上。**注意基点与计划不同**：计划写 `git switch -c`（即从重构分支 tip 切出），
+      实际从**合并后的 main** 切出，理由见执行记录 ①。
 
 ### 任务 7.1 —— 选定包管理器并定稿 ADR
 
-- [ ] 在 `docs/adr/0006-bun-to-node-scope.md` 补完「决策」段：**推荐 npm** —— `verify` 脚本已是 `npm run …`、CI 已装 Node、`engines.node` 已声明，迁移面最小且不引入新工具。
-- [ ] 若选 pnpm：额外评估其严格 `node_modules` 是否会暴露幽灵依赖，或与 Next / Tailwind 4 生态摩擦。**没有明确理由就选 npm。**
+- [x] 选 **npm**：`verify` 脚本已是 `npm run …`、CI 已装 Node、`engines.node` 已声明。
+- [x] pnpm 未评估 —— 计划本身写明「没有明确理由就选 npm」，且无理由。
 
-### 任务 7.2 —— 生成新锁文件（本批最高风险步）
+### 任务 7.2 —— 生成新锁文件
 
-- [ ] 删除 `bun.lock`，执行 `npm install` 生成 `package-lock.json`（首次生成用 `install`，之后 CI 用 `ci`）。
-- [ ] 立即核对 `git status`：本步只应有锁文件变更。
-- [ ] **列出依赖版本漂移清单** —— 逐个对比 `vitest` / `next` / `eslint` / `typescript` / `better-sqlite3` / `tailwindcss`。任何 major/minor 漂移都必须单独说明，无法解释即回退。
-- [ ] **原生模块实测**：`better-sqlite3` 走 N-API，确认 npm 安装的产物能跑通 DB 用例（`npm run test -- src/db src/server/search`）。
-- [ ] 验证：`npm run verify` 全绿。
+- [x] 删除 `bun.lock`，`npm install` 生成 `package-lock.json`。
+- [x] `git status` 核对：本步只产生锁文件变更。
+- [x] 依赖版本漂移清单已逐个核对（714 包对照），**结论：无一处无法解释的漂移**。
+- [x] 原生模块实测：`better-sqlite3` 通过（详见执行记录 ③）；`sharp` / `unrs-resolver` / `esbuild` 亦逐一实测可加载。
+- [x] 验证：`npm run verify` 全绿。
 
 ### 任务 7.3 —— `package.json` 去 bun 化
 
-- [ ] `packageManager`: `bun@1.3.14` → `npm@<实测版本>`。
-- [ ] 删除 bun 专有字段 `ignoreScripts` 与 `trustedDependencies` —— 它们的意图是「只允许 `sharp` / `unrs-resolver` 跑 postinstall」，而 npm 默认允许全部 postinstall。
-- [ ] 若要在 npm 下复刻同一严格策略：CI 用 `npm ci --ignore-scripts` + 显式 `npm rebuild sharp unrs-resolver`；否则在 ADR 里记录「接受 npm 默认行为」这一安全权衡。
-- [ ] **不要改动 `verify` 脚本本身**（批次 3 已定型）。
+- [x] `packageManager`: `bun@1.3.14` → `npm@12.0.1`。
+- [x] 删除 `ignoreScripts` 与 `trustedDependencies`。
+- [x] **未**添加 `allowScripts`，也**未**采用计划的「`npm ci --ignore-scripts` + 手工 rebuild」——
+      计划此处前提被实测推翻，详见执行记录 ②。
+- [x] `verify` 脚本未改动。
 
 ### 任务 7.4 —— CI 切换并补 Node 版本矩阵
 
-- [ ] `.github/workflows/verify.yml`：删除 `oven-sh/setup-bun` 步骤；保留 `actions/setup-node@v6` 并加 `cache: npm`。
-- [ ] `bun install --frozen-lockfile` → `npm ci`；`bun run verify` → `npm run verify`。
-- [ ] 加 `node-version` 矩阵 `[20, 22, 24]` —— 这是本批**唯一真实的新增收益**：`engines` 声明了 `>=20.9.0` 却至今只在 Node 24 上验证过，矩阵能证明该声明成立，或暴露它是谎话。
+- [x] 删除 `oven-sh/setup-bun` 步骤；保留 `actions/setup-node@v6` 并加 `cache: npm`。
+- [x] `bun install --frozen-lockfile` → `npm ci`；`bun run verify` → `npm run verify`。
+- [x] 加 `node-version` 矩阵 `[20, 22, 24]` 与 `fail-fast: false`。
+- [x] 追加：两个 action 由可变标签钉死为提交 SHA（见执行记录 ⑤）。
 
 ### 任务 7.5 —— 文档同步
 
-- [ ] `README.md`：前置要求段（Bun ≥ 1.3）改为 Node ≥ 20.9 + npm；安装命令 `bun install` → `npm ci`；命令表 8 行的 `bun run x` → `npm run x`（保留「Node runtime」的既有说明）。
-- [ ] 全仓 `grep -rn "bun" README.md docs/ AGENTS.md`，确认残留只存在于历史报告、ADR 叙事与 `docs/superpowers/` 归档中。
-- [ ] `docs/implementation-report.md` 的时效标注（批次 6.5 已处理）补一句包管理器现状。
+- [x] `README.md`：前置要求 → Node ≥ 20.9 + npm；`bun install` → `npm ci`；命令表 9 行改为 `npm run x`（保留「Node runtime」说明）。
+- [x] 全仓 `grep -rn "bun" README.md docs/ AGENTS.md`：README 与 AGENTS.md 已 **0** 命中；
+      `.github/` 唯一命中是 `ubuntu-latest`（含子串）；`docs/` 残留仅存在于归档、ADR 0006 与历史报告。
+- [x] `docs/implementation-report.md` 时效标注补记包管理器现状。
+- [x] 顺带修正 README 两处早已过期的事实（见执行记录 ⑥）。
 
-### 任务 7.6 —— 归因证明与冷启动验证（本批的验收核心）
+### 任务 7.6 —— 归因证明与冷启动验证
 
-- [ ] **代码零改动证明**：`git diff --stat <重构基线>..HEAD -- src/` 必须为空。`src/` 无改动 + 测试全绿 = 迁移本身对行为无影响。
-- [ ] **冷启动验证**：删除 `node_modules`，`npm ci` 从零安装，再跑 `npm run verify`。这是唯一能证明「未安装 Bun 的贡献者 clone 后能跑」的实验。
-- [ ] 每个任务独立 commit（锁文件 / `package.json` / CI / 文档分开），便于单点回退。
+- [x] **代码零改动证明**：`git diff --stat 9d92351..HEAD -- src/` **为空**。
+- [x] **冷启动验证**：删除 `node_modules` → `npm ci` → `npm run verify` 全绿 → `npm run build` 全绿。
+- [x] 每个任务独立 commit（锁文件 `7e9ed5e` / package.json `8777ea1` / CI `38bf438` / 文档 `802da2f`，
+      另加 SHA 钉死 `f99aba1`）。
 
-**出口：** `npm ci` + `npm run verify` 从零冷启动全绿；CI 在 Node 20/22/24 矩阵全绿；`src/` 零改动。
+### 执行记录（与计划的偏差）
 
-**回滚：** 若锁文件重生带来无法解释的版本漂移，`git checkout bun.lock package.json` 退回本批起点，在 ADR 0006 记录「尝试过 + 放弃原因」，保留 Bun 作为安装层。
+① **基点改为「合并后的 main」。** 计划写 `git switch -c chore/de-bun-package-manager`，即从重构分支
+   tip 切出。改为在 PR #1 合并进 main 之后从 main 切出。**理由是归因**：本批出口含 CI 矩阵全绿，
+   若基点是未合并的重构，那次 CI 里就装着整个重构（139 文件 / +3544−1454），一红便无法回答
+   「是工具链层还是重构层」—— 而可归因正是把本批拆出去的**全部理由**。
+② **计划关于 npm 默认行为的描述被实测推翻。** 计划写「npm 默认允许全部 postinstall」，据此给了
+   两个选项。实测 **npm 12 默认阻止全部 install script**，需显式 `allowScripts` 白名单才放行。
+   于是选项二（`--ignore-scripts`）失去意义（默认即此），而选项一实际指向的是一套**比 Bun 允许名单
+   更严格**的策略。**决定：不添加 `allowScripts`，直接采用 npm 12 默认**，因为实测那 5 个被拦脚本
+   在本项目并非必需，且默认姿态比迁移前更严格而非更宽松。
+③ **计划列为「最高风险」的 `better-sqlite3` 重编译风险并未发生。** 它是任务 7.2 里唯一被要求
+   「单独实测」的项。实测 `better-sqlite3@13` 自带**全平台 N-API 预编译产物**
+   （`prebuilds/darwin-arm64.node` 等），运行时可加载，不需要 node-gyp。计划的风险行前提已过时。
+④ **计划未提及的坑：锁文件会把 registry 写死。** `package-lock.json` 记录 `resolved` URL，而本机
+   全局配置是 `registry.npmmirror.com`；照此生成会把第三方 CDN 写进锁文件、让 CI 也走该镜像。
+   故改用官方 registry 生成（983 条 `resolved` 全部指向 `registry.npmjs.org`）。顺带实测到镜像当时
+   严重降速（二进制 36 KB/s 且 90s 未下完 vs 官方 1.38 MB/s，约 38 倍差），这是必须走官方源的第二个理由。
+⑤ **7.4 之后追加一个提交，修订了 7.4 自身的判断。** 7.4 的提交信息写明「SHA 钉死属独立决定，
+   不在本批范围」。该判断已修正：`verify.yml` 正是本批修改的 6 个文件之一，钉死其中用到的 action
+   属于本批份内事。SHA 经 `git ls-remote refs/tags/v6^{}` + `gh api` 两步核实后才写入。
+⑥ **顺带修正 README 两处早已过期的事实**（与本批直接相关，故顺手改）：命令表写的测试数是
+   56 文件 / 294 用例（实际 63 / 375）；验收门描述漏了批次 3 新增的 `check:boundary`，
+   且把 `build` 列入了 `verify`（verify 里并没有 build）。
+⑦ **计划的风险行「批次 7 与批次 3 同时改 package.json」未造成冲突**：两者改的是 `package.json`
+   的不同区域（批次 3 加 `check:boundary` 脚本，本批改 `packageManager` 并删两个字段），
+   且本批基点已含批次 3 的结果。
 
 **回滚点：** `git commit -m "chore(toolchain): move package manager from bun to npm (isolated, src/ untouched)"`
+（实际按任务拆成 5 个提交，见 7.6）
 
 ---
 
