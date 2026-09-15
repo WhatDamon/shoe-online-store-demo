@@ -1,11 +1,7 @@
-import type { Product, ProductFilter } from './types'
+import { searchableText } from '@/domain/search-text'
+import type { Product, ProductFilter } from '@/domain/product'
 
-// 内存过滤/排序（29 行规模，决策 #17）：DB 负责持久化，这里统一筛选语义供 seed/db 适配器复用。
-const byText = (p: Product, q: string) =>
-  [p.title, p.subtitle, p.productType, ...p.tags, ...p.features, p.description]
-    .join(' ')
-    .toLowerCase()
-    .includes(q)
+// 内存过滤/排序（29 行规模）：DB 负责持久化，这里统一筛选语义供 seed/db 适配器复用。
 
 export function filterProducts(list: Product[], filter: ProductFilter = {}): Product[] {
   let out = list.filter((p) => {
@@ -13,7 +9,7 @@ export function filterProducts(list: Product[], filter: ProductFilter = {}): Pro
     if (filter.sizes?.length && !filter.sizes.some((s) => p.sizes.includes(s))) return false
     if (filter.minPrice != null && p.price.amount < filter.minPrice) return false
     if (filter.maxPrice != null && p.price.amount > filter.maxPrice) return false
-    if (filter.q && !byText(p, filter.q.trim().toLowerCase())) return false
+    if (filter.q && !searchableText(p).includes(filter.q.trim().toLowerCase())) return false
     return true
   })
   const sort = filter.sort ?? 'featured'

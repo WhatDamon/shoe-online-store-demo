@@ -4,9 +4,9 @@ import { useEffect, useRef, useSyncExternalStore, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { parseShopParams, serializeShopParams } from '@/lib/shop-search-params'
 import type { ShopFilter } from '@/lib/shop-search-params'
-import type { CanonicalSize } from '@/server/catalog/types'
-import { footMmToEU } from '@/lib/my-size'
-import { getMySizeServerSnapshot, getMySizeSnapshot, subscribeMySize } from '@/lib/my-size'
+import type { CanonicalSize } from '@/domain/product'
+import { footMmToEU } from '@/domain/size'
+import { mySize } from '@/lib/my-size'
 
 export interface FilterOption {
   value: string
@@ -64,23 +64,15 @@ export function ProductFilterBar({
   const showClear = hasActiveFilters(initial)
   // 「我的尺码」命中：保存后所在码 chip 显示圆点 + aria（有码款即使未筛选也可辨识）。
   const myCanonical = useSyncExternalStore(
-    subscribeMySize,
-    getMySizeSnapshot,
-    getMySizeServerSnapshot,
+    mySize.subscribe,
+    mySize.getSnapshot,
+    mySize.getServerSnapshot,
   )
   const myEU = myCanonical != null ? footMmToEU(myCanonical) : null
 
-  // 受控 replace 模式下，服务端尚未提交新一轮筛选前 `initial` 是过期快照：若每次
-  // 变更都以 `initial` 为基底重新合并，一次 RSC 往返内的连续变更（如快速连勾两个
-  // 尺码）会丢弃前一次的参数。因此以 baseRef 累积「最后一次已发出」的查询串作为
-  // 组合基底，无中间提交渲染的连续变更在本地合成、导航最终收敛。
-  //
-  // 路由器提交的 URL 才是权威：每当本组件收到一次新的提交渲染（包括 Back/外部改
-  // URL 把状态带回先前见过的值——此时 committedQs 与上一渲染相同，但 baseRef 仍
-  // 停留在已被取消的在途意图上），只要提交状态 ≠ 在途意图，就把基底回退到已提交
-  // 状态，避免后续变更把已放弃的参数复活或丢掉刚被恢复的参数。本页面为 RSC，没有
-  // 其它会触发本组件无关重渲染的客户端状态，因此「组件发生渲染」即可视为「路由器
-  // 提交了状态」；效果在每次渲染后运行，早于下一次用户事件。
+  // 受控 replace 下 `initial` 在提交前是过期快照：以 baseRef 累积「最后一次已发出」的查询串
+  // 作组合基底，使一次 RSC 往返内的连续变更（快速连勾两个尺码）在本地合成而不互相丢弃。
+  // 提交状态 ≠ 在途意图时（Back / 外部改 URL）基底回退到已提交值，避免复活已放弃的参数。
   const committedQs = serializeShopParams(initial)
   const baseRef = useRef(committedQs)
 

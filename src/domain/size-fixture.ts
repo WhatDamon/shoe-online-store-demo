@@ -1,4 +1,4 @@
-// 尺码基准（单一事实）：以脚长 mm 为锚，整档 EU 35–48（canonical，决策 #16 扩至 35），unisex/men 基础。
+// 尺码基准（单一事实）：以脚长 mm 为锚，整档 EU 35–48（canonical，已扩至 35），unisex/men 基础。
 // 行间 mm 步进 ~6.7mm（Paris point），UK = US - 1，JP = 脚长 cm，CN 与 EU 同号。
 // 注：尺码表为演示数据（无网络对照 Zappos/REI）；按内部 mm 锚关系自洽校验，
 // 上架真实数据前需按权威源复核（用户已接受该口径）。

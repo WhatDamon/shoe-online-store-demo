@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { keywordSearch } from './keyword'
 import { seedProducts } from '@/server/catalog/seed'
-import type { Product } from '@/server/catalog/types'
+import type { Product } from '@/domain/product'
 
 // 以 p01 为基底克隆出受控 fixture，彻底覆盖会用到的字段，
 // 保证除显式设置的词外没有额外 token 干扰打分。

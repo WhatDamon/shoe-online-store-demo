@@ -1,19 +1,26 @@
 'use client'
 
 import Image from 'next/image'
-import { useEffect, useState } from 'react'
+import { useRef, useState } from 'react'
 import { XIcon } from 'lucide-react'
 import type { GiftItem } from '@/server/catalog/gifts'
+import { GIFT_OFFER } from '@/lib/gift-offer'
+import { useModalDismiss } from '@/lib/use-modal'
 
-// 赠品画廊（决策 #16）：满 $50 赠一的边角料小件 —— 仅展示（不售卖、无 PDP）。
+// 赠品画廊：满 $50 赠一的边角料小件 —— 仅展示（不售卖、无 PDP）。
 // 点击任一小件打开灯箱轮播该件全部图片；Esc/背景/关闭按钮退出。
 export function GiftGallery({ gifts }: { gifts: GiftItem[] }) {
   const [active, setActive] = useState<{ gift: GiftItem; idx: number } | null>(null)
+  const dialogRef = useRef<HTMLDivElement | null>(null)
 
-  useEffect(() => {
-    if (!active) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setActive(null)
+  // 灯箱原先只处理 Escape：Tab 能把焦点移到遮罩后的页面（WCAG 2.1.2）。改用共享弹窗行为后
+  // 获得完整焦点圈闭与打开时聚焦，左右方向键经 onKeyDown 透传。
+  // 不传 triggerRef：每件赠品都是入口，没有可归属的单一触发元素。
+  const dismiss = useModalDismiss({
+    open: active !== null,
+    dialogRef,
+    onClose: () => setActive(null),
+    onKeyDown: (e) => {
       if (e.key === 'ArrowRight') {
         setActive((a) => a && { ...a, idx: (a.idx + 1) % a.gift.images.length })
       }
@@ -22,10 +29,8 @@ export function GiftGallery({ gifts }: { gifts: GiftItem[] }) {
           a ? { ...a, idx: (a.idx - 1 + a.gift.images.length) % a.gift.images.length } : null,
         )
       }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [active])
+    },
+  })
 
   return (
     <section
@@ -38,11 +43,10 @@ export function GiftGallery({ gifts }: { gifts: GiftItem[] }) {
         id="free-gifts-heading"
         className="mt-2 font-heading text-2xl font-semibold tracking-tight text-ink"
       >
-        With any order over $50
+        {`With any order over $${GIFT_OFFER.thresholdUsd}`}
       </h2>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">
-        Pick one of these little buddies — pressed from leftover upper offcuts, so nothing goes to
-        waste. Just add one when you check out.
+        {`Pick one of these ${GIFT_OFFER.plural} — pressed from ${GIFT_OFFER.material}, so nothing goes to waste. Just add one when you check out.`}
       </p>
 
       <ul className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
@@ -78,11 +82,12 @@ export function GiftGallery({ gifts }: { gifts: GiftItem[] }) {
 
       {active ? (
         <div
+          ref={dialogRef}
           role="dialog"
           aria-modal="true"
           aria-label={`${active.gift.title} photos`}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          onClick={() => setActive(null)}
+          onClick={() => dismiss()}
         >
           <div
             className="relative w-full max-w-2xl overflow-hidden rounded-2xl bg-white p-2"
@@ -90,7 +95,7 @@ export function GiftGallery({ gifts }: { gifts: GiftItem[] }) {
           >
             <button
               type="button"
-              onClick={() => setActive(null)}
+              onClick={() => dismiss()}
               aria-label="Close gallery"
               className="absolute right-3 top-3 z-10 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
             >

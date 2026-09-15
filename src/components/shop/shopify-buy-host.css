@@ -1,4 +1,4 @@
-/* Shopify Buy Button —— product 本体宿主 DOM 样式（决策 #15 Buy 全接管）。
+/* Shopify Buy Button —— product 本体宿主 DOM 样式（Buy 全接管）。
  *
  * 背景：为了让 Buy 模块自适应铺满所在列（用户 2026-09-06 验收反馈），
  * product 组件的 options.product.iframe 被设为 false —— SDK 把 variant 选择器与

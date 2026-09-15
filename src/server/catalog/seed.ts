@@ -1,8 +1,8 @@
-import type { CanonicalSize, Product } from './types'
-import { convert } from './size-charts'
+import type { CanonicalSize, Product } from '@/domain/product'
+import { convert } from '@/domain/size'
 import supplier from './data/supplier.json'
 
-// 供应商真实目录（决策 #16）：源为 /Users/damon233/Downloads/萨洛丁款式集合.xlsx，
+// 供应商真实目录：源为 /Users/damon233/Downloads/萨洛丁款式集合.xlsx，
 // 经 scripts/import-catalog/import.py 抽取（图片 WebP → public/products/<handle>/，清单 → data/supplier.json）。
 // 本文件 = 策展层：营销名/集合/价格/文案为演示占位（图片、色系、码段、货号为真实数据），
 // 可随时按 code 覆写。尺码为 EU 整档并集（女 35-40# + 男 39-44# → 35-44），直读不换算。
@@ -72,7 +72,7 @@ const GENDER_WORD: Record<SupplierShoe['genders'], string> = {
 
 const colorNames = (s: SupplierShoe) => s.colors.map((c) => c.en)
 
-// 码段展示（决策 #20 文案美标化）：供应商段为 EU/中国同号整数（女 35-40# / 男 39-44#），
+// 码段展示（文案美标化）：供应商段为 EU/中国同号整数（女 35-40# / 男 39-44#），
 // 描述与 features 不再裸写 EU 数字（恰与中国码同号，易误读为中国标准），而是按 US 市场
 // 换算成分段区间展示。换算走仓库统一 mm 锚表（与 Select size chips / size-range 同源），
 // 男女同表（fixture 为 unisex/men 基础，用户已接受该 demo 口径，见 size-fixture 注释）。

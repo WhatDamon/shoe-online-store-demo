@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { createDb } from '@/db/client'
 import { createRepository } from '@/server/search/repository'
-import { DAILY_TOKEN_CAP, today, underDailyBudget } from './budget'
+import { dailyTokenCap, today, underDailyBudget } from './budget'
 
 describe('budget', () => {
   it('当日用量为零时放行', async () => {
@@ -15,8 +15,8 @@ describe('budget', () => {
     await repo.insertUsage({
       day: today(),
       model: 'mock',
-      promptTokens: Math.floor(DAILY_TOKEN_CAP / 2),
-      completionTokens: Math.floor(DAILY_TOKEN_CAP / 2) + 1,
+      promptTokens: Math.floor(dailyTokenCap() / 2),
+      completionTokens: Math.floor(dailyTokenCap() / 2) + 1,
       sessionKey: 's1',
     })
     expect(await underDailyBudget(repo)).toBe(false)

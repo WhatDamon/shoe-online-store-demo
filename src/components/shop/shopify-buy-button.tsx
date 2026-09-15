@@ -49,7 +49,7 @@ function loadSdk(): Promise<ShopifyBuySdk> {
   return sdkLoadPromise
 }
 
-// Shopify Buy Button 统一挂载组件（决策 #15 重启用，2026-09-06 全目录重建）。
+// Shopify Buy Button 统一挂载组件（2026-09-06 全目录重建）。
 // 读取 admin 生成的 snippet（shopify_buy_button.txt，28 块 options 逐字一致）的参数化结论：
 // 26 个挂载块的唯一差别是商品 numeric id，其余（domain/token/moneyFormat/options）每块相同 →
 // 本组件只按 productId 参数化，加载官方 SDK 后 createComponent('product', …)。

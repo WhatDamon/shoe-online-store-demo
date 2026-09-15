@@ -1,8 +1,9 @@
 import { catalog } from '@/server/catalog/adapter'
 import type { Metadata } from 'next'
-import { availableSizesForSystem } from '@/server/catalog/size-charts'
+import { availableSizesForSystem } from '@/domain/size'
 import { listProductsForMarket } from '@/server/catalog/service'
 import { giftItems } from '@/server/catalog/gifts'
+import { GIFT_OFFER } from '@/lib/gift-offer'
 import { market } from '@/lib/market'
 import { parseShopParams } from '@/lib/shop-search-params'
 import { ProductFilterBar } from '@/components/shop/product-filter-bar'
@@ -36,7 +37,7 @@ export default async function ShopPage({
 
   const [products, allCollections] = await Promise.all([
     listProductsForMarket(filter),
-    catalog.getCollections(),
+    catalog().getCollections(),
   ])
   const collectionOptions = allCollections.map((c) => ({
     value: c.handle,
@@ -53,12 +54,12 @@ export default async function ShopPage({
         </p>
       </header>
 
-      {/* 赠品活动条（决策 #16）：满 $50 赠一；软文案呈现 */}
+      {/* 赠品活动条：满 $50 赠一；软文案呈现 */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-neutral-200 bg-surface px-4 py-3">
         <p className="text-sm text-neutral-700">
-          <span className="font-medium text-ink">Spend $50, get a free gift.</span>{' '}
+          <span className="font-medium text-ink">{`Spend $${GIFT_OFFER.thresholdUsd}, get a free gift.`}</span>{' '}
           <span className="text-neutral-500">
-            {giftItems.length} little buddies to choose from, made from leftover upper offcuts.
+            {giftItems.length} {GIFT_OFFER.plural} to choose from, made from {GIFT_OFFER.material}.
           </span>
         </p>
         <a

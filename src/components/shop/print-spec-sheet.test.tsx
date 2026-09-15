@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { PrintSpecSheet } from './print-spec-sheet'
-import type { ProductView } from '@/server/catalog/service'
+import type { ProductView } from '@/domain/product'
 import { POLICY_RETURNS } from '@/lib/store-policy'
 
 const p: ProductView = {

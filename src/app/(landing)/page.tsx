@@ -15,7 +15,7 @@ export const metadata: Metadata = pageMetadata({
   title: 'Casual shoes, printed to order in your size',
 })
 
-// Landing 内容（规格 §9 顺序）：Hero / PromiseStrip / CollectionCards / FeaturedGrid /
+// Landing 内容（顺序）：Hero / PromiseStrip / CollectionCards / FeaturedGrid /
 // StorySection。外壳（AppBar 透明遮罩 + Footer）由 (landing)/layout.tsx 提供。
 // 整页零 AI 痕迹（P1：助手入口不在此页）。
 export default function HomePage() {

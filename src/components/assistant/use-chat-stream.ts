@@ -3,11 +3,11 @@
 // SSE 会话消费 hook：管理消息流、流式增量、结构化事件（productCards/sizeFit）
 // 与错误恢复。帧解析委托 events.ts 的 parseEvent（客户端可导入纯函数，不在 UI 侧重复造解析）。
 import { useCallback, useRef, useState } from 'react'
-import { parseEvent } from '@/server/ai/events'
-import type { ChatErrorCode, ChatEvent, Mode, ProductCard } from '@/server/ai/events'
-import type { CanonicalSize } from '@/server/catalog/types'
+import { parseEvent } from '@/domain/chat-events'
+import type { ChatErrorCode, ChatEvent, Mode, ProductCard } from '@/domain/chat-events'
+import type { CanonicalSize } from '@/domain/product'
 
-/** 发给服务端的最小商品引用（只需 handle + title，规格 §8.4 ChatRequest.product）。 */
+/** 发给服务端的最小商品引用（只需 handle + title）。 */
 interface ChatProductRef {
   handle: string
   title: string
@@ -100,6 +100,30 @@ async function consumeSSE(
   }
 }
 
+/** 单条 SSE 帧对助手消息的变换（纯函数：五类帧可单独断言，不必驱动真实流）。
+ * productCards 先过 isValidCard —— parseEvent 只验 items 是数组，坏 item 会让渲染崩。 */
+export function applyEvent(message: ChatMessage, event: ChatEvent): ChatMessage {
+  switch (event.type) {
+    case 'delta':
+      return { ...message, content: message.content + event.text }
+    case 'productCards':
+      return { ...message, cards: event.items.filter(isValidCard) }
+    case 'sizeFit':
+      return {
+        ...message,
+        sizeFit: {
+          recommended: event.recommended,
+          alternatives: event.alternatives,
+          rationale: event.rationale,
+        },
+      }
+    case 'done':
+      return { ...message, streaming: false }
+    case 'error':
+      return { ...message, streaming: false, error: { code: event.code, message: event.message } }
+  }
+}
+
 export function useChatStream(): ChatStream {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
@@ -147,35 +171,8 @@ export function useChatStream(): ChatStream {
       const onEvent = (event: ChatEvent) => {
         const id = activeIdRef.current
         if (!id) return
-        if (event.type === 'delta') {
-          setMessages((prev) =>
-            prev.map((m) => (m.id === id ? { ...m, content: m.content + event.text } : m)),
-          )
-        } else if (event.type === 'productCards') {
-          const items = event.items.filter(isValidCard)
-          setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, cards: items } : m)))
-        } else if (event.type === 'sizeFit') {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === id
-                ? {
-                    ...m,
-                    sizeFit: {
-                      recommended: event.recommended,
-                      alternatives: event.alternatives,
-                      rationale: event.rationale,
-                    },
-                  }
-                : m,
-            ),
-          )
-        } else if (event.type === 'done') {
-          setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, streaming: false } : m)))
-        } else if (event.type === 'error') {
-          const failure = { code: event.code, message: event.message }
-          setMessages((prev) =>
-            prev.map((m) => (m.id === id ? { ...m, streaming: false, error: failure } : m)),
-          )
+        setMessages((prev) => prev.map((m) => (m.id === id ? applyEvent(m, event) : m)))
+        if (event.type === 'error') {
           setError(event.message)
           setErrorCode(event.code)
         }

@@ -1,80 +1,61 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { sizeRangeLabel } from './size-range'
+import { sizeLabel, sizeRangeFromCanonical } from '@/domain/size'
+import { convert } from '@/domain/size'
+import { market } from '@/lib/market'
+import { seedProducts } from '@/server/catalog/seed'
+import type { CanonicalSize } from '@/domain/product'
 
-const opts = (pairs: [number, string][]) => pairs.map(([value, label]) => ({ value, label }))
+/**
+ * label 一律由真实换算表派生（sizeLabel），不手写。
+ * 此前用例手写 (value, label) 对，与 size-fixture 矛盾（EU 43 写成 US 10，表里是 US 9）；
+ * 旧实现把数字从传入 label 里读回来，所以那些断言恒真 —— 测的是解析器不是生产行为。
+ */
+const options = (...sizes: CanonicalSize[]) =>
+  sizes.map((value) => ({ value, label: sizeLabel(value) }))
 
 describe('sizeRangeLabel', () => {
-  it('returns null for an empty option list', () => {
+  it('空列表 → null（不得退化成 "<系统> null"）', () => {
     expect(sizeRangeLabel([])).toBeNull()
   })
 
-  it('single option shows only that label', () => {
-    expect(sizeRangeLabel(opts([[44, 'US 10.5']]))).toBe('US 10.5')
+  it('单档只显示该档', () => {
+    expect(sizeRangeLabel(options(44))).toBe(sizeLabel(44))
   })
 
-  it('same-market range keeps the system prefix once: US 10–10.5 (integer → half of one band)', () => {
-    expect(
-      sizeRangeLabel(
-        opts([
-          [43, 'US 10'],
-          [44, 'US 10.5'],
-        ]),
-      ),
-    ).toBe('US 10–10.5')
+  it('多档只保留一次体系前缀', () => {
+    const lo = convert(43, market.sizeSystem)
+    const hi = convert(44, market.sizeSystem)
+    expect(sizeRangeLabel(options(43, 44))).toBe(`${market.sizeSystem} ${lo}–${hi}`)
   })
 
-  it('same-market range across bands: US 9.5–11', () => {
-    expect(
-      sizeRangeLabel(
-        opts([
-          [42, 'US 9.5'],
-          [43, 'US 10'],
-          [44, 'US 10.5'],
-          [45, 'US 11'],
-        ]),
-      ),
-    ).toBe('US 9.5–11')
+  it('乱序输入按 canonical 值归一', () => {
+    expect(sizeRangeLabel(options(45, 42))).toBe(sizeRangeLabel(options(42, 45)))
   })
 
-  it('EU range renders EU 43–45', () => {
-    expect(
-      sizeRangeLabel(
-        opts([
-          [43, 'EU 43'],
-          [44, 'EU 44'],
-          [45, 'EU 45'],
-        ]),
-      ),
-    ).toBe('EU 43–45')
+  it('显示系统由 market 决定，不由传入 label 决定', () => {
+    vi.stubEnv('SITE_MARKET', 'EU')
+    try {
+      expect(sizeRangeLabel(options(43, 44, 45))).toBe('EU 43–45')
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+})
+
+describe('真实目录一致性：卡片角标与 canonical 区间同源', () => {
+  it('每款商品角标 == sizeRangeFromCanonical，且形如 "<系统> <数值>[–<数值>]"', () => {
+    expect(seedProducts.length).toBeGreaterThan(0)
+    for (const p of seedProducts) {
+      const badge = sizeRangeLabel(p.sizes.map((value) => ({ value, label: sizeLabel(value) })))
+      expect(badge).toBe(sizeRangeFromCanonical(p.sizes))
+      if (badge !== null) expect(badge).toMatch(/^(US|EU|UK|JP|CN) \d+(\.\d+)?(–\d+(\.\d+)?)?$/)
+    }
   })
 
-  it('unsorted input is normalized by canonical value', () => {
-    expect(
-      sizeRangeLabel(
-        opts([
-          [45, 'US 11'],
-          [43, 'US 10'],
-        ]),
-      ),
-    ).toBe('US 10–11')
-  })
-
-  it('cross-system or unparseable labels degrade to the full pair', () => {
-    expect(
-      sizeRangeLabel(
-        opts([
-          [43, 'US 10'],
-          [45, 'EU 45'],
-        ]),
-      ),
-    ).toBe('US 10–EU 45')
-    expect(
-      sizeRangeLabel(
-        opts([
-          [43, 'US 10'],
-          [45, 'US 11 (wide)'],
-        ]),
-      ),
-    ).toBe('US 10–US 11 (wide)')
+  it('零码款返回 null（真实目录中存在一款无码商品）', () => {
+    const noSizes = seedProducts.filter((p) => p.sizes.length === 0)
+    expect(noSizes.length).toBeGreaterThan(0)
+    for (const p of noSizes) expect(sizeRangeFromCanonical(p.sizes)).toBeNull()
   })
 })

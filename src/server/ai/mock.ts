@@ -4,7 +4,8 @@
 //   find-shoes 短语 → 一句总结；outfit 短语 → 固定 3 条搭配建议；否则 → 引用 digest 商品的简短推荐。
 // 文案一律引用注入 digest 里的真实商品名，绝不臆造价格/库存（规格 P1/P3）。
 import type { AiContext, AiProvider } from './provider'
-import { POLICY_CARE, POLICY_RETURNS } from '@/lib/store-policy'
+import { GIFT_OFFER } from '@/lib/gift-offer'
+import { POLICY_CARE, POLICY_PRODUCTION, POLICY_RETURNS } from '@/lib/store-policy'
 
 const OFF_TOPIC = [
   'recipe',
@@ -60,9 +61,7 @@ export class MockProvider implements AiProvider {
       } else if (/return|refund|exchange|replace/.test(q)) {
         yield POLICY_RETURNS
       } else if (/shipping|ship|deliver|arrive|production|print/.test(q)) {
-        yield* toDeltas(
-          'Every pair is printed to order in our studio, so nothing sits in a warehouse — we only print what you buy.',
-        )
+        yield* toDeltas(POLICY_PRODUCTION)
       } else {
         yield* toDeltas(
           'Happy to help with shipping, returns and care — what would you like to know?',
@@ -104,9 +103,8 @@ export class MockProvider implements AiProvider {
         : titles.length === 1
           ? `I would start with the ${a} — it reads as a strong match for what you described.`
           : `I would start with the ${a} and the ${b} — both read as strong matches for what you described.`
-    // 满 $50 赠一行（与 prompts 购物 mode 的 GIFT_OFFER_FACT 同源，只回一次）。
-    const offer =
-      ' And heads-up: orders over $50 include one free little buddy — a small accessory pressed from leftover upper offcuts — while supplies last.'
+    // 满 $50 赠一行：事实来自 lib/gift-offer 单源，与 prompts 的 GIFT_OFFER_FACT 同源，只回一次。
+    const offer = ` And heads-up: orders over $${GIFT_OFFER.thresholdUsd} include one free ${GIFT_OFFER.name} — ${GIFT_OFFER.composition} — ${GIFT_OFFER.availability}.`
     yield* toDeltas(recommendation + (titles.length > 0 ? offer : ''))
   }
 }

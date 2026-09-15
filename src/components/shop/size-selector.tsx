@@ -1,6 +1,6 @@
 'use client'
 
-import type { CanonicalSize } from '@/server/catalog/types'
+import type { CanonicalSize } from '@/domain/product'
 
 interface SizeOption {
   value: CanonicalSize

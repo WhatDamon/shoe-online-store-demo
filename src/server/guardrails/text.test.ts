@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_MESSAGE_CHARS, estTokens, truncateMessage } from './text'
+import { estTokens, maxMessageChars, truncateMessage } from './text'
 
 describe('text guardrails', () => {
   it('estTokens 按每 4 字符约 1 token 粗估（向上取整）', () => {
@@ -10,8 +10,8 @@ describe('text guardrails', () => {
   })
 
   it('超长消息截断到 MAX_MESSAGE_CHARS', () => {
-    const long = 'a'.repeat(MAX_MESSAGE_CHARS + 500)
-    expect(truncateMessage(long)).toHaveLength(MAX_MESSAGE_CHARS)
+    const long = 'a'.repeat(maxMessageChars() + 500)
+    expect(truncateMessage(long)).toHaveLength(maxMessageChars())
   })
 
   it('短消息原样返回', () => {

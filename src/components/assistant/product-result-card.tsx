@@ -4,7 +4,8 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { ProductVisual } from '@/components/shop/product-visual'
 import { useOptionalWishlist } from '@/components/shop/wishlist-provider'
-import type { ProductCard as ProductCardEvent } from '@/server/ai/events'
+import { WishlistHeart } from '@/components/shop/wishlist-icon'
+import type { ProductCard as ProductCardEvent } from '@/domain/chat-events'
 
 // 会话内商品结果卡：展示真实首图 + 真实元数据（货号/码段/色卡数/照片数），
 // 一律不带价格——价格只在详情页/店铺出现（AI 不传播 demo 价段）。
@@ -73,22 +74,11 @@ export function ProductResultCard({ item }: { item: ProductCardEvent }) {
           aria-label={saved ? 'Remove from wishlist' : 'Add to wishlist'}
           className="absolute right-1.5 top-1.5 inline-flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 transition-colors hover:text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
         >
-          <svg
-            viewBox="0 0 24 24"
-            width="16"
-            height="16"
-            aria-hidden="true"
-            focusable="false"
+          <WishlistHeart
+            size={16}
+            filled={saved}
             className={saved ? 'text-neutral-900' : undefined}
-          >
-            <path
-              d="M12 20.6 4.9 13.7a4.6 4.6 0 0 1 0-6.5 4.6 4.6 0 0 1 6.5 0l.6.6.6-.6a4.6 4.6 0 0 1 6.5 0 4.6 4.6 0 0 1 0 6.5L12 20.6Z"
-              fill={saved ? 'currentColor' : 'none'}
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinejoin="round"
-            />
-          </svg>
+          />
         </button>
       ) : null}
     </div>

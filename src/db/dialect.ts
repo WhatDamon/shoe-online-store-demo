@@ -1,4 +1,4 @@
-// DB_DRIVER 双驱动解析（spec 决策 #13）：默认 sqlite，未知值启动即报错。
+// DB_DRIVER 双驱动解析：默认 sqlite，未知值启动即报错。
 // 运行时懒调用（不做模块级 env 快照）——与 lib/market 的 market.code 同款先例。
 export type DbDriver = 'sqlite' | 'postgres'
 

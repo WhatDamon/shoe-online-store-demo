@@ -1,4 +1,4 @@
-import type { Collection } from './types'
+import type { Collection } from '@/domain/product'
 export const collections: Collection[] = [
   {
     handle: 'everyday',

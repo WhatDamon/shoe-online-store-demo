@@ -2,11 +2,9 @@
 // 客户端场景需要按 handle 拉取展示数据；目录数据在 server（DB/seed），UI 无本地副本）。
 // 返回最小展示字段（不含价/不含 store token）：保持顺序、去重、过滤未知 handle、
 // 上限 30（防滥用；全目录仅 29 款）。storeAvailable = 该 handle 已映射商店 Buy（env 配置时）。
-import { convert } from '@/server/catalog/size-charts'
-import type { CanonicalSize } from '@/server/catalog/types'
+import { sizeRangeFromCanonical } from '@/domain/size'
 import { listProductsForMarket } from '@/server/catalog/service'
 import { shopifyBuyConfigFor } from '@/server/catalog/shopify-buy'
-import { market } from '@/lib/market'
 
 export const dynamic = 'force-dynamic' // 目录来自 DB（seed/DB 随运行变更），不做 SSG 缓存
 
@@ -52,12 +50,6 @@ export async function GET(req: Request): Promise<Response> {
   for (const handle of handles) {
     const p = byHandle.get(handle)
     if (!p) continue // 未知 handle 静默过滤（收藏过期项不 404 崩页）
-    const lo = p.sizes.length
-      ? convert(Math.min(...p.sizes) as CanonicalSize, market.sizeSystem)
-      : null
-    const hi = p.sizes.length
-      ? convert(Math.max(...p.sizes) as CanonicalSize, market.sizeSystem)
-      : null
     out.push({
       handle: p.handle,
       title: p.title,
@@ -65,7 +57,7 @@ export async function GET(req: Request): Promise<Response> {
       image: p.images?.[0] ?? null,
       colorCount: p.colors?.length ?? 0,
       photoCount: p.images?.length ?? 0,
-      sizeRange: lo != null && hi != null ? `${market.sizeSystem} ${lo}–${hi}` : null,
+      sizeRange: sizeRangeFromCanonical(p.sizes),
       storeAvailable: shopifyBuyConfigFor(p.handle) != null,
     })
   }

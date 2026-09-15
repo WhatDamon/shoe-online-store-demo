@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import type { CanonicalSize } from '@/server/catalog/types'
+import type { CanonicalSize } from '@/domain/product'
 import type { ChatMessage } from './use-chat-stream'
 import { MarkdownLite } from './markdown-lite'
 import { ProductResultCard } from './product-result-card'

@@ -6,7 +6,7 @@ import {
 } from '@/server/catalog/shopify-buy'
 import { seedProducts } from '@/server/catalog/seed'
 
-// 商店直购映射（决策 #15 重启用，2026-09-06 全目录）：本地 seed handle ↔ Shopify 商店同 handle 商品。
+// 商店直购映射（2026-09-06 全目录）：本地 seed handle ↔ Shopify 商店同 handle 商品。
 describe('shopify-buy catalog map', () => {
   it('covers every seed product handle (29/29) with a store numeric id', () => {
     expect(seedProducts.length).toBeGreaterThanOrEqual(29)

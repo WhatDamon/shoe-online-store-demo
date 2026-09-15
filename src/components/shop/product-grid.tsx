@@ -1,4 +1,4 @@
-import type { ProductView } from '@/server/catalog/service'
+import type { ProductView } from '@/domain/product'
 import { ProductCard } from './product-card'
 
 export function ProductGrid({ products }: { products: ProductView[] }) {

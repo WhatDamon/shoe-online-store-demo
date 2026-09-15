@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { ProductCard } from './product-card'
-import type { ProductView } from '@/server/catalog/service'
+import type { ProductView } from '@/domain/product'
 
 const p: ProductView = {
   id: 'p01',

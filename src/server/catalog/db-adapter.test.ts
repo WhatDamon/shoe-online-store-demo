@@ -6,7 +6,7 @@ import { DbCatalogAdapter } from './db-adapter'
 import { seedProducts } from './seed'
 import { productToRecord } from '@/db/product-row'
 
-// DbCatalogAdapter（决策 #17）：内存 db 注入，验证自动灌种 + DB 为运行时源。
+// DbCatalogAdapter：内存 db 注入，验证自动灌种 + DB 为运行时源。
 describe('DbCatalogAdapter', () => {
   const make = () => {
     const db = createDb(':memory:')

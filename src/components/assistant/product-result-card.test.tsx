@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { ProductResultCard } from './product-result-card'
 import { WishlistProvider } from '@/components/shop/wishlist-provider'
-import type { ProductCard as CardEvent } from '@/server/ai/events'
+import type { ProductCard as CardEvent } from '@/domain/chat-events'
 
 const card: CardEvent = {
   handle: 'dc-1001',

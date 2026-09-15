@@ -1,6 +1,6 @@
-import type { Colorway, Product } from '@/server/catalog/types'
+import type { Colorway, Product } from '@/domain/product'
 
-// products 表的「规范列 + JSON 副列」编解码（决策 #17）。
+// products 表的「规范列 + JSON 副列」编解码。
 // 表结构两方言同构：核心字段成列，list/对象字段以 JSON 文本落副列。
 // 读写全走这里单点映射；行数据损坏时显式抛错（DB 已是运行时源，不允许静默降级）。
 
@@ -78,4 +78,14 @@ export function productFromRecord(r: ProductRecord): Product {
     fitNotes: r.fitNotes,
     createdAt: r.createdAt,
   }
+}
+
+/**
+ * products 表行形状与 ProductRecord 一一对应（两方言同构，见 schema.ts / schema-postgres.ts），
+ * 所以 select() 的行可直接当记录用、insert 可直接吃记录，唯一需要变形的是 upsert 的 set：
+ * id 是冲突目标（主键），冲突时不应变更。整个 DB 层只在这里摘主键。
+ */
+export function withoutId(r: ProductRecord): Omit<ProductRecord, 'id'> {
+  const { id, ...rest } = r
+  return rest
 }

@@ -2,11 +2,11 @@ import { eq, sql } from 'drizzle-orm'
 import { aiUsage, productEmbeddings, products } from '@/db/schema-postgres'
 import { ensurePgTables } from '@/db/client'
 import type { PgAppDb } from '@/db/client'
-import type { ProductRecord } from '@/db/product-row'
+import { type ProductRecord, withoutId } from '@/db/product-row'
 import { parseVector } from './vector'
 import type { EmbeddingRow } from './embedding-row'
 
-/** Postgres 实现（决策 #13）：方法形状与 sqlite 版完全一致 → 可当 Repository 用。 */
+/** Postgres 实现：方法形状与 sqlite 版完全一致 → 可当 Repository 用。 */
 export function createPostgresRepository(db: PgAppDb) {
   return {
     async getEmbedding(productId: string): Promise<EmbeddingRow | null> {
@@ -84,7 +84,7 @@ export function createPostgresRepository(db: PgAppDb) {
       await db.delete(aiUsage)
       await db.delete(products)
     },
-    // ---- products 表（决策 #17：DB 为运行时目录源；与 sqlite 实现同形）----
+    // ---- products 表（DB 为运行时目录源；与 sqlite 实现同形）----
     async countProducts(): Promise<number> {
       await ensurePgTables(db)
       const [row] = await db.select({ n: sql<number>`count(*)` }).from(products)
@@ -92,75 +92,15 @@ export function createPostgresRepository(db: PgAppDb) {
     },
     async listAllProducts(): Promise<ProductRecord[]> {
       await ensurePgTables(db)
-      const rows = await db.select().from(products)
-      return rows.map((r) => ({
-        id: r.id,
-        handle: r.handle,
-        title: r.title,
-        subtitle: r.subtitle,
-        description: r.description,
-        priceAmount: r.priceAmount,
-        currency: r.currency,
-        productType: r.productType,
-        collections: r.collections,
-        sizes: r.sizes,
-        colors: r.colors,
-        features: r.features,
-        tags: r.tags,
-        construction: r.construction,
-        visual: r.visual,
-        images: r.images,
-        fitNotes: r.fitNotes,
-        createdAt: r.createdAt,
-      }))
+      return db.select().from(products)
     },
     async upsertProducts(records: ProductRecord[]): Promise<void> {
       await ensurePgTables(db)
       for (const r of records) {
         await db
           .insert(products)
-          .values({
-            id: r.id,
-            handle: r.handle,
-            title: r.title,
-            subtitle: r.subtitle,
-            description: r.description,
-            priceAmount: r.priceAmount,
-            currency: r.currency,
-            productType: r.productType,
-            collections: r.collections,
-            sizes: r.sizes,
-            colors: r.colors,
-            features: r.features,
-            tags: r.tags,
-            construction: r.construction,
-            visual: r.visual,
-            images: r.images,
-            fitNotes: r.fitNotes,
-            createdAt: r.createdAt,
-          })
-          .onConflictDoUpdate({
-            target: products.id,
-            set: {
-              handle: r.handle,
-              title: r.title,
-              subtitle: r.subtitle,
-              description: r.description,
-              priceAmount: r.priceAmount,
-              currency: r.currency,
-              productType: r.productType,
-              collections: r.collections,
-              sizes: r.sizes,
-              colors: r.colors,
-              features: r.features,
-              tags: r.tags,
-              construction: r.construction,
-              visual: r.visual,
-              images: r.images,
-              fitNotes: r.fitNotes,
-              createdAt: r.createdAt,
-            },
-          })
+          .values(r)
+          .onConflictDoUpdate({ target: products.id, set: withoutId(r) })
       }
     },
   }

@@ -2,7 +2,8 @@
 
 import { createContext, useCallback, useContext, useMemo, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
-import { loadWishlist, saveWishlist, toggleWishlist } from '@/lib/wishlist'
+import { createPersistentStore } from '@/lib/create-store'
+import { parseWishlist, toggleWishlist, WISHLIST_KEY } from '@/lib/wishlist'
 
 interface WishlistValue {
   items: string[]
@@ -11,59 +12,25 @@ interface WishlistValue {
 
 const WishlistContext = createContext<WishlistValue | null>(null)
 
-/**
- * localStorage-backed wishlist exposed as an external store.
- *
- * Why an external store instead of useState + an effect:
- * - Hydration safety: the server snapshot is a constant empty list, so the
- *   server HTML and the first hydrated render are always identical. React
- *   re-reads the client snapshot right after hydration and re-renders with the
- *   stored items — no hydration mismatch.
- * - The lint rule `react-hooks/set-state-in-effect` forbids a synchronous
- *   setState in an effect, so the naive "load in useEffect" shape is not
- *   available.
- *
- * The snapshot is read lazily and only on the client; `loadWishlist()` itself
- * already returns `[]` whenever `window` is undefined (server prerender).
- */
-let snapshot: string[] = []
-let loaded = false
-const listeners = new Set<() => void>()
-
-// React 19 requires the server snapshot to be referentially stable: returning a
-// fresh `[]` literal each call violates useSyncExternalStore's caching contract
-// and trips the dev check "The result of getServerSnapshot should be cached to
-// avoid an infinite loop" whenever a hydration interruption (e.g. a browser
-// extension mutating <body>) forces React's recovery path to re-read it.
+// 引用稳定的 SSR 常量快照（React 19 缓存契约，理由见 create-store.ts）。
 const EMPTY_ITEMS: string[] = []
 
-const ensureLoaded = (): string[] => {
-  if (!loaded) {
-    snapshot = loadWishlist()
-    loaded = true
-  }
-  return snapshot
-}
-
-const subscribe = (listener: () => void) => {
-  listeners.add(listener)
-  return () => {
-    listeners.delete(listener)
-  }
-}
-
-const getSnapshot = (): string[] => ensureLoaded()
-
-const getServerSnapshot = (): string[] => EMPTY_ITEMS
+const wishlist = createPersistentStore<string[]>({
+  key: WISHLIST_KEY,
+  serverSnapshot: EMPTY_ITEMS,
+  decode: parseWishlist,
+  encode: (items) => JSON.stringify(items),
+})
 
 export function WishlistProvider({ children }: { children: ReactNode }) {
-  const items = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+  const items = useSyncExternalStore(
+    wishlist.subscribe,
+    wishlist.getSnapshot,
+    wishlist.getServerSnapshot,
+  )
 
   const toggle = useCallback((handle: string) => {
-    const next = toggleWishlist(ensureLoaded(), handle)
-    snapshot = next
-    saveWishlist(next)
-    for (const listener of listeners) listener()
+    wishlist.set((prev) => toggleWishlist(prev, handle))
   }, [])
 
   const value = useMemo(() => ({ items, toggle }), [items, toggle])

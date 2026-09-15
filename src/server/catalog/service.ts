@@ -1,15 +1,14 @@
 import { catalog } from './adapter'
-import { convert, toEU } from './size-charts'
-import { market } from '@/lib/market'
-import type { CanonicalSize, Product, ProductFilter, SizeSystem } from './types'
+import { sizeLabel, toEU } from '@/domain/size'
+import type {
+  CanonicalSize,
+  Product,
+  ProductFilter,
+  ProductView,
+  SizeSystem,
+} from '@/domain/product'
 
-export type ProductView = Product & {
-  sizeOptions: { value: CanonicalSize; label: string }[]
-}
 export type MarketFilter = ProductFilter & { sizeLabels?: string[] }
-
-const sizeLabel = (eu: CanonicalSize, system = market.sizeSystem) =>
-  `${system} ${convert(eu, system)}`
 
 function toView(p: Product): ProductView {
   return {
@@ -33,12 +32,12 @@ export async function listProductsForMarket(filter: MarketFilter = {}): Promise<
   const { sizeLabels, ...rest } = filter
   const canonical: ProductFilter = { ...rest }
   if (sizeLabels?.length) canonical.sizes = toCanonicalSizes(sizeLabels)
-  const products = await catalog.getProducts(canonical)
+  const products = await catalog().getProducts(canonical)
   return products.map(toView)
 }
 
 export async function getProductForMarket(handle: string): Promise<ProductView | null> {
-  const p = await catalog.getProductByHandle(handle)
+  const p = await catalog().getProductByHandle(handle)
   return p ? toView(p) : null
 }
 

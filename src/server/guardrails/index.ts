@@ -3,9 +3,9 @@ import { tokenBucket } from './rate-limit'
 import { createSessionStore, type SessionMessage } from './session-state'
 import { underDailyBudget, today } from './budget'
 
-/** IP/会话双维内存令牌桶限流速率（规格 §8.5.2：默认 10 次/分）。 */
+/** IP/会话双维内存令牌桶限流速率（默认 10 次/分）。 */
 export const RATE_PER_MIN = 10
-/** 护栏温和文案（规格 §8.5.6 / P7：消费端措辞，绝不暴露 "rate limited"）。 */
+/** 护栏温和文案（消费端措辞，绝不暴露 "rate limited"）。 */
 export const GUARDRAIL_MESSAGE = 'The assistant is taking a short break — try again in a moment.'
 
 export class GuardrailError extends Error {

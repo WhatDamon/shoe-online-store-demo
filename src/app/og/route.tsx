@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og'
 import { site } from '@/lib/site'
 
-// 本地生成的极简 OG 图（规格决策 #11：OG 不依赖外部图/字体，离线一致）。
+// 本地生成的极简 OG 图（OG 不依赖外部图/字体，离线一致）。
 // route handler（node runtime 默认）：GET /og → 1200×630 PNG。
 export async function GET() {
   return new ImageResponse(
