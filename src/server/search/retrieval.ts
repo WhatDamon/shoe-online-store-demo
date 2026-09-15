@@ -1,3 +1,4 @@
+import { envStr } from '@/config'
 import { cosine } from './vector'
 import { catalog } from '@/server/catalog/adapter'
 import { searchableText } from '@/domain/search-text'
@@ -27,7 +28,7 @@ async function semanticRetrieve(
   products: Product[],
   repo: Repo,
 ): Promise<RetrievalResult[]> {
-  const model = process.env.AI_EMBEDDING_MODEL ?? ''
+  const model = envStr('AI_EMBEDDING_MODEL')
   const [qVec] = await embed([query])
   const cached = new Map((await repo.allEmbeddings(model)).map((r) => [r.productId, r]))
   const missing: { product: Product; hash: string }[] = []
@@ -70,7 +71,7 @@ export async function retrieve(
   opts: { embedIfAvailable?: boolean } = { embedIfAvailable: true },
   repo: Repo = createDefaultRepository(),
 ): Promise<RetrievalResult[]> {
-  const products = await catalog.getProducts({}) // 规格 §5：≤2k 目录内存余弦可行
+  const products = await catalog().getProducts({}) // 规格 §5：≤2k 目录内存余弦可行
   if (opts.embedIfAvailable && (await embeddingsAvailable())) {
     try {
       return await semanticRetrieve(query, products, repo)

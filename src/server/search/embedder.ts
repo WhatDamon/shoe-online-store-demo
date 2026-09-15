@@ -1,11 +1,16 @@
-const base = process.env.AI_BASE_URL ?? ''
-const model = process.env.AI_EMBEDDING_MODEL ?? ''
+import { envStr } from '@/config'
+
 let probe: boolean | null = null
 // 瞬时限流/过载不算「不可用」：不固化 probe，留待下个请求重探（避免免费额度 429 后
 // 整个进程生命周期静默禁用语义检索）。401/400/404 等确定性错误才置 false。
 const retryable = (r: Response) => r.status === 429 || r.status >= 500
+
+// 网关地址与模型名一律**调用时**读取（不做模块级快照）：模块加载时快照会让测试
+// vi.stubEnv 失效，也让部署改配置后必须重启进程才生效。
 export async function embeddingsAvailable(): Promise<boolean> {
   if (probe !== null) return probe
+  const base = envStr('AI_BASE_URL')
+  const model = envStr('AI_EMBEDDING_MODEL')
   if (!base || !model) {
     probe = false
     return false
@@ -15,7 +20,7 @@ export async function embeddingsAvailable(): Promise<boolean> {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        authorization: `Bearer ${process.env.AI_API_KEY}`,
+        authorization: `Bearer ${envStr('AI_API_KEY')}`,
       },
       // encoding_format 显式声明 float：OpenAI 官方可省略（默认 float），但 ModelScope
       // api-inference 网关强制要求该字段，缺省即 400；带上它对 OpenAI 官方无害。
@@ -31,13 +36,17 @@ export async function embeddingsAvailable(): Promise<boolean> {
 }
 
 export async function embed(texts: string[]): Promise<number[][]> {
-  const res = await fetch(`${base}/embeddings`, {
+  const res = await fetch(`${envStr('AI_BASE_URL')}/embeddings`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      authorization: `Bearer ${process.env.AI_API_KEY}`,
+      authorization: `Bearer ${envStr('AI_API_KEY')}`,
     },
-    body: JSON.stringify({ model, input: texts, encoding_format: 'float' }),
+    body: JSON.stringify({
+      model: envStr('AI_EMBEDDING_MODEL'),
+      input: texts,
+      encoding_format: 'float',
+    }),
   })
   if (!res.ok) throw new Error(`embeddings ${res.status}`)
   const data = (await res.json()) as { data: { embedding: number[] }[] }

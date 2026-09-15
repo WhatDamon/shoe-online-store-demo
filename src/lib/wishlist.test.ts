@@ -1,21 +1,18 @@
-import { describe, expect, it, beforeEach } from 'vitest'
-import { loadWishlist, toggleWishlist } from './wishlist'
-const KEY = 'evoloop:wishlist'
+import { describe, expect, it } from 'vitest'
+import { parseWishlist, toggleWishlist } from './wishlist'
 
-describe('loadWishlist', () => {
-  beforeEach(() => window.localStorage.clear())
-  it('returns [] when nothing is stored', () => {
-    expect(loadWishlist()).toEqual([])
+describe('parseWishlist', () => {
+  it('未存储（null）→ []', () => {
+    expect(parseWishlist(null)).toEqual([])
   })
-  it('returns [] instead of throwing when the stored value is corrupt', () => {
-    window.localStorage.setItem(KEY, '{not json')
-    expect(loadWishlist()).toEqual([])
+
+  it('损坏内容 → [] 而不是抛错', () => {
+    expect(parseWishlist('{not json')).toEqual([])
   })
-  it('returns [] for a non-array value and filters non-string entries', () => {
-    window.localStorage.setItem(KEY, '{"a":1}')
-    expect(loadWishlist()).toEqual([])
-    window.localStorage.setItem(KEY, '["daily-drift", 42, null]')
-    expect(loadWishlist()).toEqual(['daily-drift'])
+
+  it('非数组 → []；混入的非字符串项被过滤', () => {
+    expect(parseWishlist('{"a":1}')).toEqual([])
+    expect(parseWishlist('["daily-drift", 42, null]')).toEqual(['daily-drift'])
   })
 })
 

@@ -14,14 +14,9 @@ import type { ReactNode } from 'react'
 import type { Mode } from '@/server/ai/events'
 import type { ProductView } from '@/server/catalog/service'
 import type { PageProductRef } from '@/lib/page-product'
-import {
-  getSpeakServerSnapshot,
-  getSpeakSnapshot,
-  setSpeakPreference,
-  subscribeSpeakPreference,
-} from '@/lib/speak-preference'
+import { speak } from '@/lib/speak-preference'
 import { readAloud, stopSpeaking, toSpeechText } from '@/lib/speech'
-import { getMySizeSnapshot } from '@/lib/my-size'
+import { mySize } from '@/lib/my-size'
 import { useChatStream } from './use-chat-stream'
 import { AssistantFabSlot } from './fab'
 import { AssistantPanel } from './assistant-panel'
@@ -47,11 +42,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   const [product, setProduct] = useState<ProductView | PageProductRef | null>(null)
 
   // 朗读偏好：外部 store（SSR 首帧常量 false → 无 hydration mismatch）。
-  const speakOn = useSyncExternalStore(
-    subscribeSpeakPreference,
-    getSpeakSnapshot,
-    getSpeakServerSnapshot,
-  )
+  const speakOn = useSyncExternalStore(speak.subscribe, speak.getSnapshot, speak.getServerSnapshot)
   // 已朗读/已略过的最后一条助手消息 id：同一回复只在完成瞬间朗读一次
   // （开关开启时已完成的历史回复不补读）。
   const lastSpokenIdRef = useRef<string | null>(null)
@@ -100,7 +91,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       const ref = needsProduct && product ? { handle: product.handle, title: product.title } : null
       setMode(chipMode)
       // size-fit 芯片（Find my size）也带已知脚长：文本不含显式尺码时服务端回退预填。
-      const footMm = chipMode === 'size-fit' ? getMySizeSnapshot() : null
+      const footMm = chipMode === 'size-fit' ? mySize.getSnapshot() : null
       send(chipMode, label, ref, footMm)
     },
     [product, send],
@@ -118,7 +109,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         stopSpeaking() // 自动开场即新回合
         // 已知「我的尺码」（脚长 mm）时一并带去：size-fit 确定性核心文本无码则回退用之，
         // 直接给出推荐而非追问「您穿什么码」（Find my size 预填）。
-        send('size-fit', '', { handle: p.handle, title: p.title }, getMySizeSnapshot())
+        send('size-fit', '', { handle: p.handle, title: p.title }, mySize.getSnapshot())
       }
     },
     [send],
@@ -132,7 +123,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       if (nextMode !== mode) setMode(nextMode)
       const ref = product ? { handle: product.handle, title: product.title } : null
       // size-fit 自由输入已带显式文本；文本无码时仍以已知脚长为回退（服务端语义）。
-      const footMm = nextMode === 'size-fit' ? getMySizeSnapshot() : null
+      const footMm = nextMode === 'size-fit' ? mySize.getSnapshot() : null
       send(nextMode, text, ref, footMm)
     },
     [mode, product, send, sizeFitSettled],
@@ -140,7 +131,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
 
   const handleToggleSpeak = useCallback((next: boolean) => {
     if (!next) stopSpeaking() // 关开关即静音
-    setSpeakPreference(next)
+    speak.set(next)
   }, [])
 
   const value = useMemo<AssistantHandle>(() => ({ open, close }), [open, close])

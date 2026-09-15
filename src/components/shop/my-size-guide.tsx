@@ -5,14 +5,12 @@ import type { SizeSystem } from '@/server/catalog/types'
 import { market } from '@/lib/market'
 import {
   footMmToSystem,
-  getMySizeServerSnapshot,
-  getMySizeSnapshot,
+  mySize,
   MY_SIZE_MAX_MM,
   MY_SIZE_MIN_MM,
   MY_SIZE_UI_MAX_MM,
   MY_SIZE_UI_MIN_MM,
   setMySize,
-  subscribeMySize,
 } from '@/lib/my-size'
 
 const SYSTEMS: SizeSystem[] = ['US', 'EU', 'UK', 'JP', 'CN']
@@ -26,7 +24,11 @@ const fmt = (v: number | null): string => (v == null ? '—' : String(v))
  * 消费同一快照。零 JS 也可展开（<details>）。
  */
 export function MySizeGuide() {
-  const savedMm = useSyncExternalStore(subscribeMySize, getMySizeSnapshot, getMySizeServerSnapshot)
+  const savedMm = useSyncExternalStore(
+    mySize.subscribe,
+    mySize.getSnapshot,
+    mySize.getServerSnapshot,
+  )
   const marketSys = market.sizeSystem
   // 草稿：已保存则从其出发；未保存给表内常见默认（265mm，演示中段）
   const [draft, setDraft] = useState(savedMm ?? 265)

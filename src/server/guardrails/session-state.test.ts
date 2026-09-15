@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { HISTORY_TURNS, MAX_TURNS, SESSION_TTL_MS, createSessionStore } from './session-state'
+import { HISTORY_TURNS, SESSION_TTL_MS, createSessionStore, maxTurns } from './session-state'
 
 describe('createSessionStore', () => {
   it('回合数达 MAX_TURNS 后第 MAX_TURNS+1 次拒绝', () => {
     const s = createSessionStore()
-    for (let i = 0; i < MAX_TURNS; i++) {
+    for (let i = 0; i < maxTurns(); i++) {
       expect(s.claim('k', i).allowed).toBe(true)
     }
-    expect(s.claim('k', MAX_TURNS).allowed).toBe(false)
+    expect(s.claim('k', maxTurns()).allowed).toBe(false)
   })
 
   it('TTL 过期后会话重置、可再次 claim', () => {

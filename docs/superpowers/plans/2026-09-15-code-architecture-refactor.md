@@ -154,65 +154,59 @@ bun run build     # 批次 1 / 3 / 4 / 6 需要（涉及 RSC、SSG、route handl
 
 ## 批次 2：共享状态与配置基座
 
-**目标：** 收敛 4 份手写 localStorage/external-store 样板（A5），消除 2 个 import 环与不一致的 env 读取时机（A4），并建立统一的 env 门面（D1）—— D1 是 A4 的前置。
+**目标：** 收敛手写 localStorage/external-store 样板（A5），消除 import 环与不一致的 env 读取时机（A4），建立统一 env 门面（D1）。
 
 **出口：** `bun run verify` 全绿；新增 store 单测；import 图环数 **2 → 0**。
 
+**状态：✅ 已完成。** `verify` = 58 文件 / **318 用例**全绿、0 lint 问题；`bun run build` = 42/42 静态页；**import 环数实测 0**（118 个非测试模块全图 DFS）。
+
 ### 任务 2.1 —— `createPersistentStore` 深模块（A5）
 
-- [ ] 新建 `src/lib/create-store.ts`：
-
-```ts
-export interface Store<T> {
-  subscribe(listener: () => void): () => void
-  getSnapshot(): T
-  getServerSnapshot(): T
-  set(next: T | ((prev: T) => T)): void
-}
-export function createPersistentStore<T>(spec: {
-  key: string
-  serverSnapshot: T
-  decode(raw: string | null): T
-  encode(value: T): string
-}): Store<T>
-export function createStore<T>(spec: {
-  initial: T
-  serverSnapshot: T
-}): Store<T> // 无持久化
-```
-
-要求：懒加载（首次 `getSnapshot` 才读 `localStorage`）、写入包 `try/catch`（隐私模式静默）、`serverSnapshot` 引用稳定、`window === undefined` 时返回 `serverSnapshot`。
-
-- [ ] 新建 `src/lib/create-store.test.ts`：覆盖懒加载、JSON 损坏回退、写入广播、SSR 快照稳定性。
-- [ ] `src/lib/speak-preference.ts` → 用 `createPersistentStore<boolean>` 重写（`'1'`/`'0'` 编解码）。
-- [ ] `src/lib/my-size.ts` → 用 `createPersistentStore<number | null>` 重写，仅保留 `MY_SIZE_*` 常量与「我的尺码」领域的公开函数。
-- [ ] `src/components/shop/wishlist-provider.tsx` → 内部改用 `createPersistentStore<string[]>`，Provider/Context 外壳保留（`useOptionalWishlist` 的契约不能动）；删除文件里那段解释「为什么用 external store」的长注释，将其结论并入 `create-store.ts` 的接口文档。
-- [ ] `src/lib/page-product.ts` → 改用 `createStore<PageProductRef | null>`（无持久化）。
-- [ ] 验证：`bun run test -- src/lib src/components/shop/wishlist-button.test.tsx src/components/shop/saved-pairs.test.tsx`
+- [x] 新建 `src/lib/create-store.ts`，导出 `Store<T>` / `createPersistentStore<T>` / `createStore<T>`。`encode` 允许返回 `null` 表示**删除该键**（见执行记录 ②）。
+- [x] 新建 `src/lib/create-store.test.ts`：覆盖惰性加载、损坏回退、写入广播、同值不广播、退订、函数式更新、SSR 快照引用稳定、`window` 缺失、隐私模式静默读写。
+- [x] `src/lib/speak-preference.ts` → `createPersistentStore<boolean>`（`'1'`/`'0'` 编解码）；文件从 60 行降到 16 行。
+- [x] `src/lib/my-size.ts` → `createPersistentStore<number | null>`，保留 `MY_SIZE_*` 常量与领域函数（`footMmRow`/`footMmToEU`/`footMmToSystem`）。
+- [x] `src/components/shop/wishlist-provider.tsx` → `createPersistentStore<string[]>`，Provider 外壳与 `useOptionalWishlist` 非抛出契约未动；删掉解释「为什么用 external store」的长注释并并入 `create-store.ts`。
+- [x] `src/lib/page-product.ts` → `createStore<PageProductRef | null>`（无持久化，按 handle/title 去重语义保留）。
+- [x] 验证：`bun run test`
 
 ### 任务 2.2 —— env 门面 `src/config.ts`（D1）
 
-- [ ] 把 `src/server/guardrails/env-int.ts` 迁为 `src/config.ts`，导出 `envStr(name, fallback='')`、`envInt(name, fallback)`、`envFlag(name, fallback=false)`；全部**调用时求值**，保留空串/空白硬化语义（`envInt` 的既有注释是这套硬化的取值理由，保留其要点）。
-- [ ] `src/server/guardrails/env-int.test.ts` → 迁为 `src/config.test.ts`。
-- [ ] 改 4 个消费方 import：`guardrails/budget.ts`、`guardrails/session-state.ts`、`guardrails/text.ts`、`ai/openai-compat.ts`。
-- [ ] `src/server/search/embedder.ts`：删除顶层 `const base` / `const model` 快照，改为函数内 `envStr` 调用。
-- [ ] `src/server/ai/openai-compat.ts`：删除顶层 `const AI_MODEL` 与 `TIMEOUT_MS` 快照，改为 `stream()` 内求值。
-- [ ] `src/server/catalog/shopify-buy.ts` / `shopify-stub.ts` / `db/dialect.ts` / `db/client.ts` / `lib/market.ts`：逐一改走 `envStr` / `envFlag`（这些本已是调用时读取，只统一取值方式）。
-- [ ] 验证：`bun run test`（全量，env 相关用例分布较广）
+- [x] `env-int.ts` 迁为 `src/config.ts`，导出 `envStr` / `envInt` / `envFlag`，全部调用时求值并保留空串/空白硬化语义。
+- [x] `env-int.test.ts` → `src/config.test.ts`，并为新增的 `envStr` / `envFlag` 补测。
+- [x] 改消费方 import：`guardrails/budget.ts`、`session-state.ts`、`text.ts`、`ai/openai-compat.ts`。
+- [x] `src/server/search/embedder.ts`：删除顶层 `base` / `model` 快照，改为函数内 `envStr`（含 `AI_API_KEY`）。
+- [x] `src/server/ai/openai-compat.ts`：删除顶层 `AI_MODEL` / `TIMEOUT_MS` 快照，改为 `stream()` 内求值；新增 `aiModelName()` 供工厂复用（记账与流式同源）。
+- [x] `shopify-buy.ts` / `shopify-stub.ts` / `lib/market.ts`：改走 `envStr`。
+- [x] 额外（计划未列）：把 `guardrails` 里 4 个**模块级常量快照**改为函数 —— 见执行记录 ①。
+- [~] `db/dialect.ts` / `db/client.ts`：**故意不改** —— 见执行记录 ③。
+- [x] 验证：`bun run test`（全量）
 
 ### 任务 2.3 —— 拆掉 AI provider 环（A4）
 
-- [ ] `src/server/ai/provider.ts` 收敛为**纯接口**：只留 `AiContext`、`AiProvider`；删除文件中的工厂代码与运行时 import。
-- [ ] 新建 `src/server/ai/factory.ts`：迁入 `realEnabled` / `aiProvider` / `aiModel`，沿用 `envStr`。
-- [ ] 更新消费方 import：`ai/chat.ts`、`app/api/ai/chat/route.ts`，以及测试中 mock 掉工厂的位置。
-- [ ] 验证 import 图无环（重新跑一次 DFS 或人工确认：`factory → {openai-compat, mock} → provider`，单向）。
-- [ ] 验证：`bun run test -- src/server/ai`
+- [x] `src/server/ai/provider.ts` 收敛为纯接口（`AiContext` / `AiProvider`），删除工厂与全部运行时 import。
+- [x] 新建 `src/server/ai/factory.ts`：迁入 `realEnabled` / `aiProvider` / `aiModel`，沿用 `envStr` / `envFlag`。
+- [x] 更新消费方 import：`ai/chat.ts` 改从 `./factory` 取工厂。
+- [x] 验证 import 图无环：**实测 0 个环**（`factory → {openai-compat, mock} → provider` 单向）。
+- [x] 验证：`bun run test -- src/server/ai`
 
-### 任务 2.4（可选，低优先）—— 目录适配器改为惰性单例
+### 任务 2.4 —— 目录适配器改为惰性单例
 
-- [ ] `src/server/catalog/adapter.ts` 的模块级 IIFE 会在 import 时快照 `CATALOG_SOURCE` / `SHOPIFY_*`。改为 `export const catalog = (): CatalogAdapter => (instance ??= pick())`。
-- [ ] 机械更新 6 个消费方（`catalog/service.ts`、`search/retrieval.ts`、`app/shop/page.tsx`、`app/product/[handle]/page.tsx`、`app/api/*`）。
-- [ ] 若改动面超出预期，**跳过本任务**并在本文件「本计划不做」表中补记理由 —— 当前 vitest 已通过 config 级 `CATALOG_SOURCE: 'seed'` 规避该问题，收益有限。
+- [x] `src/server/catalog/adapter.ts` 的模块级 IIFE 改为 `catalog()`：首次调用才读 `CATALOG_SOURCE` 并缓存实例（实例必须缓存：`DbCatalogAdapter` 内部持有「已灌种」promise）。
+- [x] 机械更新 6 个消费方（`catalog/service.ts`、`search/retrieval.ts`、`ai/chat.ts`、`app/shop/page.tsx`、`app/product/[handle]/page.tsx`、`components/marketing/collection-cards.tsx`）。
+- [x] 改动面**正好 6 个消费方**，未超预期，故不跳过。
+
+### 执行记录（与计划的偏差，均为实测后的判断）
+
+① **2.2 的范围比计划大一倍：真正的不一致是 5 个「模块级常量快照」，计划只点了 2 个。** 计划让 `embedder.ts` 与 `openai-compat.ts` 去快照，但 `guardrails` 里还有 4 个模块级常量在 import 时求值 —— 而 `env-int.ts` 的注释本身写着「调用时才读 process.env，便于测试 vi.stubEnv 后直测」：消费方用 `export const MAX_TURNS = envInt(...)` 把这句话直接作废了（谁 stub `AI_MAX_TURNS` 都不会生效）。这与批次目标「消除不一致的 env 读取时机」是同一类缺陷，只修 2 处属于打地鼠，故一并改为函数：`maxTurns()` / `maxMessageChars()` / `maxOutputTokens()` / `dailyTokenCap()`（含 4 个测试文件的调用点）。当前无测试 stub 这些变量，所以这是**不可观测的潜在坑**，而非现存 bug。
+
+② **2.1 删掉了整层「别名门面」。** 初版写的是 `export const subscribeMySize = mySize.subscribe` 这类 7 个透传别名（knip 报 `pass-through-wrappers`）。它们只增加名字不增加含义，改为直接导出 store 对象、让 5 个消费方用 `mySize.subscribe` 等；只有 `setMySize` 保留为函数（它做归一化，是真逻辑）。同时 `createPersistentStore.encode` 允许返回 `null` 以表达「删除该键」——`setMySize(null)` 因此仍是 `removeItem` 而非写入 `'null'`，行为与重构前一致。副作用：`lib/wishlist.ts` 变为纯函数（`parseWishlist` + `toggleWishlist`），持久化归 provider，`saveWishlist` 删除；`loadMySize`/`saveMySize`/`clearMySize` 删除（已并入 store，`my-size.test.ts` 相应改为 `resetModules` + 动态 import 以观察存储初始态）。
+
+③ **2.2 故意不改 `db/dialect.ts` 与 `db/client.ts`，因为计划这一条会让代码变差。** 这两处的 env 是**可注入参数**（`resolveDbDriver(env = process.env)`、`createDb(file = process.env.DATABASE_URL ?? ...)`），`dialect.test.ts` 正是用假 env 对象跑 7 个用例。改走读全局 `process.env` 的 `envStr` 会**删掉可注入性并打挂这些用例** —— 局部可注入严格优于全局门面，故保留原样。
+
+④ **2.2 补掉一个漏网点**：`search/retrieval.ts` 里还有一处 `process.env.AI_EMBEDDING_MODEL`（计划未列），已改 `envStr`。`lib/seo.ts` 的模块级快照按「本计划不做」保留。
+
+⑤ **`AI_DISABLE_REAL` 语义小幅放宽**：原为 `!== '1'` 精确匹配，现走 `envFlag`，`'1'` 与 `'true'` 都算真。`AI_MODEL` 的解析也从 `process.env.AI_MODEL ?? 缺省` 变为 `envStr`（空串/空白按未设置）。二者都是空串硬化方向的一致性收紧，无测试依赖旧行为。
 
 **回滚点：** `git commit -m "refactor(state,config): one store implementation, one env facade, acyclic AI provider seam"`
 

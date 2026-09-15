@@ -1,58 +1,70 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  clearMySize,
   footMmRow,
   footMmToEU,
   footMmToSystem,
-  getMySizeServerSnapshot,
-  getMySizeSnapshot,
-  loadMySize,
   MY_SIZE_MAX_MM,
   MY_SIZE_MIN_MM,
-  saveMySize,
-  setMySize,
-  subscribeMySize,
 } from '@/lib/my-size'
 
 const KEY = 'evoloop:foot-mm'
+
+/**
+ * store 是模块级缓存：首次读取后就不再回头看 localStorage。所以每个持久化用例都要
+ * resetModules 后重新 import，才能观察到「存储里已经有值」的初始状态。
+ */
+async function freshMySize() {
+  vi.resetModules()
+  return await import('@/lib/my-size')
+}
 
 afterEach(() => {
   window.localStorage.clear()
   vi.restoreAllMocks()
 })
 
-describe('my-size storage (localStorage 安全读写)', () => {
-  it('loads null when nothing stored (also SSR path)', () => {
+describe('my-size 持久化（createPersistentStore，崩溃安全）', () => {
+  it('未设置时读作 null', async () => {
+    const { mySize } = await freshMySize()
     expect(typeof window).toBe('object')
-    expect(loadMySize()).toBeNull()
+    expect(mySize.getSnapshot()).toBeNull()
   })
 
-  it('round-trips a saved foot length in mm', () => {
-    saveMySize(265)
-    expect(loadMySize()).toBe(265)
+  it('写入后读回，并按数值 JSON 落盘', async () => {
+    const { mySize, setMySize } = await freshMySize()
+    setMySize(265)
+    expect(mySize.getSnapshot()).toBe(265)
+    expect(window.localStorage.getItem(KEY)).toBe('265')
   })
 
-  it('clear removes the key', () => {
-    saveMySize(265)
-    clearMySize()
-    expect(loadMySize()).toBeNull()
+  it('setMySize(null) 删除键，而不是写入字符串 "null"', async () => {
+    const { mySize, setMySize } = await freshMySize()
+    setMySize(265)
+    setMySize(null)
+    expect(window.localStorage.getItem(KEY)).toBeNull()
+    expect(mySize.getSnapshot()).toBeNull()
   })
 
-  it('corrupt JSON falls back to null', () => {
+  it('损坏 JSON 回退 null，不抛错', async () => {
     window.localStorage.setItem(KEY, '{not json')
-    expect(loadMySize()).toBeNull()
+    const { mySize } = await freshMySize()
+    expect(mySize.getSnapshot()).toBeNull()
   })
 
-  it('non-number / non-finite stored values fall back to null', () => {
-    window.localStorage.setItem(KEY, '"265"')
-    expect(loadMySize()).toBeNull()
-    window.localStorage.setItem(KEY, 'null')
-    expect(loadMySize()).toBeNull()
+  it('非数值 / null / 对象 / 数组 落盘值一律回退 null', async () => {
+    for (const raw of ['"265"', 'null', '{}', '[265]']) {
+      window.localStorage.setItem(KEY, raw)
+      const { mySize } = await freshMySize()
+      expect(mySize.getSnapshot()).toBeNull()
+    }
   })
 
-  it('saveMySize ignores non-finite input', () => {
-    saveMySize(Number.NaN)
-    expect(loadMySize()).toBeNull()
+  it('非有限数值按「未设置」处理：清空而不是留下旧值', async () => {
+    const { mySize, setMySize } = await freshMySize()
+    setMySize(265)
+    setMySize(Number.NaN)
+    expect(mySize.getSnapshot()).toBeNull()
+    expect(window.localStorage.getItem(KEY)).toBeNull()
   })
 })
 
@@ -88,31 +100,32 @@ describe('footMm → row mapping (就近映射)', () => {
 })
 
 describe('external store snapshot/subscribe', () => {
-  it('server snapshot is a stable null constant', () => {
-    expect(getMySizeServerSnapshot()).toBeNull()
-    expect(getMySizeServerSnapshot()).toBe(getMySizeServerSnapshot())
+  it('server snapshot 是稳定的 null 常量', async () => {
+    const { mySize } = await freshMySize()
+    expect(mySize.getServerSnapshot()).toBeNull()
+    expect(mySize.getServerSnapshot()).toBe(mySize.getServerSnapshot())
   })
 
-  it('setMySize updates snapshot and notifies subscribers', () => {
+  it('setMySize 更新快照并广播订阅者；退订后不再广播', async () => {
+    const { mySize, setMySize } = await freshMySize()
     const listener = vi.fn()
-    const unsub = subscribeMySize(listener)
-    expect(getMySizeSnapshot()).toBeNull()
+    const unsub = mySize.subscribe(listener)
+    expect(mySize.getSnapshot()).toBeNull()
     setMySize(280)
-    expect(getMySizeSnapshot()).toBe(280)
+    expect(mySize.getSnapshot()).toBe(280)
     expect(listener).toHaveBeenCalledTimes(1)
     setMySize(null)
-    expect(getMySizeSnapshot()).toBeNull()
+    expect(mySize.getSnapshot()).toBeNull()
     expect(listener).toHaveBeenCalledTimes(2)
     unsub()
     setMySize(266)
     expect(listener).toHaveBeenCalledTimes(2) // 已退订不再广播
-    expect(getMySizeSnapshot()).toBe(266)
-    setMySize(null)
+    expect(mySize.getSnapshot()).toBe(266)
   })
 
-  it('rounds fractional mm input', () => {
+  it('小数值输入取整到毫米', async () => {
+    const { mySize, setMySize } = await freshMySize()
     setMySize(265.6)
-    expect(getMySizeSnapshot()).toBe(266)
-    setMySize(null)
+    expect(mySize.getSnapshot()).toBe(266)
   })
 })

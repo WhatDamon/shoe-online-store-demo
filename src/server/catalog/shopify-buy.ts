@@ -13,6 +13,8 @@
 // 挂载块含 2 个重复商品），其余 5 款（dc-26075 / 26027-m / 26019-m / 26017-m / 26016-m）经同一
 // Storefront API 拉取补齐。维护：商店增删改商品时，用 Storefront GraphQL products 查询刷新下表。
 
+import { envStr } from '@/config'
+
 export interface ShopifyBuyConfig {
   productId: string
   domain: string
@@ -64,9 +66,9 @@ export function shopifyProductIdFor(handle: string): string | null {
 // 激活开关：与 catalog 适配器完全隔离的独立键。buildClient 的 domain/token 会被打进
 // 客户端 bundle（Buy Button SDK 本就是浏览器端脚本，token 为公开 Storefront 只读令牌）。
 // 未配置 → PDP 维持 demo 购买条（P1 克制：零购买 UI，不静默半激活）。
-const envDomain = () => process.env.SHOPIFY_BUY_DOMAIN?.trim() || ''
-const envToken = () => process.env.SHOPIFY_BUY_TOKEN?.trim() || ''
-const envMoney = () => process.env.SHOPIFY_BUY_MONEY_FORMAT || '¥{{amount}}'
+const envDomain = () => envStr('SHOPIFY_BUY_DOMAIN')
+const envToken = () => envStr('SHOPIFY_BUY_TOKEN')
+const envMoney = () => envStr('SHOPIFY_BUY_MONEY_FORMAT', '¥{{amount}}')
 
 /**
  * handle 的商店购买配置；未启用（env 缺 domain/token）或商品无映射 → null。

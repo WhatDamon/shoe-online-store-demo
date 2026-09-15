@@ -24,7 +24,7 @@ import { pageMetadata } from '@/lib/seo'
 import { POLICY_PRODUCTION, POLICY_RETURNS } from '@/lib/store-policy'
 
 export async function generateStaticParams() {
-  const products = await catalog.getProducts()
+  const products = await catalog().getProducts()
   return products.map((p) => ({ handle: p.handle }))
 }
 
@@ -55,7 +55,7 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
   // 该 PDP 由 Shopify Buy Button 接管变体选择与结算（隐藏 demo 价与选择器）；否则维持 demo 购买条。
   const buyConfig = shopifyBuyConfigFor(product.handle)
   const [buyUrl, related] = await Promise.all([
-    catalog.getBuyUrl(product),
+    catalog().getBuyUrl(product),
     getRelatedProducts(product.handle, 3),
   ])
 

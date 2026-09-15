@@ -37,7 +37,7 @@ export default async function ShopPage({
 
   const [products, allCollections] = await Promise.all([
     listProductsForMarket(filter),
-    catalog.getCollections(),
+    catalog().getCollections(),
   ])
   const collectionOptions = allCollections.map((c) => ({
     value: c.handle,

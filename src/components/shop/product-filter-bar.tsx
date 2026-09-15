@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation'
 import { parseShopParams, serializeShopParams } from '@/lib/shop-search-params'
 import type { ShopFilter } from '@/lib/shop-search-params'
 import type { CanonicalSize } from '@/server/catalog/types'
-import { footMmToEU } from '@/lib/my-size'
-import { getMySizeServerSnapshot, getMySizeSnapshot, subscribeMySize } from '@/lib/my-size'
+import { footMmToEU, mySize } from '@/lib/my-size'
 
 export interface FilterOption {
   value: string
@@ -64,9 +63,9 @@ export function ProductFilterBar({
   const showClear = hasActiveFilters(initial)
   // 「我的尺码」命中：保存后所在码 chip 显示圆点 + aria（有码款即使未筛选也可辨识）。
   const myCanonical = useSyncExternalStore(
-    subscribeMySize,
-    getMySizeSnapshot,
-    getMySizeServerSnapshot,
+    mySize.subscribe,
+    mySize.getSnapshot,
+    mySize.getServerSnapshot,
   )
   const myEU = myCanonical != null ? footMmToEU(myCanonical) : null
 

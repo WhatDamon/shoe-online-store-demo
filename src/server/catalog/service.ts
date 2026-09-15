@@ -30,12 +30,12 @@ export async function listProductsForMarket(filter: MarketFilter = {}): Promise<
   const { sizeLabels, ...rest } = filter
   const canonical: ProductFilter = { ...rest }
   if (sizeLabels?.length) canonical.sizes = toCanonicalSizes(sizeLabels)
-  const products = await catalog.getProducts(canonical)
+  const products = await catalog().getProducts(canonical)
   return products.map(toView)
 }
 
 export async function getProductForMarket(handle: string): Promise<ProductView | null> {
-  const p = await catalog.getProductByHandle(handle)
+  const p = await catalog().getProductByHandle(handle)
   return p ? toView(p) : null
 }
 

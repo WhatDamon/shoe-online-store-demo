@@ -2,8 +2,8 @@
 import { describe, expect, it } from 'vitest'
 import { createDb } from '@/db/client'
 import { createRepository } from '@/server/search/repository'
-import { DAILY_TOKEN_CAP, today } from './budget'
-import { MAX_TURNS } from './session-state'
+import { dailyTokenCap, today } from './budget'
+import { maxTurns } from './session-state'
 import { GUARDRAIL_MESSAGE, GuardrailError, RATE_PER_MIN, createGuardrails } from './index'
 
 const fresh = () => createGuardrails(createRepository(createDb(':memory:')))
@@ -11,7 +11,7 @@ const fresh = () => createGuardrails(createRepository(createDb(':memory:')))
 describe('createGuardrails', () => {
   it('assertTurn 达 MAX_TURNS 后抛 code=turns 的温和拒答', () => {
     const g = fresh()
-    for (let i = 0; i < MAX_TURNS; i++) {
+    for (let i = 0; i < maxTurns(); i++) {
       expect(g.assertTurn('ses-a')).toEqual([])
     }
     try {
@@ -66,11 +66,11 @@ describe('createGuardrails', () => {
     await g.noteUsage({
       day: today(),
       model: 'mock',
-      promptTokens: Math.floor(DAILY_TOKEN_CAP / 2),
-      completionTokens: Math.floor(DAILY_TOKEN_CAP / 2) + 1,
+      promptTokens: Math.floor(dailyTokenCap() / 2),
+      completionTokens: Math.floor(dailyTokenCap() / 2) + 1,
       sessionKey: 'ses-b',
     })
-    expect(await repo.dayTokenUsage(today())).toBeGreaterThanOrEqual(DAILY_TOKEN_CAP)
+    expect(await repo.dayTokenUsage(today())).toBeGreaterThanOrEqual(dailyTokenCap())
     await expect(g.assertBudget()).rejects.toMatchObject({ code: 'budget' })
   })
 

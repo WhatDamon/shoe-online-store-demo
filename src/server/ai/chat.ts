@@ -4,7 +4,7 @@
 import { createGuardrails, type Guardrails } from '@/server/guardrails'
 import { GuardrailError } from '@/server/guardrails'
 import type { SessionMessage } from '@/server/guardrails/session-state'
-import { MAX_OUTPUT_TOKENS, estTokens, truncateMessage } from '@/server/guardrails/text'
+import { estTokens, maxOutputTokens, truncateMessage } from '@/server/guardrails/text'
 import { today } from '@/server/guardrails/budget'
 import { catalog } from '@/server/catalog/adapter'
 import type { Product } from '@/server/catalog/types'
@@ -16,7 +16,7 @@ import { createDefaultRepository } from '@/server/search/repository'
 import { createSizeFitEvent } from './events'
 import type { AiContext, AiProvider } from './provider'
 import type { ChatEvent, Mode, ProductCard } from './events'
-import { aiProvider, aiModel } from './provider'
+import { aiModel, aiProvider } from './factory'
 import { systemFor } from './prompts'
 import { adviceFor } from './size-input'
 
@@ -87,7 +87,7 @@ async function retrieveProducts(query: string, limit = 4): Promise<Product[]> {
   // 保守下限只剔除正交/负分噪声；更严格截断待引入原生向量后端时按已知模型标定）。
   const relevant = hits.filter((h) => h.score > 0)
   const ps = await Promise.all(
-    relevant.slice(0, limit).map((h) => catalog.getProductByHandle(h.handle)),
+    relevant.slice(0, limit).map((h) => catalog().getProductByHandle(h.handle)),
   )
   return ps.filter((p): p is Product => p !== null)
 }
@@ -175,7 +175,7 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
     let assistant = ''
     for await (const delta of provider.stream({
       system,
-      maxTokens: MAX_OUTPUT_TOKENS,
+      maxTokens: maxOutputTokens(),
       messages,
     })) {
       assistant += delta

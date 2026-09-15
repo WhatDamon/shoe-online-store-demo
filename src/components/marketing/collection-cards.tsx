@@ -20,11 +20,11 @@ interface SeriesCard {
 }
 
 export async function CollectionCards() {
-  const collections = await catalog.getCollections()
+  const collections = await catalog().getCollections()
 
   const cards: SeriesCard[] = await Promise.all(
     collections.map(async (collection) => {
-      const products = await catalog.getProducts({
+      const products = await catalog().getProducts({
         collection: collection.handle,
         sort: 'featured',
       })

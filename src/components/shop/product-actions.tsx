@@ -4,8 +4,7 @@ import { useSyncExternalStore, useState, type ReactNode } from 'react'
 import type { CanonicalSize } from '@/server/catalog/types'
 import type { ProductView } from '@/server/catalog/service'
 import type { ShopifyBuyConfig } from '@/server/catalog/shopify-buy'
-import { footMmToEU } from '@/lib/my-size'
-import { getMySizeServerSnapshot, getMySizeSnapshot, subscribeMySize } from '@/lib/my-size'
+import { footMmToEU, mySize } from '@/lib/my-size'
 import { formatPrice } from '@/lib/format'
 import { useAssistant } from '@/components/assistant/assistant-provider'
 import { SizeSelector } from './size-selector'
@@ -42,7 +41,7 @@ export function ProductActions({
   const storeLive = buyConfig != null
   const colors = product.colors ?? []
   // 「我的尺码」快照：demo 分支 Select-size 命中高亮（产品在库才显形，天然自然）。
-  const myMm = useSyncExternalStore(subscribeMySize, getMySizeSnapshot, getMySizeServerSnapshot)
+  const myMm = useSyncExternalStore(mySize.subscribe, mySize.getSnapshot, mySize.getServerSnapshot)
   const myCanonical = myMm != null ? footMmToEU(myMm) : null
   // 多色款下单前选色：照片未按颜色拆分（决策 #16），色卡仅记录意向，主图保持代表图。
   const [colorIdx, setColorIdx] = useState(0)
