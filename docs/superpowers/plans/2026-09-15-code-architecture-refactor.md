@@ -266,32 +266,50 @@ bun run build     # 批次 1 / 3 / 4 / 6 需要（涉及 RSC、SSG、route handl
 
 ## 批次 4：AI 编排解耦
 
-**目标：** `ai/chat.ts`（293 行 / 16 import，全仓 fan-out 最高）把护栏顺序、5 个 mode 分支、上下文构造、流式转发、记账、错误映射挤在一个生成器里，导致改任一 mode 都必须穿过整条护栏栈才能测试。同时去掉 `retrieve()` 的隐式全局依赖与「默认参数陷阱」。
+**目标：** `ai/chat.ts`（283 行 / 18 import，全仓 fan-out 最高）把护栏顺序、5 个 mode 分支、上下文构造、流式转发、记账、错误映射挤在一个生成器里，导致改任一 mode 都必须穿过整条护栏栈才能测试。同时去掉 `retrieve()` 的隐式全局依赖与「默认参数陷阱」。
 
 **出口：** `bun run verify` + `bun run build` 全绿；每个 mode 有独立单测；`chat()` 主函数 ≤ 80 行。
 
+**状态：✅ 已完成。** `verify` = 60 文件 / **341 用例**全绿、0 lint 问题；`build` = **42/42 静态页**；`chat()` **62 行**（≤80）；`chat.ts` 283 → **106 行**，import 18 → 10，运行时依赖只剩 6 个；import 环 **0**。
+
 ### 任务 4.1 —— 抽出 `ai/context.ts`
 
-- [ ] 把 `chat.ts` 中的纯函数移出：`productContextOf`、`digestLines`、`toCard`（连同批次 1.2 已迁走的 `sizeRangeText` 调用点）。
-- [ ] 新建 `src/server/ai/context.test.ts`，直接对纯函数断言（当前这些逻辑只能经 SSE 端到端断言）。
+- [x] 把 `chat.ts` 中的纯函数移出：`productContextOf`、`digestLines`、`toCard`（连同批次 1.2 已迁走的 `sizeRangeText` 调用点）。
+- [x] 新建 `src/server/ai/context.test.ts`（10 例），直接对纯函数断言 —— 此前这些逻辑只能经 SSE 端到端断言。
 
 ### 任务 4.2 —— 按 mode 拆分处理函数
 
-- [ ] 定义统一签名：`type ModeHandler = (ctx: TurnContext) => AsyncGenerator<ChatEvent, void, void>`，其中 `TurnContext` 携带 `{req, text, history, provider, guardrails, record}`。
-- [ ] 拆出 `handleSizeFit`（含 `footMmToEU` 预填）、`handleOutfit`、`handleSupport`、`handleFindShoes`、`handleShopping`（后两者共用检索分支）。
-- [ ] `chat()` 收敛为：`truncateMessage` → `assertRate` → `assertBudget` → `assertTurn` → `modeHandlers[req.mode](ctx)` → `catch → toErrorEvent`。
-- [ ] `streamAssistantReplies` 的 `yield*` 复用结构保留（那处注释解释了「yield 不能出现在箭头闭包内」这一非显然约束 —— 属保留范围）。
-- [ ] 为每个 handler 增加独立单测，覆盖现有 `chat.test.ts` 已断言的场景；`chat.test.ts` 保留护栏顺序相关的端到端用例。
-- [ ] 验证：`bun run test -- src/server/ai`
+- [x] 定义统一签名 `ModeHandler = (ctx: TurnContext) => AsyncGenerator<ChatEvent, void, void>`。
+- [x] 拆出 `handleSizeFit`（含 `footMmToEU` 预填）、`handleOutfit`、`handleSupport`、`handleCatalogModes`（find-shoes / shopping 共用检索分支）。
+- [x] `chat()` 收敛为：`truncateMessage` → `assertRate` → `assertBudget` → `assertTurn` → `modeHandlers[req.mode](ctx)` → `catch → toErrorEvent`（**62 行**）。
+- [x] `streamAssistantReplies` 的 `yield*` 复用结构保留（那处「yield 不能出现在箭头闭包内」的注释也保留）。
+- [x] 新增 `src/server/ai/handlers.test.ts`（13 例），给每个 mode 独立单测；`chat.test.ts` 保留护栏顺序等端到端用例。
+- [x] 验证：`bun run test src/server/ai`（66 例全绿）。
 
 ### 任务 4.3 —— `retrieve()` 注入化（B3）
 
-- [ ] `src/server/search/retrieval.ts`：签名改为 `retrieve(query: string, deps: { products: Product[]; repo: Repository; canEmbed: () => Promise<boolean>; embed: EmbedFn })`。
-- [ ] 删除默认参数 `repo = createDefaultRepository()` 与 `opts = { embedIfAvailable: true }`（后者依赖调用约定，是缺陷不是配置）；`features` 开关由组合根决定是否调用。
-- [ ] 删除文件内对 `catalog` 单例的 import；`products` 由调用方传入。
-- [ ] 新增 `src/server/ai/retrieval-gateway.ts`（或放在 `ai/context.ts`）作为组合根，装配 `catalog` + `createDefaultRepository()` + `embeddingsAvailable` + `embed`，供 `chat.ts` 使用。
-- [ ] 同步更新 `retrieval.test.ts`：改用注入的假 repo / 假 embed，删除为绕过单例而做的 env 设置。
-- [ ] 验证：`bun run test -- src/server/search src/server/ai`
+- [x] `retrieval.ts`：签名改为 `retrieve(query: string, deps: RetrievalDeps)`，`RetrievalDeps = { products, repo, canEmbed, embed }`。
+- [x] 删除默认参数 `repo = createDefaultRepository()` 与 `opts = { embedIfAvailable: true }`。
+- [x] 删除文件内对 `catalog` 单例的 import；`products` 由调用方传入。
+- [x] 新增 `src/server/ai/retrieval-gateway.ts` 作为组合根，装配 `catalog` + `createDefaultRepository()` + `embeddingsAvailable` + `embed`。
+- [x] `retrieval.test.ts` 改为注入假 repo / 假 embed，**删除了 `vi.mock('./embedder')` 整个模块 mock**。
+- [x] 验证：`bun run test src/server/search src/server/ai`（全绿）。
+
+### 执行记录（与计划的偏差，均为实测后的判断）
+
+① **新增了计划里没有的 `ai/turn.ts`。** 计划让 `ChatRequest` 留在 `chat.ts`、handler 另置他处 —— 这两件事不能同时成立：handler 要用 `ChatRequest`，`chat.ts` 要用 `modeHandlers`，必然成环。故把 `ChatRequest` / `TurnContext` / `ModeHandler` / `StreamReplies` / `RecordTurn` 独立成接口模块，两侧都只依赖它，它不依赖任何一侧。
+
+② **`TurnContext` 不含 `provider` / `guardrails`**（计划写的是 `{req, text, history, provider, guardrails, record}`）。handler 实际只用到两个能力：转发流、记账。把 provider / guardrails 暴露出去等于让每个 handler 都能绕过护栏顺序与 `maxTokens` 约束。改为注入 `stream`（已绑定 provider 与 `maxOutputTokens`）与 `record`——顺带让 handler 单测完全不需要假 provider。
+
+③ **find-shoes 与 shopping 共用一个 `handleCatalogModes`**，而非计划要的两个函数。二者只差「是否先出结果卡」，拆成两个近乎相同的函数只会得到一层透传。
+
+④ **三个逐字相同的 try/catch 合并为一个**（护栏 rate → budget → turns）。行为等价：任一失败都只回一个 error 帧并 return，被 rate/budget 拒的请求仍不消耗回合。
+
+⑤ **组合根落在 `retrieval-gateway.ts` 而非计划备选的 `context.ts`。** `context.ts` 是纯投影函数（无 IO），把目录与仓库装配塞进去会毁掉它的纯度与可测性。
+
+⑥ **没有新建 `copy.ts`**（维持批次 1 的判断）：三个文案各自只有一个归属模块 —— `PRODUCT_REQUIRED_TEXT` / `NO_MATCH_TEXT` 归 `handlers.ts`，`FALLBACK_ERROR_TEXT` 归 `chat.ts`，不满足「需要共享」的条件。`chat.test.ts` 的 `NO_MATCH_TEXT` 改从 `./handlers` 导入。
+
+⑦ **发现并修掉了 `chat.test.ts` 相关性下限用例的空转。** 该用例自称验证「余弦 ≤0 的命中被下限滤掉」，但两个 mock handle（`daily-drift` / `cloudwalk-slip`）**在真实目录里不存在**，会被 `getProductByHandle` 返回 null 丢掉 —— 于是「按分过滤」这一步从未被执行，用例在接线断掉时也照样变绿。且查询串 `zzz nonsense` 在关键词路径本来就零命中，spy 失效时同样变绿。改为：用**真实 handle** 承载 ≤0 分（保证这一步真的被执行），查询串换成关键词路径**本来会命中**的 `avocado`（保证 spy 失效时可被证伪）。负向验证：把分数改成 `0.9` 后该用例**确定失败**（productCards 出现），证明 mock 的返回值确实流到断言、下限确实承重。
 
 **回滚点：** `git commit -m "refactor(ai): per-mode handlers, extracted context builders, injected retrieval deps"`
 

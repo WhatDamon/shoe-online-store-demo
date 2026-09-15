@@ -1,11 +1,13 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { chat, NO_MATCH_TEXT, type ChatRequest } from './chat'
+import { chat, type ChatRequest } from './chat'
+import { NO_MATCH_TEXT } from './handlers'
 import { createDb } from '@/db/client'
 import { createRepository } from '@/server/search/repository'
 import { createGuardrails, GUARDRAIL_MESSAGE, type Guardrails } from '@/server/guardrails'
 import { encodeEvent, parseEvent, type ChatEvent } from '@/domain/chat-events'
 import { REDIRECT_TEXT } from './mock'
+import { seedProducts } from '@/server/catalog/seed'
 import * as retrievalModule from '@/server/search/retrieval'
 import type { AiContext, AiProvider } from './provider'
 
@@ -159,16 +161,22 @@ describe('chat mock 编排', () => {
 
   it('语义命中全为余弦≤0 → NO_MATCH（相关性下限闭合嵌入模式零命中分支）', async () => {
     const g = fresh()
+    // 两个细节让本用例真的有判别力（缺任一个都会在接线断掉时依然变绿）：
+    // 1) handle 必须是真实存在的——用杜撰 handle 会被 getProductByHandle 返回 null 丢掉，
+    //    那样「≤0 分被下限滤掉」这一步从未被验证；
+    // 2) 查询串必须选关键词路径本来会命中的词（avocado 命中 26016-m），否则 spy 没接上时
+    //    关键词查询本来也零命中，用例照样变绿。
     const spy = vi.spyOn(retrievalModule, 'retrieve').mockResolvedValue([
-      { handle: 'daily-drift', score: 0 },
-      { handle: 'cloudwalk-slip', score: -0.12 },
+      { handle: seedProducts[0].handle, score: 0 },
+      { handle: seedProducts[1].handle, score: -0.12 },
     ])
     try {
       const evs = await collect(
-        chat(req({ mode: 'find-shoes', text: 'zzz nonsense' }), {
+        chat(req({ mode: 'find-shoes', text: 'avocado' }), {
           guardrails: g,
         }),
       )
+      expect(spy).toHaveBeenCalled()
       expect(evs.some((e) => e.type === 'productCards')).toBe(false)
       const deltas = evs.filter((e) => e.type === 'delta')
       expect(deltas).toHaveLength(1)

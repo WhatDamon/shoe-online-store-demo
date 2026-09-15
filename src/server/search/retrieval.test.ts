@@ -1,24 +1,29 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { retrieve, hashText } from './retrieval'
+import { hashText, retrieve, type RetrievalDeps } from './retrieval'
 import { searchableText } from '@/domain/search-text'
 import { createDb } from '@/db/client'
-import { createRepository } from './repository'
+import { createRepository, type Repository } from './repository'
 import { seedProducts } from '@/server/catalog/seed'
 
-// vi.mock 工厂整体替换 ./embedder：embeddingsAvailable 与 embed 都由测试控制，
-// 真实 embedder（含 fetch 探测）在本测试中绝不执行。
-const { mockEmbed, mockEmbeddingsAvailable } = vi.hoisted(() => ({
-  mockEmbed: vi.fn(),
-  mockEmbeddingsAvailable: vi.fn(),
-}))
-vi.mock('./embedder', () => ({
-  embeddingsAvailable: mockEmbeddingsAvailable,
-  embed: mockEmbed,
-}))
+// 嵌入能力与嵌入实现都由测试直接注入 —— 这正是本次重构的目的：不再 vi.mock 整个 ./embedder
+// 模块，也不必靠 env 开关绕过模块级全局单例。
+const mockEmbed = vi.fn()
+const mockEmbeddingsAvailable = vi.fn()
 
 const DIM = seedProducts.length // 商品数（随 seed 动态）
 const FIRST = seedProducts[0]
+
+const makeRepo = (): Repository => createRepository(createDb(':memory:'))
+
+/** products 显式传入：生产由组合根（ai/retrieval-gateway）注入 catalog().getProducts({})。 */
+const depsOf = (repo: Repository, over: Partial<RetrievalDeps> = {}): RetrievalDeps => ({
+  products: seedProducts,
+  repo,
+  canEmbed: mockEmbeddingsAvailable,
+  embed: mockEmbed,
+  ...over,
+})
 
 describe('retrieve', () => {
   beforeEach(() => {
@@ -46,9 +51,8 @@ describe('retrieve', () => {
 
   it('无 embedding 能力时走关键词降级，且不调用 embed', async () => {
     mockEmbeddingsAvailable.mockResolvedValue(false)
-    const repo = createRepository(createDb(':memory:'))
     // avocado 仅出现在 26016-m 的色系描述里 → 单命中确定性断言
-    const res = await retrieve('avocado', {}, repo)
+    const res = await retrieve('avocado', depsOf(makeRepo()))
     expect(mockEmbed).not.toHaveBeenCalled()
     expect(res).toEqual([{ handle: '26016-m', score: expect.any(Number) }])
     expect(res[0].score).toBeGreaterThan(0)
@@ -56,8 +60,7 @@ describe('retrieve', () => {
 
   it('关键词降级返回形状 {handle,score} 且降序', async () => {
     mockEmbeddingsAvailable.mockResolvedValue(false)
-    const repo = createRepository(createDb(':memory:'))
-    const res = await retrieve('sneaker', {}, repo) // productType 全目录含 sneaker
+    const res = await retrieve('sneaker', depsOf(makeRepo())) // productType 全目录含 sneaker
     expect(res.length).toBeGreaterThan(1)
     for (let i = 1; i < res.length; i++) {
       expect(res[i - 1].score).toBeGreaterThanOrEqual(res[i].score)
@@ -66,16 +69,15 @@ describe('retrieve', () => {
 
   it('关键词零命中返回空数组', async () => {
     mockEmbeddingsAvailable.mockResolvedValue(false)
-    const repo = createRepository(createDb(':memory:'))
-    expect(await retrieve('zzzqwertyplokmnb', {}, repo)).toEqual([])
+    expect(await retrieve('zzzqwertyplokmnb', depsOf(makeRepo()))).toEqual([])
   })
 
   it('语义可用时懒嵌入缺失商品并缓存，余弦排序首位为查询对齐商品', async () => {
     mockEmbeddingsAvailable.mockResolvedValue(true)
     mockSemanticEmbed()
-    const repo = createRepository(createDb(':memory:'))
+    const repo = makeRepo()
 
-    const res = await retrieve('everyday breathable runner', { embedIfAvailable: true }, repo)
+    const res = await retrieve('everyday breathable runner', depsOf(repo))
 
     // 1 次查询嵌入 + 1 次批量补齐嵌入（DIM 个商品一次请求）
     expect(mockEmbed).toHaveBeenCalledTimes(2)
@@ -99,11 +101,11 @@ describe('retrieve', () => {
   it('缓存命中（contentHash 未变）时不重复嵌入', async () => {
     mockEmbeddingsAvailable.mockResolvedValue(true)
     mockSemanticEmbed()
-    const repo = createRepository(createDb(':memory:'))
-    await retrieve('warmup query', { embedIfAvailable: true }, repo)
+    const repo = makeRepo()
+    await retrieve('warmup query', depsOf(repo))
     expect(mockEmbed).toHaveBeenCalledTimes(2) // 查询 + 批量补齐
 
-    await retrieve('warmup query', { embedIfAvailable: true }, repo)
+    await retrieve('warmup query', depsOf(repo))
     // 第二次仅查询嵌入（+1），16 商品全部命中缓存不再嵌入
     expect(mockEmbed).toHaveBeenCalledTimes(3)
   })
@@ -111,7 +113,7 @@ describe('retrieve', () => {
   it('contentHash 变化时仅重算该商品并刷新缓存', async () => {
     mockEmbeddingsAvailable.mockResolvedValue(true)
     mockSemanticEmbed()
-    const repo = createRepository(createDb(':memory:'))
+    const repo = makeRepo()
 
     // 预置全部行正确哈希，仅首商品置为过期哈希
     for (const p of seedProducts) {
@@ -123,7 +125,7 @@ describe('retrieve', () => {
       })
     }
 
-    const res = await retrieve('everyday breathable runner', { embedIfAvailable: true }, repo)
+    const res = await retrieve('everyday breathable runner', depsOf(repo))
     expect(mockEmbed).toHaveBeenCalledTimes(2) // 1 查询 + 批量补齐(仅首商品一个)
     expect((mockEmbed.mock.calls[1][0] as string[]).length).toBe(1)
     expect(res[0].handle).toBe(FIRST.handle)
