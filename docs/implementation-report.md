@@ -7,7 +7,9 @@
 > - 「scripts bake in `bun --bun`」→ `dev` / `build` / `start` 已去掉 `--bun`，一律由 Node 执行
 > - `bun --bun run build`（本文的 gate 命令）→ `bun run build`；`--bun` 会让 Bun SIGILL 崩溃
 >
-> 运行时已无任何 Bun 专有 API；仅包管理器/锁文件层仍为 Bun，其去留见
+> 运行时已无任何 Bun 专有 API。包管理器/锁文件层已在批次 7 迁至 npm：
+> `bun.lock` → `package-lock.json`，`packageManager: npm@12.0.1`，本文中的 `bun install` /
+> `bun run x` 一律读作 `npm ci` / `npm run x`。迁移的范围与放弃标准见
 > [`adr/0006-bun-to-node-scope.md`](./adr/0006-bun-to-node-scope.md)。
 > 领域词汇见 [`../CONTEXT.md`](../CONTEXT.md)，架构决策见 [`adr/`](./adr/)。
 
