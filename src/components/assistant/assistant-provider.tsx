@@ -6,27 +6,35 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
   useSyncExternalStore,
 } from 'react'
 import type { ReactNode } from 'react'
 import type { Mode } from '@/domain/chat-events'
-import type { ProductView } from '@/domain/product'
-import type { PageProductRef } from '@/lib/page-product'
 import { speak } from '@/lib/speak-preference'
 import { readAloud, stopSpeaking, toSpeechText } from '@/lib/speech'
 import { mySize } from '@/lib/my-size'
 import { useChatStream } from './use-chat-stream'
 import { AssistantFabSlot } from './fab'
 import { AssistantPanel } from './assistant-panel'
+import {
+  INITIAL_SESSION,
+  modeForSend,
+  needsProduct,
+  productRefOf,
+  sessionReducer,
+  sizeFitSettled,
+  type SessionProduct,
+} from './session'
 
 /** 导购控制器：PDP 的 "Find my size"、FAB 锚定等消费方调用的契约。
  * product 可为完整 ProductView（页面内入口）或轻引用 {handle,title}（FAB 页面锚点）：
  * 服务端均按 handle 回取全量事实，UI 侧只用 handle/title（面板对缺失 sizeOptions 有兜底）。 */
 export interface AssistantHandle {
   /** 打开面板并设置模式（size-fit 带商品 → 预置上下文并自动询问尺码）。 */
-  open: (mode: Mode, product?: ProductView | PageProductRef | null) => void
+  open: (mode: Mode, product?: SessionProduct) => void
   close: () => void
 }
 
@@ -38,8 +46,8 @@ const AssistantContext = createContext<AssistantHandle | null>(null)
 export function AssistantProvider({ children }: { children: ReactNode }) {
   const { messages, isStreaming, send, retry } = useChatStream()
   const [isOpen, setIsOpen] = useState(false)
-  const [mode, setMode] = useState<Mode>('shopping')
-  const [product, setProduct] = useState<ProductView | PageProductRef | null>(null)
+  const [session, dispatch] = useReducer(sessionReducer, INITIAL_SESSION)
+  const { mode, product } = session
 
   // 朗读偏好：外部 store（SSR 首帧常量 false → 无 hydration mismatch）。
   const speakOn = useSyncExternalStore(speak.subscribe, speak.getSnapshot, speak.getServerSnapshot)
@@ -72,36 +80,21 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     setIsOpen(false)
   }, [])
 
-  // size-fit 是否已结算：最近一条助手消息为含结构化推荐的已结束消息。
-  // 已结算后自由输入再走 size-fit 只会让确定性核心再次追问尺码（死循环），
-  // 故 handleSend 自动转向 shopping（用户仍可用上下文 chips 显式重入 size-fit/outfit）。
-  const sizeFitSettled = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const m = messages[i]
-      if (m.role !== 'assistant') continue
-      return m.sizeFit != null && !m.streaming && !m.error
-    }
-    return false
-  }, [messages])
-
   const handleChip = useCallback(
     (chipMode: Mode, label: string) => {
       stopSpeaking() // 新回合开始：停掉上一回复的朗读
-      const needsProduct = chipMode === 'size-fit' || chipMode === 'outfit'
-      const ref = needsProduct && product ? { handle: product.handle, title: product.title } : null
-      setMode(chipMode)
+      dispatch({ type: 'pick', mode: chipMode })
       // size-fit 芯片（Find my size）也带已知脚长：文本不含显式尺码时服务端回退预填。
       const footMm = chipMode === 'size-fit' ? mySize.getSnapshot() : null
-      send(chipMode, label, ref, footMm)
+      send(chipMode, label, needsProduct(chipMode) ? productRefOf(product) : null, footMm)
     },
     [product, send],
   )
 
   const open = useCallback(
-    (nextMode: Mode, nextProduct?: ProductView | PageProductRef | null) => {
+    (nextMode: Mode, nextProduct?: SessionProduct) => {
       const p = nextProduct ?? null
-      setMode(nextMode)
-      setProduct(p)
+      dispatch({ type: 'open', mode: nextMode, product: p })
       setIsOpen(true)
       // PDP "Find my size"：商品上下文齐备时直接开场问尺码（消费端自然流），
       // 由服务端 size-fit 确定性核心应答（askedForInput → 追问）。
@@ -109,7 +102,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         stopSpeaking() // 自动开场即新回合
         // 已知「我的尺码」（脚长 mm）时一并带去：size-fit 确定性核心文本无码则回退用之，
         // 直接给出推荐而非追问「您穿什么码」（Find my size 预填）。
-        send('size-fit', '', { handle: p.handle, title: p.title }, mySize.getSnapshot())
+        send('size-fit', '', productRefOf(p), mySize.getSnapshot())
       }
     },
     [send],
@@ -118,15 +111,14 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   const handleSend = useCallback(
     (text: string) => {
       stopSpeaking() // 新回合开始：停掉上一回复的朗读
-      // size-fit 已结算后的自由输入自动转 shopping；同时落定 mode，避免下一条仍粘滞 size-fit。
-      const nextMode = mode === 'size-fit' && sizeFitSettled ? 'shopping' : mode
-      if (nextMode !== mode) setMode(nextMode)
-      const ref = product ? { handle: product.handle, title: product.title } : null
+      // 结算状态在发送这一刻现算：原先是 useMemo 存起来，每条消息变化都重算一次。
+      const nextMode = modeForSend(session, sizeFitSettled(messages))
+      if (nextMode !== mode) dispatch({ type: 'sent', mode: nextMode })
       // size-fit 自由输入已带显式文本；文本无码时仍以已知脚长为回退（服务端语义）。
       const footMm = nextMode === 'size-fit' ? mySize.getSnapshot() : null
-      send(nextMode, text, ref, footMm)
+      send(nextMode, text, productRefOf(product), footMm)
     },
-    [mode, product, send, sizeFitSettled],
+    [session, mode, product, messages, send],
   )
 
   const handleToggleSpeak = useCallback((next: boolean) => {
@@ -144,12 +136,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         isOpen={isOpen}
         onClose={close}
         product={product}
-        onRemoveProduct={() => {
-          // 移除上下文 chip 后 mode 归位 shopping：否则仍处 size-fit/outfit 的
-          // 下一条必然得到服务端 "Pick a product first" invalid 错误。
-          setProduct(null)
-          setMode('shopping')
-        }}
+        onRemoveProduct={() => dispatch({ type: 'clear-product' })}
         onSend={handleSend}
         onPick={handleChip}
         onRetry={retry}

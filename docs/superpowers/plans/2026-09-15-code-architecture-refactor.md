@@ -321,25 +321,43 @@ bun run build     # 批次 1 / 3 / 4 / 6 需要（涉及 RSC、SSG、route handl
 
 **出口：** `bun run verify` 全绿；会话规则由 reducer 单测覆盖；UI 测试行数下降。
 
+**状态：✅ 已完成（出口第 3 条未采纳，理由见执行记录 ②）。** `verify` = 63 文件 / **375 用例**全绿、0 lint 问题；`build` = **42/42 静态页**；`focusableIn` 全仓只剩 **1 份**；import 环 **0**。
+
 ### 任务 5.1 —— 会话 reducer
 
-- [ ] 新建 `src/components/assistant/session.ts`：`sessionReducer(state, action)` 管 `{ mode, product, messages, sizeFitSettled }`；`sizeFitSettled` 由 reducer 内的派生函数算出，不再是 `useMemo` 里的遍历。
-- [ ] 新建 `src/components/assistant/session.test.ts`：覆盖「size-fit 已结算 + 自由输入 → shopping」「移除商品上下文 → mode 归位 shopping」「chip 重入 size-fit/outfit」三条现有规则。
-- [ ] `assistant-provider.tsx` 改用 reducer，只保留：store 接线、朗读副作用、`AssistantHandle` 的 `open`/`close`。
-- [ ] 验证：`bun run test -- src/components/assistant`
+- [x] 新建 `src/components/assistant/session.ts`：`sessionReducer(state, action)` 管 `{ mode, product }`；`sizeFitSettled` 抽为纯选择器，不再由 `useMemo` 持有。
+- [x] 新建 `src/components/assistant/session.test.ts`（16 例）：覆盖「size-fit 已结算 + 自由输入 → shopping」「移除商品上下文 → mode 归位 shopping」「chip 重入 size-fit/outfit」三条规则，外加 reducer 各动作与 `productRefOf` / `needsProduct`。
+- [x] `assistant-provider.tsx` 改用 `useReducer`，只保留 store 接线、朗读副作用、`AssistantHandle` 的 `open`/`close`（167 → 154 行）。
+- [x] 验证：`bun run test -- src/components/assistant`（全绿）。
 
 ### 任务 5.2 —— SSE 帧归约抽为纯函数
 
-- [ ] `use-chat-stream.ts`：把 `onEvent` 里对单条 `ChatEvent` 的 state 变换抽为纯函数 `applyEvent(message, event): ChatMessage`；`isValidCard` 保留（它守的是运行时形状，非样式）。
-- [ ] 新增单测覆盖 delta / productCards / sizeFit / done / error 五类帧。
-- [ ] 验证：`bun run test -- src/components/assistant`
+- [x] `use-chat-stream.ts`：抽出 `applyEvent(message, event): ChatMessage`；`isValidCard` 保留（守运行时形状）。`onEvent` 从五个分支的 `setMessages` 收敛成一次 `map` + 错误态旁路。
+- [x] 新建 `src/components/assistant/use-chat-stream.test.ts`（8 例）：覆盖 delta / productCards / sizeFit / done / error 五类帧，含坏 item 过滤与「每类帧都返回新对象」。
+- [x] 验证：`bun run test -- src/components/assistant`（全绿）。
 
 ### 任务 5.3 —— 模态与焦点陷阱统一（B5）
 
-- [ ] 新建 `src/lib/use-modal.ts`：`useModalDismiss({ dialogRef, triggerRef, onClose })` —— 打开时聚焦首个可聚焦元素、Tab/Shift+Tab 环形、Escape 关闭、关闭后焦点还原触发元素。
-- [ ] 新建 `src/lib/use-modal.test.ts`。
-- [ ] 三处采用并删除各自的 `focusableIn` 副本与长注释：`components/shop/care-instructions.tsx`、`components/shop/product-buy-bar.tsx`、`components/shop/gift-gallery.tsx`（后者当前只有 Escape，改用后获得完整焦点圈闭）。
-- [ ] 验证：`bun run test -- src/components/shop src/test/a11y`
+- [x] 新建 `src/lib/use-modal.ts`：`useModalDismiss` —— 打开时聚焦首个可聚焦元素、Tab/Shift+Tab 环形、Escape 关闭、关闭后焦点还原触发元素。
+- [x] 新建 `src/lib/use-modal.test.tsx`（10 例）：含回环方向、中间元素不被劫持、`dismiss` 的所有关闭路径都还原焦点、无触发元素、空弹窗、额外按键透传、关闭后不再响应。
+- [x] 三处采用并删除各自的 `focusableIn` 副本与长注释：`care-instructions.tsx`（121 → 76 行）、`product-buy-bar.tsx`（165 → 128 行）、`gift-gallery.tsx`。
+- [x] 验证：`bun run test -- src/components/shop src/test/a11y`（含既有 care-instructions / product-buy-bar / axe 门禁，全绿）。
+
+### 执行记录（与计划的偏差，均为实测后的判断）
+
+① **没有把 `messages` 并进 session reducer**（计划写的是 `{mode, product, messages, sizeFitSettled}`）。messages 的生命周期属于 SSE 消费 hook（网络、abort、流式增量），搬进 session reducer 会把它与任务 5.2 刚拆出的纯帧归约重新缠在一起 —— **同一批次的两个任务在这一点上互相拉扯**。实际做法：reducer 管 `{ mode, product }`；`sizeFitSettled` 成为纯选择器，只在发送那一刻现算。这比原实现更省：原先是一个 `useMemo`，每条消息变化都要重算一遍并驻留。
+
+② **未删除 UI 测试 —— 计划「UI 测试行数下降」的前提不成立。** 实测两个文件不是「为了覆盖这些规则而存在」：`assistant.test.tsx` 10 例中只有 3 例沾会话规则，其余是流式渲染、错误重试、卡片链接、PDP 锚定等接线；`assistant-speak.test.tsx` 8 例**全部**是 TTS 副作用（开关默认值、完成即读、去重、打断、历史不补读）。这些恰恰是 reducer 单测覆盖不到的「reducer → send → fetch 请求体」与副作用接线。删掉它们等于用「规则已被单测覆盖」换掉「接线不再有人验证」。故改为只增不删：新增 34 例单测，UI 测试原样保留。代价是本条出口未达成 —— 但达成它的方式（删测试）会让总覆盖变差。
+
+③ **`useModalDismiss` 比计划签名多两个参数**：`open`（监听必须在关闭时卸载）与 `onKeyDown`（灯箱左右方向键）。计划写的 `{dialogRef, triggerRef, onClose}` 表达不了这两件事。
+
+④ **钩子返回 `dismiss()`，而不只是装监听。** 三条关闭路径（Escape / 关闭按钮 / 点遮罩）都必须还原焦点。把「关状态 + 还焦点」绑成一个动作，调用方就不可能只做对一半；原实现里 `close()` 恰好兼做两件事，一旦有人拆开就会静默丢掉焦点还原（WCAG 2.4.3）。
+
+⑤ **内部用「最新回调」ref 持有 `onClose` / `onKeyDown`。** 调用方几乎总是传箭头函数（每次渲染换身份），若进依赖数组，监听会在打开期间每次重渲染重挂 —— 副作用是焦点被反复抢回第一个元素。这是测试里「中间元素上的 Tab 不被劫持」之外的隐性坑，故在注释中写明。
+
+⑥ **gift-gallery 不传 `triggerRef`**（不还原焦点）：每件赠品都是入口，没有可归属的单一触发元素。它换到的是**完整焦点圈闭** —— 原先只处理 Escape，Tab 能把焦点移到遮罩后的页面（WCAG 2.1.2 违规），这是本批次顺带修掉的一个真实 a11y 缺陷。
+
+⑦ **过程中自己制造并修掉一个回归**：替换 care-instructions 关闭按钮时误把 `onClick={() => close()}` 整行删掉（只保留了 `aria-label`），关闭按钮会变成死按钮。读完文件核对时发现并补回 `onClick={() => dismiss()}`，随后由既有 UI 测试（点击 X 关闭）守住。
 
 **回滚点：** `git commit -m "refactor(assistant): session reducer, pure SSE fold, shared modal dismissal"`
 
