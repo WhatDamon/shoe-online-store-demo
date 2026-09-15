@@ -1,5 +1,6 @@
 import { cosine } from './vector'
 import { catalog } from '@/server/catalog/adapter'
+import { searchableText } from '@/domain/search-text'
 import { embed, embeddingsAvailable } from './embedder'
 import { keywordSearch } from './keyword'
 import { createDefaultRepository } from './repository'
@@ -10,10 +11,6 @@ export interface RetrievalResult {
   score: number
 }
 
-export const textualContent = (p: Product) =>
-  [p.title, p.subtitle, p.productType, ...p.tags, ...p.features, p.description]
-    .join(' ')
-    .toLowerCase()
 export const hashText = (s: string) => {
   let h = 0
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0
@@ -35,17 +32,17 @@ async function semanticRetrieve(
   const cached = new Map((await repo.allEmbeddings(model)).map((r) => [r.productId, r]))
   const missing: { product: Product; hash: string }[] = []
   for (const p of products) {
-    const h = hashText(textualContent(p))
+    const h = hashText(searchableText(p))
     const hit = cached.get(p.id)
     if (!hit || hit.contentHash !== h) missing.push({ product: p, hash: h })
   }
   if (missing.length) {
     // 瞬时限流（429/5xx）：小退避后重试一次；仍失败抛出让上层降级关键词。
-    const vecs = await embed(missing.map((m) => textualContent(m.product))).catch(async (e) => {
+    const vecs = await embed(missing.map((m) => searchableText(m.product))).catch(async (e) => {
       const msg = String((e as Error).message ?? '')
       if (/\b(429|5\d\d)\b/.test(msg)) {
         await sleep(1_200)
-        return embed(missing.map((m) => textualContent(m.product)))
+        return embed(missing.map((m) => searchableText(m.product)))
       }
       throw e
     })

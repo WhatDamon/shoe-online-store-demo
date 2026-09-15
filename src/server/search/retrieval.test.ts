@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { retrieve, textualContent, hashText } from './retrieval'
+import { retrieve, hashText } from './retrieval'
+import { searchableText } from '@/domain/search-text'
 import { createDb } from '@/db/client'
 import { createRepository } from './repository'
 import { seedProducts } from '@/server/catalog/seed'
@@ -30,7 +31,7 @@ describe('retrieve', () => {
   // 支持批量入参（补齐逻辑现为一次请求补算全部缺失商品）。
   // 查询向量与首商品对齐 → 余弦 1，其余产品 0。
   function mockSemanticEmbed() {
-    const contents = new Map(seedProducts.map((p) => [textualContent(p), p]))
+    const contents = new Map(seedProducts.map((p) => [searchableText(p), p]))
     mockEmbed.mockImplementation(async (texts: string[]) =>
       texts.map((t) => {
         const hit = contents.get(t)
@@ -90,7 +91,7 @@ describe('retrieve', () => {
     for (const p of seedProducts) {
       const row = rows.find((r) => r.productId === p.id)
       expect(row).toBeDefined()
-      expect(row!.contentHash).toBe(hashText(textualContent(p)))
+      expect(row!.contentHash).toBe(hashText(searchableText(p)))
       expect(row!.model).toBe('test-model')
     }
   })
@@ -116,7 +117,7 @@ describe('retrieve', () => {
     for (const p of seedProducts) {
       await repo.upsertEmbedding({
         productId: p.id,
-        contentHash: p.id === FIRST.id ? 'stale-hash' : hashText(textualContent(p)),
+        contentHash: p.id === FIRST.id ? 'stale-hash' : hashText(searchableText(p)),
         model: 'test-model',
         vector: oneHot(seedProducts.findIndex((s) => s.id === p.id)),
       })
@@ -129,6 +130,6 @@ describe('retrieve', () => {
 
     const rows = await repo.allEmbeddings('test-model')
     const firstRow = rows.find((r) => r.productId === FIRST.id)
-    expect(firstRow!.contentHash).toBe(hashText(textualContent(seedProducts[0])))
+    expect(firstRow!.contentHash).toBe(hashText(searchableText(seedProducts[0])))
   })
 })

@@ -1,6 +1,6 @@
 // POST /api/ai/chat → SSE 流（规格 §8.4）。匿名开放，成本护栏在 chat() 内全链执行。
 // 每帧 = encodeEvent 输出（data: {…}\n\n）；客户端 parseEvent 消费。
-import { chat } from '@/server/ai/chat'
+import { chat, FALLBACK_ERROR_TEXT } from '@/server/ai/chat'
 import { encodeEvent } from '@/server/ai/events'
 import type { ChatEvent, Mode } from '@/server/ai/events'
 
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
         send({
           type: 'error',
           code: 'provider',
-          message: 'Something went wrong — please try again.',
+          message: FALLBACK_ERROR_TEXT,
         })
       }
       controller.close()

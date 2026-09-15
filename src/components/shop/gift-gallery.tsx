@@ -4,6 +4,7 @@ import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { XIcon } from 'lucide-react'
 import type { GiftItem } from '@/server/catalog/gifts'
+import { GIFT_OFFER } from '@/lib/gift-offer'
 
 // 赠品画廊（决策 #16）：满 $50 赠一的边角料小件 —— 仅展示（不售卖、无 PDP）。
 // 点击任一小件打开灯箱轮播该件全部图片；Esc/背景/关闭按钮退出。
@@ -38,11 +39,10 @@ export function GiftGallery({ gifts }: { gifts: GiftItem[] }) {
         id="free-gifts-heading"
         className="mt-2 font-heading text-2xl font-semibold tracking-tight text-ink"
       >
-        With any order over $50
+        {`With any order over $${GIFT_OFFER.thresholdUsd}`}
       </h2>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">
-        Pick one of these little buddies — pressed from leftover upper offcuts, so nothing goes to
-        waste. Just add one when you check out.
+        {`Pick one of these ${GIFT_OFFER.plural} — pressed from ${GIFT_OFFER.material}, so nothing goes to waste. Just add one when you check out.`}
       </p>
 
       <ul className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">

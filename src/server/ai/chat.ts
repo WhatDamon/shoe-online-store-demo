@@ -7,10 +7,9 @@ import type { SessionMessage } from '@/server/guardrails/session-state'
 import { MAX_OUTPUT_TOKENS, estTokens, truncateMessage } from '@/server/guardrails/text'
 import { today } from '@/server/guardrails/budget'
 import { catalog } from '@/server/catalog/adapter'
-import { convert } from '@/server/catalog/size-charts'
-import type { CanonicalSize, Product } from '@/server/catalog/types'
+import type { Product } from '@/server/catalog/types'
 import { getProductForMarket } from '@/server/catalog/service'
-import { market } from '@/lib/market'
+import { sizeRangeFromCanonical } from '@/domain/size'
 import { footMmToEU } from '@/lib/my-size'
 import { retrieve } from '@/server/search/retrieval'
 import { createDefaultRepository } from '@/server/search/repository'
@@ -20,16 +19,6 @@ import type { ChatEvent, Mode, ProductCard } from './events'
 import { aiProvider, aiModel } from './provider'
 import { systemFor } from './prompts'
 import { adviceFor } from './size-input'
-
-// 商品卡/码段展示口径（决策 #20）：与 PDP 描述/Select size chips 同源——canonical(EU) 经
-// 市场换算表显示为市场系统区间（默认 US），绝不裸写 EU 数字（同号易与中国码混读）。
-// 市场大小写标签取市场系统名（US/EU/UK/JP/CN）。
-function sizeRangeText(sizes: number[]): string | null {
-  const lo = convert(Math.min(...sizes) as CanonicalSize, market.sizeSystem)
-  const hi = convert(Math.max(...sizes) as CanonicalSize, market.sizeSystem)
-  if (lo == null || hi == null) return null
-  return `${market.sizeSystem} ${lo}–${hi}`
-}
 
 export interface ChatRequest {
   sessionKey: string
@@ -49,7 +38,8 @@ export interface ChatOptions {
 }
 
 const PRODUCT_REQUIRED_TEXT = 'Pick a product first, then I can help with that.'
-const FALLBACK_ERROR_TEXT = 'Something went wrong — please try again.'
+/** 流内异常的统一文案；`/api/ai/chat` 的兜底 catch 也用它（单一来源）。 */
+export const FALLBACK_ERROR_TEXT = 'Something went wrong — please try again.'
 /** 消费端文案（导出供测试断言；克制措辞——不出现 "AI"）。 */
 export const NO_MATCH_TEXT =
   "I couldn't find a style that matches that yet — try different words or browse the shop."
@@ -80,7 +70,7 @@ const toCard = (p: Product): ProductCard => ({
   image: p.images?.[0] ?? null,
   imageKind: (p.images?.length ?? 0) > 0 ? 'photo' : 'svg',
   photoCount: p.images?.length ?? 0,
-  sizeRange: p.sizes.length ? sizeRangeText(p.sizes) : null,
+  sizeRange: sizeRangeFromCanonical(p.sizes),
   colorCount: p.colors?.length ?? 0,
   palette: p.visual.palette,
 })
@@ -121,7 +111,7 @@ const productContextOf = (v: Product): string => {
     facts.push(`Colors: ${shown}.`)
   }
   if (v.sizes.length > 0) {
-    facts.push(`Available sizes: ${sizeRangeText(v.sizes) ?? v.sizes.join(', ')}.`)
+    facts.push(`Available sizes: ${sizeRangeFromCanonical(v.sizes) ?? v.sizes.join(', ')}.`)
   }
   if (v.images?.length) facts.push(`Photos: ${v.images.length}.`)
   if (v.features.length > 0) facts.push(`Details: ${v.features.slice(0, 5).join('; ')}.`)

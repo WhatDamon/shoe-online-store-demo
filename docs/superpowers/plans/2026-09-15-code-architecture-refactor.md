@@ -10,8 +10,10 @@
 
 ```bash
 bun run verify          # format:check → typecheck → lint → test
-bun --bun run build     # 批次 1 / 3 / 4 / 6 需要（涉及 RSC、SSG、route handler）；批次 7 改用 npm run build
+bun run build     # 批次 1 / 3 / 4 / 6 需要（涉及 RSC、SSG、route handler）
 ```
+
+> **构建门禁固定为 `bun run build`，不要加 `--bun`。** `bun --bun run build` 会让 Next 跑在 Bun 运行时，在 "Collecting page data" 阶段以 `NAPI FATAL ERROR: napi_get_last_error_info` 崩溃（SIGTRAP；旧版 Bun 表现为 SIGILL）。项目已于 2026-09-07 决策去掉 `--bun`（`package.json` 的 dev/build/start 均无 `--bun`）。本计划早期版本的 `bun --bun run build` 是从 2026-09-04 的 execution-notes.md 抄来的过期命令，已于本次执行中实测修正。
 
 基线：`56 个测试文件 / 294 个用例全绿`。任何批次结束时测试数不得下降，用例不得跳过。
 
@@ -22,6 +24,7 @@ bun --bun run build     # 批次 1 / 3 / 4 / 6 需要（涉及 RSC、SSG、route
 ### 分支策略
 
 - **所有重构改动必须在新分支上进行**，不得直接在 `main` 上工作。
+- 批次 1–6 在同一分支 `refactor/high-cohesion-low-coupling` 上完成（决策 2026-09-15），每批次一个 commit 作为回滚点。
 - **用分支（`git switch -c`），不用 git worktree** —— 单写者、单一工作区，避免多工作区并行改动互相不可见。
 - 每个批次结束一个 commit（见各批次「回滚点」），使任一批次可单点回退。
 - 批次 7 按计划另开 `chore/de-bun-package-manager`（归因隔离要求）。
@@ -87,52 +90,63 @@ bun --bun run build     # 批次 1 / 3 / 4 / 6 需要（涉及 RSC、SSG、route
 
 ## 批次 1：消除重复真源
 
-**目标：** 把复制粘贴出来的第二、第三份实现收敛回单点。全部是「搬移 + 改 import」，无逻辑变更 —— 294 个既有测试全绿即等价证明。
+**目标：** 把复制粘贴出来的第二、第三份实现收敛回单点。
 
-**出口：** `bun run verify` + `bun --bun run build` 全绿，**无需新增测试**。
+**出口：** `bun run verify` + `bun run build` 全绿。
+
+**状态：✅ 已完成。** `verify` = 57 文件 / 297 用例全绿、**0 lint 问题**；`bun run build` = 42/42 静态页。用例数 294 → 297（净增 3 条，见执行记录 ③）。
 
 ### 任务 1.1 —— 统一「可搜索文本」投影（A1）
 
-- [ ] 新建 `src/domain/search-text.ts`，导出 `searchableText(product: Product): string`，实现取现 `filter.ts` 版本（`title + subtitle + productType + tags + features + description`，小写、空格连接）。
-- [ ] `src/server/catalog/filter.ts`：删除私有 `byText`，改 import `searchableText`。
-- [ ] `src/server/search/retrieval.ts`：删除导出的 `textualContent`，改 import `searchableText`；同步改本文件内 3 处调用（`missing` 计算、`embed` 入参、`hashText` 入参）。
-- [ ] `src/server/search/keyword.ts`：删除文件顶部那份「为绕开环而复制」的 `textualContent` 及其注释，改 import `searchableText`。
-- [ ] 删除 `retrieval.test.ts` / `keyword.test.ts` 中对 `textualContent` 的直接引用（若有）；若无引用则不动。
-- [ ] 验证：`bun run test -- src/server/search src/server/catalog`
+- [x] 新建 `src/domain/search-text.ts`，导出 `searchableText(product: Product): string`，实现取现 `filter.ts` 版本（`title + subtitle + productType + tags + features + description`，小写、空格连接）。
+- [x] `src/server/catalog/filter.ts`：删除私有 `byText`，改 import `searchableText`。
+- [x] `src/server/search/retrieval.ts`：删除导出的 `textualContent`，改 import `searchableText`；同步改本文件内 3 处调用（`missing` 计算、`embed` 入参、`hashText` 入参）。
+- [x] `src/server/search/keyword.ts`：删除文件顶部那份「为绕开环而复制」的 `textualContent` 及其注释，改 import `searchableText`。
+- [x] 改 `retrieval.test.ts` 对 `textualContent` 的引用（确有 5 处）。
+- [x] 验证：`bun run test -- src/server/search src/server/catalog`
 
 > 为什么放在 `domain/`：`catalog/` 不依赖 `search/`，因此 `keyword` 与 `retrieval` 同时依赖 `domain/search-text` 不构成环。原来的环是用复制规避的，不是靠倒置依赖解决的。
 
 ### 任务 1.2 —— 统一尺码标签与区间格式化（A2）
 
-- [ ] 在 `src/domain/size.ts`（若批次 3 尚未建立，则先建 `src/server/catalog/size-format.ts`，批次 3 再迁入）导出：
-  - `sizeLabel(eu: CanonicalSize, system: SizeSystem): string`
-  - `sizeRangeFromCanonical(sizes: CanonicalSize[], system: SizeSystem): string | null`
-- [ ] `src/server/ai/chat.ts`：删除私有 `sizeRangeText`，改调 `sizeRangeFromCanonical`。
-- [ ] `src/app/api/catalog/route.ts`：删除 `lo`/`hi` 内联计算块，改调 `sizeRangeFromCanonical`。
-- [ ] `src/server/catalog/service.ts`：`sizeLabel` 改为从新模块导入后重导出，删除本地实现。
-- [ ] `src/components/assistant/assistant-panel.tsx`：`sizeLabelFor` 的回退分支改调 `sizeLabel`。
-- [ ] `src/lib/size-range.ts`：`sizeRangeLabel(sizeOptions)` 保留签名（`ProductCard` 在用），内部改为「取首末 label → 委托 `sizeRangeFromCanonical` 的同一套体系前缀规则」，删除重复的 `split`/正则。
-- [ ] 验证：`bun run test -- src/lib/size-range src/server/catalog/size-charts src/components/shop/product-card.test.tsx`
+- [x] 在 `src/domain/size.ts` 导出 `sizeLabel(eu, system?)` 与 `sizeRangeFromCanonical(sizes, system?)`。
+- [x] `src/server/ai/chat.ts`：删除私有 `sizeRangeText`，改调 `sizeRangeFromCanonical`。
+- [x] `src/app/api/catalog/route.ts`：删除 `lo`/`hi` 内联计算块，改调 `sizeRangeFromCanonical`。
+- [x] `src/server/catalog/service.ts`：删除本地实现，改 import `sizeLabel`（无外部消费者，故不需要重导出）。
+- [x] `src/components/assistant/assistant-panel.tsx`：`sizeLabelFor` 的回退分支改调 `sizeLabel`。
+- [x] `src/lib/size-range.ts`：`sizeRangeLabel(sizeOptions)` 保留签名（`ProductCard` 在用），内部改为委托 `sizeRangeFromCanonical`。
+- [x] 验证：`bun run test -- src/lib/size-range src/server/catalog/size-charts`
+
+> 根因不是「同一模板写了四遍」，而是 `sizeRangeLabel` 先渲染标签、再用正则把自己的输出解析回系统 —— 等于从自己的输出里恢复已知信息。改为直接从 canonical 取 min/max。
 
 ### 任务 1.3 —— 收敛 ProductRecord 行映射（A3）
 
-- [ ] `src/db/product-row.ts` 新增：
-  - `productRowFromDb(row: Record<string, unknown>): ProductRecord`
-  - `productRecordValues(r: ProductRecord)` —— 返回可直接喂给 drizzle `.values()` 的对象
-  - `productRecordSet(r: ProductRecord)` —— 返回 `.onConflictDoUpdate({ set })` 的对象
-- [ ] `src/server/search/repository.ts`：`listAllProducts` 的 19 字段 map、`upsertProducts` 的 `values` 与 `set` 三处全部改为调用上述函数。
-- [ ] `src/server/search/repository-postgres.ts`：同样三处替换。
-- [ ] 验证：`bun run test -- src/db src/server/search`
+- [x] `src/db/product-row.ts` 新增 `withoutId(r)` —— 见执行记录 ②，实际只需这一个辅助函数。
+- [x] `src/server/search/repository.ts`：`listAllProducts` 的 18 字段 map、`upsertProducts` 的 `values` 与 `set` 三处全部收敛。
+- [x] `src/server/search/repository-postgres.ts`：同样三处收敛。
+- [x] 验证：`bun run test -- src/db src/server/search`
 
 > 加一个商品字段的改动面：**6 处 → 2 处**（`productToRecord` 编码 / `productFromRecord` 解码）。这是本计划对 DB 层唯一的改动（对应决策记录）。
 
 ### 任务 1.4 —— 纠正已被违反的「文案单源」约定（A6）
 
-- [ ] `src/server/ai/mock.ts`：import 补上 `POLICY_PRODUCTION`，删除 `:` 附近硬编码的那句运输文案（当前与 `lib/store-policy.ts` 逐字相同）。
-- [ ] `src/lib/store-policy.ts`：新增 `GIFT_OFFER_FACT`（从 `prompts.ts` 迁入）与 `GIFT_OFFER_RULES`；`prompts.ts` 改为 import 后重导出，保持现有引用面不变。
-- [ ] `src/server/ai/mock.ts`：赠品句改为 import `GIFT_OFFER_FACT`（当前是另一份字面量，注释却声称同源）。
-- [ ] 新建 `src/server/ai/copy.ts` 或并入 `ai/events.ts`，导出 `FALLBACK_ERROR_TEXT`；`chat.ts` 与 `app/api/ai/chat/route.ts` 共用。
-- [ ] 验证：`bun run test -- src/server/ai src/lib`
+- [x] `src/server/ai/mock.ts`：import 补上 `POLICY_PRODUCTION`，删除硬编码的那句运输文案（与 `lib/store-policy.ts` 逐字相同）。
+- [x] 新建 `src/lib/gift-offer.ts` 承载赠品事实（见执行记录 ③；未按原计划并入 `store-policy.ts`）。
+- [x] `src/server/ai/mock.ts`：赠品句改为按 `GIFT_OFFER` 事实拼装（原注释声称同源，实为另一份字面量）。
+- [x] `FALLBACK_ERROR_TEXT` 收归单一来源（`chat.ts` 导出，`/api/ai/chat` 兜底 catch 复用）。
+- [x] 验证：`bun run test -- src/server/ai src/lib`
+
+### 执行记录（与计划的偏差，均为实测后的判断）
+
+① **构建门禁命令修正。** 计划早期版本抄了 2026-09-04 `execution-notes.md` 的 `bun --bun run build`；实测该命令必崩（`NAPI FATAL ERROR`/SIGTRAP，死在 Collecting page data），而项目已于 2026-09-07 决策去掉 `--bun`。门禁固定为 `bun run build`，共修正 6 处并加了警示块。
+
+② **1.3 比计划更彻底，只留 1 个辅助函数而非 3 个。** 计划的 `productRowFromDb` / `productRecordValues` / `productRecordSet` 三个函数其实是多余的：products 表行形状与 `ProductRecord` **一一对应**，所以 `listAllProducts` 直接 `return db.select().from(products)`（返回类型即编译期契约，列缺失会报错）、insert 直接 `.values(r)` 都是恒等映射，那 18 行 ×2 是纯噪声。真正需要变形的只有 upsert 的 `set`（id 是冲突目标），收敛为 `withoutId`。6 处 → 1 个函数。
+
+③ **1.4 实际范围是 7 处而非 2 处，故单源收口扩到 UI。** 赠品事实（门槛 $50 / little buddy / leftover upper offcuts）同时硬编码在 `gifts.ts`、`shop/page.tsx`、`gift-gallery.tsx`、`ai/mock.ts`、`ai/prompts.ts` 五处渲染 + 两处注释。只修 `mock.ts` 两行等于打地鼠，所以新建 `src/lib/gift-offer.ts` 收口事实（门槛/名称/材质/供给口径），各呈现面保留自己的语气，输出逐字节不变（由 `gift-offer.test.ts` 三条黄金断言钉住）。未按原计划并入 `store-policy.ts`：那里是「店务政策」，赠品属「促销」，且该模块被 support 模式断言不得出现促销口径。
+
+④ **`size-range.test.ts` 原本在测一个虚构，已重写。** 6 个用例的期望值与项目自己的 `size-fixture.ts` 矛盾（EU 43 写成 `US 10`，表里是 `US 9`）；旧实现把数字从传入的 `label` 读回来，断言恒真，从未验证生产行为。重写为「label 由真实换算表派生」，删掉生产不可达的混合体系输入用例，并新增真实目录一致性 + 零码款回归用例。测试数 7 → 7。等价性另有强证据：探针跑遍 29 款真实商品，新旧实现 **0 处差异**。
+
+⑤ **顺带修掉 2 条既有 lint 警告。** `@typescript-eslint/no-unused-vars` 原先未开 `ignoreRestSiblings`，导致「摘掉一个键」的惯用写法必报警告（`product-row.test.ts` 即有 2 条），并会逼出 `void id` 之类的凑数行。已在 `eslint.config.mjs` 开启该选项：警告 2 → 0，且 1.3 的 `withoutId` 无需任何 hack。
 
 **回滚点：** `git commit -m "refactor(core): single source for search text, size labels, row mapping and shared copy"`
 
@@ -208,7 +222,7 @@ export function createStore<T>(spec: {
 
 **目标：** `src/server/**` 目前被客户端大面积 import —— server/client 边界名存实亡；同一个尺码域被 `server/catalog/size-charts.ts` 与 `lib/my-size.ts` 切成两半。建立 `src/domain/` 作为两端共享的纯域层。
 
-**出口：** `bun run verify` + `bun --bun run build` 全绿；新增一条边界守卫（脚本或 lint 规则）；此后 `src/server/**` 不再被任何 `'use client'` 模块非类型导入。
+**出口：** `bun run verify` + `bun run build` 全绿；新增一条边界守卫（脚本或 lint 规则）；此后 `src/server/**` 不再被任何 `'use client'` 模块非类型导入。
 
 ### 任务 3.1 —— 建立 `src/domain/` 并保留兼容垫片
 
@@ -245,7 +259,7 @@ export function createStore<T>(spec: {
 
 **目标：** `ai/chat.ts`（293 行 / 16 import，全仓 fan-out 最高）把护栏顺序、5 个 mode 分支、上下文构造、流式转发、记账、错误映射挤在一个生成器里，导致改任一 mode 都必须穿过整条护栏栈才能测试。同时去掉 `retrieve()` 的隐式全局依赖与「默认参数陷阱」。
 
-**出口：** `bun run verify` + `bun --bun run build` 全绿；每个 mode 有独立单测；`chat()` 主函数 ≤ 80 行。
+**出口：** `bun run verify` + `bun run build` 全绿；每个 mode 有独立单测；`chat()` 主函数 ≤ 80 行。
 
 ### 任务 4.1 —— 抽出 `ai/context.ts`
 
@@ -308,7 +322,7 @@ export function createStore<T>(spec: {
 
 **目标：** 处理剩余的死接口面、类型松动与注释审计，并把本次决策固化为 ADR，避免后续架构审查重复提出同一议题。
 
-**出口：** `bun run verify` + `bun --bun run build` 全绿；`CONTEXT.md` 与 `docs/adr/` 建立。
+**出口：** `bun run verify` + `bun run build` 全绿；`CONTEXT.md` 与 `docs/adr/` 建立。
 
 ### 任务 6.1 —— 收缩死接口面（D2）
 
@@ -367,7 +381,7 @@ export function createStore<T>(spec: {
 **入口条件（全部满足才允许开工）：**
 
 - [ ] 批次 1–6 全部落地并已 commit，工作区干净。
-- [ ] `bun run verify` 与 `bun --bun run build` 在干净工作区全绿，测试数 ≥ 294。
+- [ ] `bun run verify` 与 `bun run build` 在干净工作区全绿，测试数 ≥ 294。
 - [ ] 已在独立分支上：`git switch -c chore/de-bun-package-manager`。
 
 ### 任务 7.1 —— 选定包管理器并定稿 ADR

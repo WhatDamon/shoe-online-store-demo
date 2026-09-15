@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { GIFT_OFFER_FACT, GIFT_OFFER_RULES, systemFor } from './prompts'
+import { GIFT_OFFER_FACT } from '@/lib/gift-offer'
+import { GIFT_OFFER_RULES, systemFor } from './prompts'
 import { POLICY_CARE, POLICY_RETURNS } from '@/lib/store-policy'
 
 // 赠品营销只存在于 shopping 模式（决策 #16 + P1 克制：不打扰找鞋/搭配/尺码流程）。

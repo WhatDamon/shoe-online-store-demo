@@ -10,8 +10,7 @@ import type { Mode } from '@/server/ai/events'
 import type { CanonicalSize } from '@/server/catalog/types'
 import type { ProductView } from '@/server/catalog/service'
 import type { PageProductRef } from '@/lib/page-product'
-import { convert } from '@/server/catalog/size-charts'
-import { market } from '@/lib/market'
+import { sizeLabel } from '@/domain/size'
 import { isSpeechSupported } from '@/lib/speech'
 import { cn } from 'cn'
 import type { ChatMessage } from './use-chat-stream'
@@ -27,7 +26,7 @@ export interface AssistantPanelProps {
   isOpen: boolean
   onClose: () => void
   /** 商品上下文：完整 ProductView 或 FAB 锚定轻引用 {handle,title}（面板只用 handle/title，
-   * sizeLabelFor 对缺失 sizeOptions 有 convert 回退）。 */
+   * 缺 sizeOptions 时 sizeLabelFor 回退到 sizeLabel 的同口径标签）。 */
   product: ProductView | PageProductRef | null
   onRemoveProduct: () => void
   /** 发送当前模式下的用户文本（provider 已带 mode/product 上下文）。 */
@@ -65,17 +64,12 @@ export function AssistantPanel({
     setDraft('')
   }
 
-  // 决策 #20：码段/附近尺码一律走市场标签（同 Select size chips）；
-  // 无商品上下文时也无 sizeOptions，回退同口径市场标签（默认 US，经换算表）。
-  // FAB 锚定轻引用缺 sizeOptions（页面内 Find my size 才传全 ProductView），同样回退。
+  // 决策 #20：码段/附近尺码一律走市场标签，与 Select size chips 同口径。
+  // FAB 锚定轻引用缺 sizeOptions（只有页面内的 Find my size 才传全 ProductView），回退同一个 sizeLabel。
   const sizeLabelFor = (eu: CanonicalSize): string =>
     (product && 'sizeOptions' in product
       ? product.sizeOptions.find((o) => o.value === eu)?.label
-      : undefined) ??
-    (() => {
-      const v = convert(eu, market.sizeSystem)
-      return v == null ? `EU ${eu}` : `${market.sizeSystem} ${v}`
-    })()
+      : undefined) ?? sizeLabel(eu)
 
   const showWelcome = messages.length === 0 && !isStreaming
 

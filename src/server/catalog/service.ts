@@ -1,15 +1,12 @@
 import { catalog } from './adapter'
-import { convert, toEU } from './size-charts'
-import { market } from '@/lib/market'
+import { toEU } from './size-charts'
+import { sizeLabel } from '@/domain/size'
 import type { CanonicalSize, Product, ProductFilter, SizeSystem } from './types'
 
 export type ProductView = Product & {
   sizeOptions: { value: CanonicalSize; label: string }[]
 }
 export type MarketFilter = ProductFilter & { sizeLabels?: string[] }
-
-const sizeLabel = (eu: CanonicalSize, system = market.sizeSystem) =>
-  `${system} ${convert(eu, system)}`
 
 function toView(p: Product): ProductView {
   return {

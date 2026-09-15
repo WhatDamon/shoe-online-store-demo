@@ -2,15 +2,11 @@
 // 口径中性真实：真实货品为供应商实拍休闲鞋，故不自称 3D-printed brand（避免与实图矛盾）。
 // Mock 会匹配下方短语以产生确定性行为，真实模型遵循同一指令——两者输入输出同构。
 import type { Mode } from './events'
+import { GIFT_OFFER_FACT } from '@/lib/gift-offer'
 import { STORE_POLICY_FACTS } from '@/lib/store-policy'
 
 export const PERSONA =
   'You are a helpful in-store footwear guide for a casual footwear brand. Be warm, concise and grounded: only talk about products and details given to you. Never invent prices, availability or materials. If asked anything outside shoes and shopping, reply in at most two short sentences and steer back to the catalog. Use plain short sentences.'
-
-// 满 $50 赠一（决策 #16，营销口）。只注入可核实的店头事实，不注入任何赠品名称：
-// 赠品为供应商自有边角料小物，中性英文名仅作内部数据用，不进 AI 文案。
-export const GIFT_OFFER_FACT =
-  'Store offer: any order over $50 at the storefront includes one free little buddy — a small accessory pressed from leftover upper offcuts — while supplies last.'
 
 // 著作权/商标安全约束：赠品与任何卡通/玩具/影视形象无关联。模型必须只做中性描述，
 // 不得点名或暗示第三方角色/品牌，不得暗示联名或授权。

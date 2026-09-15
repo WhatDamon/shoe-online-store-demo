@@ -3,7 +3,7 @@ import { aiUsage, productEmbeddings, products } from '@/db/schema'
 import { db } from '@/db/client'
 import type { AppDb, PgAppDb } from '@/db/client'
 import { resolveDbDriver } from '@/db/dialect'
-import type { ProductRecord } from '@/db/product-row'
+import { type ProductRecord, withoutId } from '@/db/product-row'
 import { parseVector } from './vector'
 import { createPostgresRepository } from './repository-postgres'
 import type { EmbeddingRow } from './embedding-row'
@@ -85,74 +85,14 @@ export function createRepository(db: AppDb) {
       return Number(row?.n ?? 0)
     },
     async listAllProducts(): Promise<ProductRecord[]> {
-      const rows = await db.select().from(products)
-      return rows.map((r) => ({
-        id: r.id,
-        handle: r.handle,
-        title: r.title,
-        subtitle: r.subtitle,
-        description: r.description,
-        priceAmount: r.priceAmount,
-        currency: r.currency,
-        productType: r.productType,
-        collections: r.collections,
-        sizes: r.sizes,
-        colors: r.colors,
-        features: r.features,
-        tags: r.tags,
-        construction: r.construction,
-        visual: r.visual,
-        images: r.images,
-        fitNotes: r.fitNotes,
-        createdAt: r.createdAt,
-      }))
+      return db.select().from(products)
     },
     async upsertProducts(records: ProductRecord[]): Promise<void> {
       for (const r of records) {
         await db
           .insert(products)
-          .values({
-            id: r.id,
-            handle: r.handle,
-            title: r.title,
-            subtitle: r.subtitle,
-            description: r.description,
-            priceAmount: r.priceAmount,
-            currency: r.currency,
-            productType: r.productType,
-            collections: r.collections,
-            sizes: r.sizes,
-            colors: r.colors,
-            features: r.features,
-            tags: r.tags,
-            construction: r.construction,
-            visual: r.visual,
-            images: r.images,
-            fitNotes: r.fitNotes,
-            createdAt: r.createdAt,
-          })
-          .onConflictDoUpdate({
-            target: products.id,
-            set: {
-              handle: r.handle,
-              title: r.title,
-              subtitle: r.subtitle,
-              description: r.description,
-              priceAmount: r.priceAmount,
-              currency: r.currency,
-              productType: r.productType,
-              collections: r.collections,
-              sizes: r.sizes,
-              colors: r.colors,
-              features: r.features,
-              tags: r.tags,
-              construction: r.construction,
-              visual: r.visual,
-              images: r.images,
-              fitNotes: r.fitNotes,
-              createdAt: r.createdAt,
-            },
-          })
+          .values(r)
+          .onConflictDoUpdate({ target: products.id, set: withoutId(r) })
       }
     },
   }
