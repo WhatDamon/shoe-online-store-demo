@@ -1,6 +1,6 @@
 'use client'
 
-import type { Mode } from '@/server/ai/events'
+import type { Mode } from '@/domain/chat-events'
 
 // 开场建议 chips（规格 §8.1，消费端措辞——不出现 "AI"）。
 // size-fit/outfit 需要商品上下文（服务端要求 product 引用），无上下文时不可达，

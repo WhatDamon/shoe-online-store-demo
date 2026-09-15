@@ -1,8 +1,8 @@
 // size-fit 确定性建议核心（规格 §8.2：附尺码表 + fitNotes，引导式 → 推荐 + 解释）。
 // 复用 size-charts 的 parseSizeHint/nearestCanonical，不做 LLM 解析（确定性、可测、零成本）。
-import { parseSizeHint, nearestCanonical } from '@/server/catalog/size-charts'
-import type { CanonicalSize } from '@/server/catalog/types'
-import type { ProductView } from '@/server/catalog/service'
+import { parseSizeHint, nearestCanonical } from '@/domain/size'
+import type { CanonicalSize } from '@/domain/product'
+import type { ProductView } from '@/domain/product'
 
 export interface SizeAdvice {
   recommended: number | null // canonical EU

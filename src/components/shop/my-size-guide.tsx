@@ -1,17 +1,10 @@
 'use client'
 
 import { useState, useSyncExternalStore } from 'react'
-import type { SizeSystem } from '@/server/catalog/types'
+import type { SizeSystem } from '@/domain/product'
 import { market } from '@/lib/market'
-import {
-  footMmToSystem,
-  mySize,
-  MY_SIZE_MAX_MM,
-  MY_SIZE_MIN_MM,
-  MY_SIZE_UI_MAX_MM,
-  MY_SIZE_UI_MIN_MM,
-  setMySize,
-} from '@/lib/my-size'
+import { footMmToSystem, MY_SIZE_MAX_MM, MY_SIZE_MIN_MM } from '@/domain/size'
+import { mySize, MY_SIZE_UI_MAX_MM, MY_SIZE_UI_MIN_MM, setMySize } from '@/lib/my-size'
 
 const SYSTEMS: SizeSystem[] = ['US', 'EU', 'UK', 'JP', 'CN']
 

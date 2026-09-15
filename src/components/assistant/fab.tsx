@@ -3,8 +3,8 @@
 import { Suspense } from 'react'
 import { usePathname } from 'next/navigation'
 import { MessageCircleIcon } from 'lucide-react'
-import type { Mode } from '@/server/ai/events'
-import type { ProductView } from '@/server/catalog/service'
+import type { Mode } from '@/domain/chat-events'
+import type { ProductView } from '@/domain/product'
 import { getPageProductSnapshot, type PageProductRef } from '@/lib/page-product'
 
 // 由 AssistantProvider 注入的控制器（结构化契约：避免 provider↔fab 运行时/类型循环导入）。

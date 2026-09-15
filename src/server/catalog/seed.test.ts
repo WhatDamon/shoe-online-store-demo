@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { seedProducts } from './seed'
 import { collections } from './collections'
-import { sizeRows } from './size-fixture'
+import { sizeRows } from '@/domain/size-fixture'
 
 describe('seed integrity', () => {
   it('has the real-catalog product count (29 supplier styles)', () => {

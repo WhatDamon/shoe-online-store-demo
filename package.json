@@ -11,12 +11,13 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
+    "check:boundary": "node scripts/check-server-boundary.mjs",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "verify": "npm run format:check && npm run typecheck && npm run lint && npm run test"
+    "verify": "npm run format:check && npm run typecheck && npm run check:boundary && npm run lint && npm run test"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

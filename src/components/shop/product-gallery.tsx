@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import { useState } from 'react'
-import type { ProductView } from '@/server/catalog/service'
+import type { ProductView } from '@/domain/product'
 import { ProductVisual, type ProductVisualView } from './product-visual'
 
 const VIEW_LABELS: { view: ProductVisualView; label: string }[] = [

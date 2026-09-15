@@ -1,5 +1,5 @@
 import { envStr } from '@/config'
-import type { CatalogAdapter } from './types'
+import type { CatalogAdapter } from './adapter-contract'
 import { DbCatalogAdapter } from './db-adapter'
 import { seedAdapter } from './seed-adapter'
 import { shopifyStub, shopifyEnabled } from './shopify-stub'

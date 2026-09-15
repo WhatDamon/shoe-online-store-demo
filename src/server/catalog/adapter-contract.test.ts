@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { Product, ProductFilter, CatalogAdapter } from './types'
+import type { Product, ProductFilter } from '@/domain/product'
+import type { CatalogAdapter } from './adapter-contract'
 
 describe('catalog contract', () => {
   it('Product canonical sizes are whole EU numbers', () => {

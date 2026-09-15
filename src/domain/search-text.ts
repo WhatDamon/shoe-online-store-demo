@@ -1,4 +1,4 @@
-import type { Product } from '@/server/catalog/types'
+import type { Product } from '@/domain/product'
 
 /**
  * 商品的可搜索文本投影。

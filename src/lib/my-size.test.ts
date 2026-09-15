@@ -5,7 +5,7 @@ import {
   footMmToSystem,
   MY_SIZE_MAX_MM,
   MY_SIZE_MIN_MM,
-} from '@/lib/my-size'
+} from '@/domain/size'
 
 const KEY = 'evoloop:foot-mm'
 

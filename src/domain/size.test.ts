@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { availableSizesForSystem, convert, nearestCanonical, parseSizeHint } from './size-charts'
-import { sizeRows } from './size-fixture'
+import { availableSizesForSystem, convert, nearestCanonical, parseSizeHint } from '@/domain/size'
+import { sizeRows } from '@/domain/size-fixture'
 
 describe('convert', () => {
   it('converts EU 42 to US 8.5 (unisex basis)', () => expect(convert(42, 'US')).toBe(8.5))

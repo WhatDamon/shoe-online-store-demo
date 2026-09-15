@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AssistantProvider, useAssistant } from './assistant-provider'
-import type { ProductView } from '@/server/catalog/service'
+import type { ProductView } from '@/domain/product'
 import { registerPageProduct } from '@/lib/page-product'
 
 // FAB 用 usePathname 判断落地页隐藏；测试可控 pathname，并避免真实 router 依赖。

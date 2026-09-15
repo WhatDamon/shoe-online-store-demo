@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { formatPrice } from './format'
-import type { Price } from '@/server/catalog/types'
+import type { Price } from '@/domain/product'
 
 describe('formatPrice', () => {
   it('formats dollars with two decimals', () => expect(formatPrice(139)).toBe('$139.00'))

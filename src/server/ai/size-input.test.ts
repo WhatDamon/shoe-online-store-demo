@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it } from 'vitest'
 import { adviceFor } from './size-input'
-import type { ProductView } from '@/server/catalog/service'
+import type { ProductView } from '@/domain/product'
 import { getProductForMarket } from '@/server/catalog/service'
 
 // size-input 为纯函数（接受 ProductView），用 seed 真实视图 + 空库存变体做 golden。

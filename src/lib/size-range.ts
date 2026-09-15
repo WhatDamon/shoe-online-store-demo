@@ -1,5 +1,5 @@
 import { sizeRangeFromCanonical } from '@/domain/size'
-import type { CanonicalSize } from '@/server/catalog/types'
+import type { CanonicalSize } from '@/domain/product'
 
 /**
  * 商品可用尺码区间的人读标签（卡片角标），如 "US 8.5–10.5" / "EU 43–45"。

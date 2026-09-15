@@ -1,5 +1,5 @@
-import type { CanonicalSize, Product } from './types'
-import { convert } from './size-charts'
+import type { CanonicalSize, Product } from '@/domain/product'
+import { convert } from '@/domain/size'
 import supplier from './data/supplier.json'
 
 // 供应商真实目录（决策 #16）：源为 /Users/damon233/Downloads/萨洛丁款式集合.xlsx，

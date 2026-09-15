@@ -5,7 +5,7 @@ import { searchableText } from '@/domain/search-text'
 import { embed, embeddingsAvailable } from './embedder'
 import { keywordSearch } from './keyword'
 import { createDefaultRepository } from './repository'
-import type { Product } from '@/server/catalog/types'
+import type { Product } from '@/domain/product'
 
 export interface RetrievalResult {
   handle: string

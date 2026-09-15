@@ -8,7 +8,7 @@ import { GiftGallery } from '@/components/shop/gift-gallery'
 import { SizeSelector } from '@/components/shop/size-selector'
 import { WishlistProvider } from '@/components/shop/wishlist-provider'
 import { giftItems } from '@/server/catalog/gifts'
-import type { ProductView } from '@/server/catalog/service'
+import type { ProductView } from '@/domain/product'
 
 // ===========================================================================
 // 无障碍回归门禁（差异化承诺：键盘可达 + 结构语义，axe 无 critical/serious 违规）。

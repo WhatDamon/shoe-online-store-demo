@@ -214,36 +214,51 @@ bun run build     # 批次 1 / 3 / 4 / 6 需要（涉及 RSC、SSG、route handl
 
 ## 批次 3：域边界重组
 
-**目标：** `src/server/**` 目前被客户端大面积 import —— server/client 边界名存实亡；同一个尺码域被 `server/catalog/size-charts.ts` 与 `lib/my-size.ts` 切成两半。建立 `src/domain/` 作为两端共享的纯域层。
+**目标：** `src/server/**` 被客户端大面积 import —— server/client 边界名存实亡；同一个尺码域被 `server/catalog/size-charts.ts` 与 `lib/my-size.ts` 切成两半。建立 `src/domain/` 作为两端共享的纯域层。
 
-**出口：** `bun run verify` + `bun run build` 全绿；新增一条边界守卫（脚本或 lint 规则）；此后 `src/server/**` 不再被任何 `'use client'` 模块非类型导入。
+**出口：** `bun run verify` + `bun run build` 全绿；新增一条边界守卫；此后 `src/server/**` 不再被任何 `'use client'` 模块非类型导入。
+
+**状态：✅ 已完成。** `verify` = 58 文件 / **318 用例**全绿、0 lint 问题；`build` = **42/42 静态页**；守卫 `check-server-boundary` 通过；import 环数 **0**。三个子任务全程 `318` 用例不变 —— 零行为变化。
 
 ### 任务 3.1 —— 建立 `src/domain/` 并保留兼容垫片
 
-- [ ] 新建 `src/domain/product.ts`：迁入 `server/catalog/types.ts` 的领域类型（`SizeSystem`、`CanonicalSize`、`Price`、`Colorway`、`Product`、`Collection`、`ProductFilter`）。
-- [ ] 新建 `src/domain/size.ts`：合并 `server/catalog/size-charts.ts` 全部纯函数 与 `lib/my-size.ts` 的纯函数（`footMmRow` / `footMmToEU` / `footMmToSystem` / `MY_SIZE_MIN_MM` / `MY_SIZE_MAX_MM`）。
-- [ ] 新建 `src/domain/size-fixture.ts`：从 `server/catalog/size-fixture.ts` 迁入。
-- [ ] 把批次 1 的 `search-text.ts`、批次 1.2 的尺码格式化函数并入 `domain/`。
-- [ ] 旧路径暂时改为 `export * from '@/domain/...'` 垫片，使本任务可独立验证。
-- [ ] 验证：`bun run test` 全绿（此步应零行为变化）。
+- [x] 新建 `src/domain/product.ts`：`SizeSystem` / `CanonicalSize` / `Price` / `Colorway` / `Product` / `Collection` / `ProductFilter`（`CurrencyCode` 保持模块私有）。
+- [x] 新建 `src/domain/size.ts`：合并 `size-charts.ts` 全部纯函数 + `lib/my-size.ts` 的纯函数（`footMmRow` / `footMmToEU` / `footMmToSystem` / `MY_SIZE_MIN_MM` / `MY_SIZE_MAX_MM`）。
+- [x] `size-fixture.ts` 迁入 `src/domain/`（`git mv`，纯数据无依赖）。
+- [x] 批次 1 的 `search-text.ts`、批次 1.2 的尺码格式化函数并入 `domain/`。
+- [x] 旧路径改为垫片（`size-charts.ts` / `size-fixture.ts` / `types.ts` 各 `export *`），使本任务可独立验证。
+- [x] 验证：`bun run test` 全绿（**318 用例不变**，零行为变化）。
 
 ### 任务 3.2 —— 全量改写消费方 import
 
-- [ ] 机械替换全部 `@/server/catalog/types` → `@/domain/product`（fan-in 28）。
-- [ ] 全部 `@/server/catalog/size-charts` → `@/domain/size`（含 `assistant-panel.tsx` 等 `'use client'` 文件）。
-- [ ] 全部 `@/server/catalog/size-fixture` → `@/domain/size-fixture`（含 `lib/my-size.ts`）。
-- [ ] `lib/my-size.ts` 只保留存储层（持久化 mm 值与 store 接线），域数学全部来自 `@/domain/size`。
-- [ ] `lib/size-range.ts` 改为从 `@/domain/size` 取格式化原语。
-- [ ] 验证：`bun run test` + `bun run typecheck`
+- [x] 全部 `@/server/catalog/types` → `@/domain/product`（实测 fan-in 21 个别名引用点 + `server/catalog` 内 4 处相对引用）。
+- [x] 全部 `size-charts` → `@/domain/size`（含 `print-spec-sheet.tsx`、`assistant-panel.tsx` 等 `'use client'` 文件）。
+- [x] 全部 `size-fixture` → `@/domain/size-fixture`。
+- [x] `lib/my-size.ts` 只保留存储层（持久化 mm + store 接线 + UI 滑杆上下界）；域数学来自 `@/domain/size`。
+- [x] `lib/size-range.ts` 改用 `@/domain/size` 的格式化原语。
+- [x] 验证：`bun run test` + `bun run typecheck` 全绿（**318 用例不变**）。
 
 ### 任务 3.3 —— 删除垫片并加边界守卫
 
-- [ ] 删除 `server/catalog/types.ts`、`server/catalog/size-charts.ts`、`server/catalog/size-fixture.ts` 三个垫片文件。
-- [ ] 确认 `server/catalog/service.ts` 的 `ProductView` 定义位置：`ProductView` 被 14 个文件引用，且被客户端组件用于 props → 一并迁入 `domain/product.ts`，`service.ts` 只保留取数函数。
-- [ ] 新增守卫，二选一：
-  - **首选** `scripts/check-server-boundary.mjs`：扫描含 `'use client'` 的文件，若出现非 `import type` 的 `from '@/server/...'` 则退出码 1；接入 `package.json` 的 `verify`。
-  - 备选：`eslint.config.mjs` 中对 `src/components/**` 与 `src/lib/**` 加 `no-restricted-imports` 的 `@/server/*` 规则。
-- [ ] 验证：守卫脚本在当前代码上通过（既证明迁移完整，也证明守卫可用）。
+- [x] 删除 `server/catalog/types.ts`、`size-charts.ts`、`size-fixture.ts` 三个垫片。
+- [x] `ProductView` 迁入 `domain/product.ts`（15 个消费方 repoint）；`service.ts` 只保留取数函数。
+- [x] `CatalogAdapter` 移入新增的 `server/catalog/adapter-contract.ts`（**不进 domain**，理由见执行记录 ②）。
+- [x] 新增 `scripts/check-server-boundary.mjs` + 接入 `verify`（`check:boundary`，位在 typecheck 与 lint 之间）。
+- [x] 验证：守卫在当前代码上通过；并用**故意注入违规**的负向用例证明它真的会拦（见执行记录 ⑤）。
+
+### 执行记录（与计划的偏差，均为实测后的判断）
+
+① **把 `ai/events.ts` 迁到了 `domain/chat-events.ts` —— 计划没列这一项，但守卫逼出了它。** 守卫第一次运行只报出**一处**真实违规：`'use client'` 的 `use-chat-stream.ts` 运行时 `import { parseEvent } from '@/server/ai/events'`。该模块是 SSE **线协议**（`ChatEvent` / `ProductCard` / `Mode` / `parseEvent` / `encodeEvent`），服务端 `chat()`/route 产出、客户端消费，本身无任何 server-only 依赖；它的文件头注释甚至写着「本模块必须保持客户端可导入」—— 那正是用**约定**去顶替**结构**。本批次出口写的是「`src/server/**` 不再被 `'use client'` 非类型导入」，若靠例外清单放行，出口就没真正达成。故移入 `domain/`（14 处 import repoint），使约束由目录位置承载，守卫得以**零例外**。若判为超出批次范围，回退点即本批次 commit。
+
+② **`CatalogAdapter` 没有进 domain。** 它是**纯服务端**契约（DB / 内存 seed / Shopify 三种实现，含 `getBuyUrl`），放进「两端共享的纯层」会把 IO 关切带进 domain。计划只说删除 `types.ts`，没说 `CatalogAdapter` 去哪；实际做法是新建 `server/catalog/adapter-contract.ts` 承载它（5 个 import repoint），避免它被删成孤儿。`types.test.ts` 相应改名 `adapter-contract.test.ts`（其测试对象只剩适配器契约）。
+
+③ **`size-charts.test.ts` → `src/domain/size.test.ts`。** 它测的是已迁移的模块，留在 `server/catalog/` 会变成「测一个不存在的路径」。
+
+④ **`MY_SIZE_MIN_MM` / `MY_SIZE_MAX_MM` 改为从 fixture 首末行派生**（原为重新写一遍的 `227` / `313` 字面量）。这属于批次 1 的「消除重复真源」主题：给尺码表补一档时上下界自动跟着走，不会再漂移。
+
+⑤ **守卫做过负向测试，不是只跑通就算。** 注入一个 `'use client'` 探针（一个运行时 import + 一个 `import type` + 一个内联 `{ type X }`），守卫退出码 1 且**只**报出那一个运行时 import，两种类型写法均正确放行 —— 证明它是有判别力的检查，而非「见到 `@/server` 就报」。探针已删除。
+
+⑥ **合并时顺手删掉一处无意义的类型重述**：`size-charts.ts` 里的 `type Key = 'US' | 'EU' | 'UK' | 'JP' | 'CN'` 与 `SizeSystem` 完全等价，连带 5 处 `as Key` / `as 'US' | ...` 断言都是空操作；已删除该别名与全部断言（行为中性：318 用例不变）。
 
 **回滚点：** `git commit -m "refactor(domain): move product types and size math into a shared domain layer"`
 

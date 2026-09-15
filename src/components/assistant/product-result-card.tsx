@@ -4,7 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { ProductVisual } from '@/components/shop/product-visual'
 import { useOptionalWishlist } from '@/components/shop/wishlist-provider'
-import type { ProductCard as ProductCardEvent } from '@/server/ai/events'
+import type { ProductCard as ProductCardEvent } from '@/domain/chat-events'
 
 // 会话内商品结果卡：展示真实首图 + 真实元数据（货号/码段/色卡数/照片数），
 // 一律不带价格——价格只在详情页/店铺出现（AI 不传播 demo 价段）。

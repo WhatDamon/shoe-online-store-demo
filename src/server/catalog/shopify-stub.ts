@@ -1,5 +1,5 @@
 import { envStr } from '@/config'
-import type { CatalogAdapter } from './types'
+import type { CatalogAdapter } from './adapter-contract'
 
 export const shopifyEnabled = () =>
   Boolean(envStr('SHOPIFY_DOMAIN') && envStr('SHOPIFY_STOREFRONT_TOKEN'))

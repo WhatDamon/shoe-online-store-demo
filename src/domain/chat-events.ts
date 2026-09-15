@@ -1,7 +1,9 @@
 // AI 事件行 = SSE `data:` 帧内 JSON（规格 §8.4）。chat() 产出，客户端 parseEvent 消费。
-// 本模块必须保持客户端可导入：只含类型与纯函数，禁止引入任何 server-only 依赖
-// （消费方：'use client' 的 use-chat-stream 在客户端 import 本模块）。
-import type { CanonicalSize } from '@/server/catalog/types'
+//
+// 放在 domain 而非 server/ai：这是**两端共享**的线协议 —— 服务端 chat()/route 产出，
+// 'use client' 的 use-chat-stream 消费。留在 server 下只能靠「本模块必须保持客户端可导入」
+// 这类约定维持，而目录位置本身不携带该约束（scripts/check-server-boundary.mjs 会直接报违规）。
+import type { CanonicalSize } from '@/domain/product'
 
 // 商品结果卡事件：只携带展示所需真实字段（规格 §8.4）——不携带价格（价格只存在
 // 详情页/店舖，AI 不传播 demo 价段；决策：AI 彻底不带价）。

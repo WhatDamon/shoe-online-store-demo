@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import { sizeRangeLabel } from './size-range'
 import { sizeLabel, sizeRangeFromCanonical } from '@/domain/size'
-import { convert } from '@/server/catalog/size-charts'
+import { convert } from '@/domain/size'
 import { market } from '@/lib/market'
 import { seedProducts } from '@/server/catalog/seed'
-import type { CanonicalSize } from '@/server/catalog/types'
+import type { CanonicalSize } from '@/domain/product'
 
 /**
  * label 一律由真实换算表派生（sizeLabel），不手写。

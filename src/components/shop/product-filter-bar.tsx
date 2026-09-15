@@ -4,8 +4,9 @@ import { useEffect, useRef, useSyncExternalStore, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { parseShopParams, serializeShopParams } from '@/lib/shop-search-params'
 import type { ShopFilter } from '@/lib/shop-search-params'
-import type { CanonicalSize } from '@/server/catalog/types'
-import { footMmToEU, mySize } from '@/lib/my-size'
+import type { CanonicalSize } from '@/domain/product'
+import { footMmToEU } from '@/domain/size'
+import { mySize } from '@/lib/my-size'
 
 export interface FilterOption {
   value: string

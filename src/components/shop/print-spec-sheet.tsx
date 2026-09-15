@@ -1,8 +1,8 @@
-import { convert } from '@/server/catalog/size-charts'
+import { convert } from '@/domain/size'
 import { site } from '@/lib/site'
 import { POLICY_PRODUCTION, POLICY_RETURNS } from '@/lib/store-policy'
-import type { ProductView } from '@/server/catalog/service'
-import type { CanonicalSize } from '@/server/catalog/types'
+import type { ProductView } from '@/domain/product'
+import type { CanonicalSize } from '@/domain/product'
 
 const SYSTEMS = ['US', 'EU', 'UK', 'JP', 'CN'] as const
 

@@ -1,5 +1,5 @@
 import { envStr } from '@/config'
-import type { SizeSystem } from '@/server/catalog/types'
+import type { SizeSystem } from '@/domain/product'
 
 const MARKET_SIZE_SYSTEM = {
   US: 'US',

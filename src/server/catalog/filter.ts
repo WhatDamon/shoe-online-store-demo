@@ -1,5 +1,5 @@
 import { searchableText } from '@/domain/search-text'
-import type { Product, ProductFilter } from './types'
+import type { Product, ProductFilter } from '@/domain/product'
 
 // 内存过滤/排序（29 行规模，决策 #17）：DB 负责持久化，这里统一筛选语义供 seed/db 适配器复用。
 

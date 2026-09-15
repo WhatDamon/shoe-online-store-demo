@@ -1,7 +1,7 @@
 // 人设 + 各模式 system prompt（规格 §8.5.4：购物话题限定、克制、只基于注入上下文作答）。
 // 口径中性真实：真实货品为供应商实拍休闲鞋，故不自称 3D-printed brand（避免与实图矛盾）。
 // Mock 会匹配下方短语以产生确定性行为，真实模型遵循同一指令——两者输入输出同构。
-import type { Mode } from './events'
+import type { Mode } from '@/domain/chat-events'
 import { GIFT_OFFER_FACT } from '@/lib/gift-offer'
 import { STORE_POLICY_FACTS } from '@/lib/store-policy'
 

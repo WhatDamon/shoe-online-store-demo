@@ -11,8 +11,8 @@ import {
   useSyncExternalStore,
 } from 'react'
 import type { ReactNode } from 'react'
-import type { Mode } from '@/server/ai/events'
-import type { ProductView } from '@/server/catalog/service'
+import type { Mode } from '@/domain/chat-events'
+import type { ProductView } from '@/domain/product'
 import type { PageProductRef } from '@/lib/page-product'
 import { speak } from '@/lib/speak-preference'
 import { readAloud, stopSpeaking, toSpeechText } from '@/lib/speech'

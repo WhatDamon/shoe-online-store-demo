@@ -4,7 +4,8 @@ import { productFromRecord, productToRecord } from '@/db/product-row'
 import { collections } from './collections'
 import { filterProducts } from './filter'
 import { seedProducts } from './seed'
-import type { CatalogAdapter, Collection, Product, ProductFilter } from './types'
+import type { Collection, Product, ProductFilter } from '@/domain/product'
+import type { CatalogAdapter } from './adapter-contract'
 
 // DB 运行时目录适配器（决策 #17）：products 表空时从导入层（seed 策展）灌种；
 // 此后读取一律走表。增量同步：每次首读补入缺失的 seed id（例如目录新增款），

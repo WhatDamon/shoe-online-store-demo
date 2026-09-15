@@ -1,4 +1,4 @@
-import type { ProductFilter } from '@/server/catalog/types'
+import type { ProductFilter } from '@/domain/product'
 export type ShopFilter = ProductFilter & { sizeLabels?: string[] }
 
 /** URL 搜索参数 → 服务层可消费的筛选对象。size 为市场标签（"US 9"），由服务层换算 canonical。 */
