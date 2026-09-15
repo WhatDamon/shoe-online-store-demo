@@ -9,8 +9,8 @@ catalog data, care poster, demo artwork) stay **All Rights Reserved** — fine t
 in-repo as a demo, but not for redistribution without written authorization (see `LICENSE` +
 `LICENSE-ASSETS`). Evoloop claims **no trademark** on its name.
 
-Built with **Next.js (App Router), Tailwind and shadcn/ui on the Node runtime (Bun is the package
-manager only)** — with a server-side shopping assistant that stays understated: consumer wording
+Built with **Next.js (App Router), Tailwind and shadcn/ui on the Node runtime (npm is the package
+manager)** — with a server-side shopping assistant that stays understated: consumer wording
 only, never "AI"-branded.
 
 The storefront has **no real checkout**: PDPs run a **custom demo flow** — demo price (placeholder
@@ -26,7 +26,7 @@ gallery of leftover-offcut trinkets.
 ## Tech stack
 
 - **Next.js 16.3.4** (App Router, Turbopack) + React 19 + TypeScript 5
-- **Bun ≥ 1.3** as the package manager only (the `next` CLI and every gate script run on Node)
+- **npm** as the package manager (the `next` CLI and every gate script run on Node)
 - **Tailwind CSS v4** + **shadcn/ui** (Base UI preset)
 - **Drizzle ORM**, dual-driver: **SQLite** (`better-sqlite3`, default, zero-setup) or
   **Postgres** (`postgres.js`, Cloud SQL-ready) — chosen by `DB_DRIVER` in the environment
@@ -35,21 +35,23 @@ gallery of leftover-offcut trinkets.
 
 ## Prerequisites
 
-- **Bun ≥ 1.3** (project ships `packageManager: bun@1.3.14`). Verify with `bun --version`.
+- **Node ≥ 22** with npm (project ships `packageManager: npm@12.0.1`). Verify with `node --version`.
+  Node 20 is **not** supported: `jsdom@30` requires `^22.22.2 || ^24.15.0 || >=26.0.0`, and Node 20
+  itself reached EOL on 2026-04-30.
 - No API keys are required to run the demo — the AI assistant works in Mock mode.
 
 ## Quick start
 
 ```bash
-bun install
+npm ci
 cp .env.example .env.local      # defaults are fine — empty AI_API_KEY = Mock mode
-bun run dev               # http://localhost:3000
+npm run dev               # http://localhost:3000
 ```
 
-> **Node runtime for Next.** The `next` CLI runs on Node; the SQLite driver is
-> `better-sqlite3` (Node native, works on Bun too) — no Bun runtime needed for dev/build/start.
-> Bun is the package manager only. `DB_DRIVER=postgres` (with a `DATABASE_URL=postgres://…`)
-> switches to `postgres.js` — both drivers run on Node, Vercel-ready.
+> **Node runtime throughout.** The `next` CLI and every gate script run on Node; the SQLite driver is
+> `better-sqlite3`, which ships **N-API prebuilds** — no compiler or build step required.
+> `DB_DRIVER=postgres` (with a `DATABASE_URL=postgres://…`) switches to `postgres.js` —
+> both drivers run on Node, Vercel-ready.
 
 First run auto-creates the schema (**three** tables: `products` + `product_embeddings`,
 `ai_usage`) via idempotent `CREATE TABLE IF NOT EXISTS` on **either** driver — SQLite file at
@@ -73,16 +75,19 @@ tests); `SHOPIFY_*` still takes priority over both.
 
 | Command | Meaning |
 |---|---|
-| `bun run dev` | Next dev server (Turbopack) on the **Node** runtime. |
-| `bun run build` | Production build (Node runtime). |
-| `bun run start` | Serve the production build (Node runtime). |
-| `bun run typecheck` | `tsc --noEmit` |
-| `bun run lint` | ESLint over the repo |
-| `bun run test` | Vitest (56 files, 294 tests) on Node via the `better-sqlite3` driver. |
-| `bun run verify` | One-shot acceptance gate: `format:check` + `typecheck` + `lint` + `test`. |
-| `bun run test:watch` | Vitest watch mode |
+| `npm run dev` | Next dev server (Turbopack) on the **Node** runtime. |
+| `npm run build` | Production build (Node runtime). |
+| `npm run start` | Serve the production build (Node runtime). |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run check:boundary` | Guards that `'use client'` modules carry no runtime `@/server/**` import. |
+| `npm run lint` | ESLint over the repo |
+| `npm run test` | Vitest (63 files, 375 tests) on Node via the `better-sqlite3` driver. |
+| `npm run verify` | One-shot acceptance gate: `format:check` + `typecheck` + `check:boundary` + `lint` + `test`. |
+| `npm run test:watch` | Vitest watch mode |
 
-The acceptance gate is **format:check + typecheck + lint + test + build**, all green on `main` (HEAD).
+The acceptance gate is **format:check + typecheck + check:boundary + lint + test** (`npm run verify`),
+with **`npm run build`** run alongside it — all green on `main` (HEAD), and verified across
+**Node 22 / 24** in CI.
 
 ## Environment variables
 
