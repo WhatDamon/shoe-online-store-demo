@@ -7,7 +7,7 @@ import { createDefaultRepository } from '@/server/search/repository'
 import { retrieve } from '@/server/search/retrieval'
 import type { Product } from '@/domain/product'
 
-/** 检索 top-N 并取回完整商品（规格 §5：≤2k 目录内存余弦可行）。 */
+/** 检索 top-N 并取回完整商品（≤2k 目录内存余弦可行）。 */
 export async function retrieveProducts(query: string, limit = 4): Promise<Product[]> {
   const products = await catalog().getProducts({})
   const hits = await retrieve(query, {

@@ -25,9 +25,9 @@ const p: ProductView = {
   ],
 }
 
-// 规格 §9（详情页顺序）：尺码选择器 → "Find my size" → 材质/合脚手风琴 → 主 CTA → 相关推荐。
+// 详情页顺序：尺码选择器 → "Find my size" → 材质/合脚手风琴 → 主 CTA → 相关推荐。
 // 本用例把该顺序固化在收口组件层：children（页面注入的手风琴）必须渲染在尺码区与购买条之间。
-describe('ProductActions layout order (spec §9)', () => {
+describe('ProductActions layout order', () => {
   it('renders size selector, then children slot, then buy CTA', () => {
     const { container } = render(
       <ProductActions product={p} buyUrl={null}>
@@ -100,7 +100,7 @@ describe('PDP colorway picker (decision #16: color selectable pre-order)', () =>
   })
 })
 
-// 商店直购形态（决策 #15 重启用，2026-09-06）：buyConfig 非 null → 本站颜色/尺码选择器与
+// 商店直购形态（2026-09-06）：buyConfig 非 null → 本站颜色/尺码选择器与
 // demo 购买条整体隐藏，Buy Button 挂载；Find my size 与 children 插槽保留（克制：不删演示内容）。
 const storeCfg = {
   productId: '9407853625559',

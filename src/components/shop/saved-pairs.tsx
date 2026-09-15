@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useWishlist } from './wishlist-provider'
 import { ProductVisual } from './product-visual'
+import { WishlistHeart } from './wishlist-icon'
 import type { CatalogSummary } from '@/app/api/catalog/route'
 
 interface LoadedRow extends CatalogSummary {
@@ -138,15 +139,7 @@ export function SavedPairs() {
             aria-label={`Remove ${row.title} from saved`}
             className="shrink-0 rounded-full p-2.5 text-neutral-500 transition-colors hover:text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
           >
-            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
-              <path
-                d="M12 20.6 4.9 13.7a4.6 4.6 0 0 1 0-6.5 4.6 4.6 0 0 1 6.5 0l.6.6.6-.6a4.6 4.6 0 0 1 6.5 0 4.6 4.6 0 0 1 0 6.5L12 20.6Z"
-                fill="currentColor"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <WishlistHeart size={18} filled />
           </button>
         </li>
       ))}

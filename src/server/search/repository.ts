@@ -8,6 +8,9 @@ import { parseVector } from './vector'
 import { createPostgresRepository } from './repository-postgres'
 import type { EmbeddingRow } from './embedding-row'
 
+// 仓储只做持久化与整表读写：筛选/查找留在内存（catalog/filter.ts）。
+// 前提是目录规模 ~10²（当前 29 款），全表 listAllProducts 再 find/filter 的成本可忽略；
+// 若增长到 10⁴ 量级，需把筛选下推到 SQL（Repository 增加 query 方法）。
 export function createRepository(db: AppDb) {
   return {
     async getEmbedding(productId: string): Promise<EmbeddingRow | null> {
@@ -79,7 +82,7 @@ export function createRepository(db: AppDb) {
       await db.delete(aiUsage)
       await db.delete(products)
     },
-    // ---- products 表（决策 #17：DB 为运行时目录源）----
+    // ---- products 表（DB 为运行时目录源）----
     async countProducts(): Promise<number> {
       const [row] = await db.select({ n: sql<number>`count(*)` }).from(products)
       return Number(row?.n ?? 0)
@@ -100,7 +103,7 @@ export function createRepository(db: AppDb) {
 
 export type Repository = ReturnType<typeof createRepository>
 
-/** 决策 #13：按 DB_DRIVER 返回默认驱动实现（sqlite 本地 / postgres 云端）。
+/** 按 DB_DRIVER 返回默认驱动实现（sqlite 本地 / postgres 云端）。
  * db() 负责 driver 分派并缓存两种连接；此处仅做类型收窄到对应驱动接口。 */
 export function createDefaultRepository(): Repository {
   const connection = db()

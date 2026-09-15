@@ -42,27 +42,27 @@ describe('adviceFor', () => {
 
   describe('known「我的尺码」回退（Find my size 预填）', () => {
     it('text with explicit size wins over known (user answer takes priority)', () => {
-      const advice = adviceFor(view, 'I wear US 8.5', null, 43)
+      const advice = adviceFor(view, 'I wear US 8.5', 43)
       expect(advice.askedForInput).toBe(false)
       expect(advice.recommended).toBe(42) // US 8.5 → EU 42，而非 known 的 43
     })
 
     it('no size in text falls back to known canonical', () => {
-      const advice = adviceFor(view, 'Find my size', null, 43)
+      const advice = adviceFor(view, 'Find my size', 43)
       expect(advice.askedForInput).toBe(false)
       expect(advice.recommended).toBe(43)
       expect(advice.rationale).toContain('43 (EU)')
     })
 
     it('known null + no size in text still asks', () => {
-      const advice = adviceFor(view, '', null, null)
+      const advice = adviceFor(view, '', null)
       expect(advice.askedForInput).toBe(true)
       expect(advice.recommended).toBeNull()
     })
 
     it('known size not stocked still asks via nearest? no — out-of-stock wording when none nearby', () => {
-      // dc-1001 尺码 35-44；known 46 不在库 → 无货（推荐附近替代，如 44）。
-      const advice = adviceFor(view, '', null, 46)
+      // dc-1001 尺码 35-44；known 46 不在库 → 推荐最近在库档 44。
+      const advice = adviceFor(view, '', 46)
       expect(advice.askedForInput).toBe(false)
       expect(advice.recommended).toBe(44) // 离 46 最近的在库档
     })

@@ -1,17 +1,13 @@
-// Shopify Buy Button 通道（决策 #15 重启用；#19 曾整体回退，2026-09-06 按 29 款真目录重建）。
-// 职责仅限「购买通道」映射：本站 Product.handle（= 供应商货号小写，如 dc-1001 / 26016-m）
-// → Shopify 商店同 handle 商品的 numeric id（Buy Button 的 createComponent 需要）。
+// Shopify Buy Button 通道：本站 Product.handle（= 供应商货号小写，如 dc-1001）→ Shopify 商店
+// 同 handle 商品的 numeric id（Buy Button 的 createComponent 需要）。
 //
-// 低耦合边界（吸取 #19 回退教训）：
+// 低耦合边界：
 //  - 不写 Product 类型、不进 products 表、不改 schema —— 映射是独立静态表；
 //  - 激活走独立 env 键 SHOPIFY_BUY_*，绝不复用 SHOPIFY_DOMAIN / SHOPIFY_STOREFRONT_TOKEN
 //    （那两个是 catalog 适配器的开关，一旦同配会把运行时目录源切成抛错的 shopifyStub）。
 //
-// 数据来源：商店 03zrk0-2u.myshopify.com 现有 29 款商品（2026-09-06 Storefront API 快照，
-// 与本站 supplier.json 29 款 handle 一一对应，title 均为 "<英文名> - <货号>"）。
-// 其中 24 款 id 出现在用户提供的 shopify_buy_button.txt（admin 生成的 Buy Button 代码，26 个
-// 挂载块含 2 个重复商品），其余 5 款（dc-26075 / 26027-m / 26019-m / 26017-m / 26016-m）经同一
-// Storefront API 拉取补齐。维护：商店增删改商品时，用 Storefront GraphQL products 查询刷新下表。
+// 维护：本表是 2026-09-06 的 Storefront API 快照（与 supplier.json 29 款一一对应）。商店增删改
+// 商品后，用 Storefront GraphQL products 查询刷新下表。
 
 import { envStr } from '@/config'
 

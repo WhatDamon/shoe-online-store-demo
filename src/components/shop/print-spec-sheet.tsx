@@ -20,7 +20,7 @@ function systemRow(eu: CanonicalSize): { label: string; value: string }[] {
  *
  * 真实数据原则：只印实有字段——货号、真实色数、尺码换算行（表内换算）；不印 demo
  * 价格（§AI 不带价原则延伸：价格只在店铺实时呈现），不印虚构工艺词。护理内容与
- * PDP 详情区同源（store-policy 常量）。尺码为演示换算口径（决策 #20 注）。
+ * PDP 详情区同源（store-policy 常量）。尺码为演示换算口径。
  */
 export function PrintSpecSheet({ product }: { product: ProductView }) {
   const colors = product.colors ?? []

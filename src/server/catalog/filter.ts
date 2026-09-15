@@ -1,7 +1,7 @@
 import { searchableText } from '@/domain/search-text'
 import type { Product, ProductFilter } from '@/domain/product'
 
-// 内存过滤/排序（29 行规模，决策 #17）：DB 负责持久化，这里统一筛选语义供 seed/db 适配器复用。
+// 内存过滤/排序（29 行规模）：DB 负责持久化，这里统一筛选语义供 seed/db 适配器复用。
 
 export function filterProducts(list: Product[], filter: ProductFilter = {}): Product[] {
   let out = list.filter((p) => {

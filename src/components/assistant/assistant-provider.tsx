@@ -40,7 +40,7 @@ export interface AssistantHandle {
 
 // 根 layout 挂载一次；FAB + Sheet 面板随 Provider 渲染（落地页 FAB 自隐；
 // FAB 以受控注入方式拿到 open/close，避免 provider↔fab 循环导入）。
-// 会话状态存于 provider（仅客户端，页面刷新即重置——规格 §8"仅当次记忆"）。
+// 会话状态存于 provider（仅客户端，页面刷新即重置——仅当次记忆）。
 const AssistantContext = createContext<AssistantHandle | null>(null)
 
 export function AssistantProvider({ children }: { children: ReactNode }) {

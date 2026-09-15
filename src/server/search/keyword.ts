@@ -1,7 +1,7 @@
 import { searchableText } from '@/domain/search-text'
 import type { Product } from '@/domain/product'
 
-// title 命中的位置权重（规格 §8.3.4：title 命中权重高）
+// title 命中的位置权重（title 命中权重高）
 const TITLE_WEIGHT = 3
 
 const countHits = (haystack: string, token: string): number => {

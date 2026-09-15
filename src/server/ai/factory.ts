@@ -1,4 +1,4 @@
-// AI provider 工厂（规格 §8.3/§8.5.5：无 key = Mock；有 key = OpenAICompat；AI_DISABLE_REAL 强制 Mock）。
+// AI provider 工厂（无 key = Mock；有 key = OpenAICompat；AI_DISABLE_REAL 强制 Mock）。
 //
 // 工厂与接口分开（provider.ts 只有类型）是为了让依赖方向单向：
 // factory → {openai-compat, mock} → provider(接口)。把工厂放回 provider.ts 会立刻形成

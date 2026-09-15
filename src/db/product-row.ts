@@ -1,6 +1,6 @@
 import type { Colorway, Product } from '@/domain/product'
 
-// products 表的「规范列 + JSON 副列」编解码（决策 #17）。
+// products 表的「规范列 + JSON 副列」编解码。
 // 表结构两方言同构：核心字段成列，list/对象字段以 JSON 文本落副列。
 // 读写全走这里单点映射；行数据损坏时显式抛错（DB 已是运行时源，不允许静默降级）。
 

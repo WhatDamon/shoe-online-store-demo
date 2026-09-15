@@ -7,7 +7,7 @@ import { parseEvent } from '@/domain/chat-events'
 import type { ChatErrorCode, ChatEvent, Mode, ProductCard } from '@/domain/chat-events'
 import type { CanonicalSize } from '@/domain/product'
 
-/** 发给服务端的最小商品引用（只需 handle + title，规格 §8.4 ChatRequest.product）。 */
+/** 发给服务端的最小商品引用（只需 handle + title）。 */
 interface ChatProductRef {
   handle: string
   title: string

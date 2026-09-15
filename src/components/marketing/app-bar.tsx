@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { cn } from 'cn'
 
 /**
- * 固定头部（规格 §9 全局导航）：位于每个路由组的 SiteShell 顶部。
+ * 固定头部（全局导航）：位于每个路由组的 SiteShell 顶部。
  *
  * tone 决定未滚动时的表现：
  * - overlay：顶部透明 + 白色文字，压在深色 Hero 全出血图上（Landing 专用）；

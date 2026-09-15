@@ -1,4 +1,4 @@
-// chat() 编排（规格 §8：护栏 → 模式分发 → 检索/上下文 → 流 → 事件行）。
+// chat() 编排（护栏 → 模式分发 → 检索/上下文 → 流 → 事件行）。
 // RAG-lite 零工具调用：检索命中经 digest/system 注入，模型只能基于注入内容作答（§8.2/§8.5.4）。
 // 本文件只管护栏顺序、上下文装配与错误映射；每个 mode 具体怎么回答见 handlers.ts。
 import { createGuardrails, GuardrailError, type Guardrails } from '@/server/guardrails'

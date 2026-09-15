@@ -25,7 +25,7 @@ export function ProductCard({ product }: { product: ProductView }) {
       >
         <div className="relative overflow-hidden bg-white">
           {cover ? (
-            // 真实商品照（决策 #16）：首图作封面；无图产品回落到 SVG 3D 视觉。
+            // 真实商品照：首图作封面；无图产品回落到 SVG 3D 视觉。
             // 白底 + object-contain：任意宽高比照片完整入框居中，不裁剪（用户指定）。
             <div className="relative aspect-square w-full bg-white">
               <Image

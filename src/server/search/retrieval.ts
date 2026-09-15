@@ -74,12 +74,12 @@ export async function retrieve(query: string, deps: RetrievalDeps): Promise<Retr
     try {
       return await semanticRetrieve(query, deps)
     } catch (e) {
-      // 语义侧故障（限流/过载/瞬时）不拖垮导购：本次请求降级关键词（规格 §8.3.4）。
+      // 语义侧故障（限流/过载/瞬时）不拖垮导购：本次请求降级关键词。
       console.warn(
         '[retrieval] embeddings failed (%s) — keyword fallback for this request',
         (e as Error).message ?? e,
       )
     }
   }
-  return keywordSearch(query, deps.products) // 无 embedding 能力 → 关键词降级（规格 §8.3.4）
+  return keywordSearch(query, deps.products) // 无 embedding 能力 → 关键词降级
 }

@@ -2,7 +2,7 @@
 
 import type { Mode } from '@/domain/chat-events'
 
-// 开场建议 chips（规格 §8.1，消费端措辞——不出现 "AI"）。
+// 开场建议 chips（消费端措辞——不出现 "AI"）。
 // size-fit/outfit 需要商品上下文（服务端要求 product 引用），无上下文时不可达，
 // 由调用方按 product 是否存在选组合（GENERAL 或 CONTEXT 或全量）。
 // 末尾两枚为店务客服入口（克制客服 P1：无 AI 字样、不需商品上下文），

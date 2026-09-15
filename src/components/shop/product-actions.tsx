@@ -18,7 +18,7 @@ interface ProductActionsProps {
   /** 服务端已算好的结算 URL（无 store → null） */
   buyUrl: string | null
   /**
-   * 商店在售配置（决策 #15 重启用，2026-09-06 全目录）：非 null 时该 PDP 为「商店直购」形态 ——
+   * 商店在售配置（2026-09-06 全目录）：非 null 时该 PDP 为「商店直购」形态 ——
    * 尺码/颜色选择与 demo 购买条整体隐藏，只渲染 Shopify Buy Button（其 iframe 内自带
    * 商店真实变体选择与店币价格）；Find my size / 手风琴 / 护理海报等 demo 内容保留。
    */
@@ -30,7 +30,7 @@ interface ProductActionsProps {
   children?: ReactNode
 }
 
-// PDP 购买群集（规格 §9 顺序）：颜色选择（多色款，受控）→ 尺码选择 → "Find my size" → 手风琴（children 插槽）→ 购买条。
+// PDP 购买群集（顺序）：颜色选择（多色款，受控）→ 尺码选择 → "Find my size" → 手风琴（children 插槽）→ 购买条。
 // children 插槽让本集群保持单一 'use client' 边界共享 selected 状态，同时允许页面以 RSC 注入中间内容；
 // 持有所选尺码/颜色状态，供购买条在无 store 阶段做 aria-live 说明。
 export function ProductActions({
@@ -44,7 +44,7 @@ export function ProductActions({
   // 「我的尺码」快照：demo 分支 Select-size 命中高亮（产品在库才显形，天然自然）。
   const myMm = useSyncExternalStore(mySize.subscribe, mySize.getSnapshot, mySize.getServerSnapshot)
   const myCanonical = myMm != null ? footMmToEU(myMm) : null
-  // 多色款下单前选色：照片未按颜色拆分（决策 #16），色卡仅记录意向，主图保持代表图。
+  // 多色款下单前选色：照片未按颜色拆分，色卡仅记录意向，主图保持代表图。
   const [colorIdx, setColorIdx] = useState(0)
   const [selected, setSelected] = useState<CanonicalSize | null>(null)
   // 面板打开 + 预置 size-fit 上下文由 AssistantProvider 处理；context 为空（Provider 未挂载的孤立渲染）时静默。

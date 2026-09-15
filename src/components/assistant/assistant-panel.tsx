@@ -64,7 +64,7 @@ export function AssistantPanel({
     setDraft('')
   }
 
-  // 决策 #20：码段/附近尺码一律走市场标签，与 Select size chips 同口径。
+  // 码段/附近尺码一律走市场标签，与 Select size chips 同口径。
   // FAB 锚定轻引用缺 sizeOptions（只有页面内的 Find my size 才传全 ProductView），回退同一个 sizeLabel。
   const sizeLabelFor = (eu: CanonicalSize): string =>
     (product && 'sizeOptions' in product

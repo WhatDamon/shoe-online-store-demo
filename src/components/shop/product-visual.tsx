@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import type { Product } from '@/domain/product'
 
-// 参数化 inline-SVG 商品视觉（规格 §6 决策 #11：本地程序化 SVG，无图片文件/零网络请求）。
+// 参数化 inline-SVG 商品视觉（本地程序化 SVG，无图片文件/零网络请求）。
 // 纯展示、确定性输出（无随机、无 date），3 个 view 各自结构不同。
 
 export type ProductVisualView = 'side' | 'sole' | 'detail'

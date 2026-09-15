@@ -1,4 +1,4 @@
-// AiProvider 契约（规格 §8.3/§8.5.5）。
+// AiProvider 契约。
 // stream 只产出文本 delta；productCards/sizeFit 等结构化事件由 chat() 编排产出，Mock 与真实同构。
 //
 // 本模块**只放类型**：工厂在 factory.ts，两个实现（mock / openai-compat）只 type-import 这里。

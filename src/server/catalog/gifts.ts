@@ -1,7 +1,7 @@
 import { GIFT_ITEM_DESCRIPTION } from '@/lib/gift-offer'
 import supplier from './data/supplier.json'
 
-// 满 $50 赠一个的小件（决策 #16）：供应商边角料制小物，仅营销展示 —— 不单独售卖、
+// 满 $50 赠一个的小件：供应商边角料制小物，仅营销展示 —— 不单独售卖、
 // 不进正价目录/筛选/AI 检索。图片取自同一导入管线（public/products/<handle>/*.webp）。
 
 export interface GiftItem {

@@ -365,55 +365,95 @@ bun run build     # 批次 1 / 3 / 4 / 6 需要（涉及 RSC、SSG、route handl
 
 ## 批次 6：收口与文档
 
-**目标：** 处理剩余的死接口面、类型松动与注释审计，并把本次决策固化为 ADR，避免后续架构审查重复提出同一议题。
+**目标：** 处理剩余的死接口面、类型松动与注释审计，并把本次决策固化为 ADR。
 
 **出口：** `bun run verify` + `bun run build` 全绿；`CONTEXT.md` 与 `docs/adr/` 建立。
 
-### 任务 6.1 —— 收缩死接口面（D2）
+**状态：✅ 已完成（6.1 按计划自身的前置条件跳过）。** `verify` = 63 文件 / **375 用例**全绿、0 lint 问题；
+`build` = **42/42 静态页**；import 环 **0**；`CONTEXT.md` + 6 条 ADR 建立。
 
-- [ ] `CatalogAdapter.getBuyUrl` 在 `DbCatalogAdapter` 与 `SeedAdapter` 中恒返回 `null`，仅 `shopify-stub` 占位 —— 属「一个实现 = 假想接缝」。二选一：(a) 落地真实 Shopify adapter 证成该接口；(b) 从 `CatalogAdapter` 移除 `getBuyUrl`，`getBuyUrl` 调用点改为直接使用已独立的 `shopify-buy.ts` 映射（该模块本就是与 catalog 无关的静态表）。
-- [ ] 若选 (b)，同步删除 `shopify-stub.ts` 与 `adapter.ts` 的 `shopifyEnabled()` 分支。
-- [ ] **前置确认：** 该决策会改变 `CATALOG_SOURCE` / `SHOPIFY_*` 的语义，需先确认 Shopify 通道是否仍要保持「休眠可启用」。若不确定，**跳过本任务**并记入「本计划不做」。
+### 任务 6.1 —— 收缩死接口面（D2）⏭️ 跳过
 
-### 任务 6.2 —— 数据访问层收口（D3）
+- [x] **前置确认已执行，结论是「保留休眠可启用」，故本任务按计划的自身规定跳过。**
+- [x] 记入「本计划不做」（见下方执行记录 ①）。
 
-- [ ] `server/catalog/db-adapter.ts` 的 `getProductByHandle` 目前 `listAllProducts().find()`；`service.ts` 的 `getRelatedProducts` 连做两轮全表。
-- [ ] 二选一：(a) `Repository` 暴露 `getProductByHandle` / `queryProducts(filter)`，把筛选下推到 DB；(b) 明确接受内存筛选，在接口处写清「目录规模 ≤2k 的前提」这一非显然约束。
-- [ ] 按「只做 A3，不合并 repository」的决策，**推荐 (b)** —— 改动最小且诚实。
+### 任务 6.2 —— 数据访问层收口（D3）→ 选 (b)
+
+- [x] 采纳 (b)：接受内存筛选，在 `Repository` 工厂处写明这条**非显然约束** ——
+      「前提是目录规模 ~10²（当前 29 款）；若增长到 10⁴，需把筛选下推到 SQL」。
+- [x] 未改 `db-adapter.ts` / `service.ts` 的查询形态（与「只做 A3」的决策一致）。
 
 ### 任务 6.3 —— 类型与死参收紧（D4）
 
-- [ ] `server/ai/size-input.ts`：删除 `adviceFor` 的 `base?` 预留参数与 `void base`（无调用方使用）。
-- [ ] `SizeAdvice`：`recommended: CanonicalSize | null`、`alternatives: CanonicalSize[]`。
-- [ ] 验证：`bun run test -- src/server/ai/size-input.test.ts`
+- [x] `server/ai/size-input.ts`：删除 `adviceFor` 的 `base?` 预留参数与 `void base`（唯一调用点本就传 `null`）。
+- [x] `SizeAdvice`：`recommended: CanonicalSize | null`、`alternatives: CanonicalSize[]`
+      （`nearestCanonical` 本就返回 `CanonicalSize | null`，故收紧无摩擦）。
+- [x] 同步更新唯一调用点 `handlers.ts` 与 `size-input.test.ts` 的 4 处调用。
+- [x] 验证：`bun run test -- src/server/ai`（全绿）。
 
-### 任务 6.4 —— 注释审计（按已定策略）
+### 任务 6.4 —— 注释审计
 
-逐文件执行，判定标准：**这条注释是否记录了不读代码就无法得知的约束？** 是 → 保留；否 → 删除。
-
-- [ ] 保留（示例，非穷举）：`keyword.ts` 的位置权重取值理由；`wishlist` 相关的 React 19 `getServerSnapshot` 引用稳定性约束（迁移至 `create-store.ts` 的接口文档后从组件内删除）；`embedder.ts` 中 ModelScope 网关强制 `encoding_format` 的外部系统怪癖；`openai-compat.ts` 中「惰性构造 OpenAI client」的理由；`next.config` / a11y 相关的安全与合规边界。
-- [ ] 删除：`shopify-buy.ts` 顶部约 20 行数据来源史（压缩为一句 + 指向 `docs/adr`）；`product-filter-bar.tsx` 中 20 行 `baseRef` 论证（若该逻辑本身可收敛则优先收敛，否则压缩到 3 行）；`assistant-page-anchor.tsx` 中含自问自答（「…？No——」）的编辑残留；`events.ts` 中复述字段名的逐字段 JSDoc；各处 `规格 §x` / `决策 #n` 编号引用。
-- [ ] 全仓清理被引用但已不存在的文档指针（`docs/superpowers/specs/...` 正在被裁剪）。
-- [ ] 验证：`bun run verify`
+- [x] 保留：`keyword.ts` 的位置权重理由、`create-store.ts` 的 `getServerSnapshot` 引用稳定性、
+      `embedder.ts` 的网关 `encoding_format` 怪癖、`openai-compat.ts` 的惰性构造、安全与合规边界。
+- [x] `shopify-buy.ts` 顶部 17 行数据来源史 → 压缩为 1 行维护说明（保留两条真正的约束：不改 Product/schema；
+      绝不复用 `SHOPIFY_DOMAIN`/`SHOPIFY_STOREFRONT_TOKEN`）。
+- [x] `product-filter-bar.tsx` 的 11 行 `baseRef` 论证 → 3 行。
+- [x] `assistant-page-anchor.tsx` 的自问自答（「…？No——」）→ 一句陈述。
+- [x] `chat-events.ts` 复述字段名的逐字段 JSDoc（`photoCount` / `colorCount`）→ 删除；
+      携带真实信息的（`subtitle` = 货号、`sizeRange` 的 null 语义、`palette` 的「仅 SVG 兜底时才需要」）→ 保留。
+- [x] 全仓 `规格 §x` / `决策 #n` 编号引用 → **全部清理为 0**（见执行记录 ②）。
+- [x] 文档指针核验：`src/` 内无 `docs/*.md` 指针；`docs/` 与 README 的相对链接逐条存在性检查通过。
+- [x] 验证：`bun run verify`
 
 ### 任务 6.5 —— 建立领域词汇与 ADR（D6）
 
-- [ ] 新建 `CONTEXT.md`：术语表 —— `CanonicalSize`（EU 整档 35–48，唯一存储形式）、`ProductView`、`Mode`、`CatalogAdapter`、`Guardrails`、`RetrievalResult`、`PageProductRef`、`SizeAdvice`。每项一句定义 + 不变量。
-- [ ] 新建 `docs/adr/`，至少落 6 条（每条 ≤1 页：背景 / 决策 / 后果）：
-  - `0001-canonical-eu-size-storage.md` —— 为什么 canonical 是 EU 整档而非 mm 或 US
-  - `0002-dual-db-driver-thin-adapters.md` —— 为什么保留两份 repository 薄壳而不合并（对应本计划「不做 C1」）
-  - `0003-zero-migration-idempotent-ddl.md` —— 为什么不用 drizzle-kit 迁移（对应「不做 C2」）
-  - `0004-ai-never-emits-price.md` —— AI 卡片与 prompt 一律不带价的理由
-  - `0005-shared-domain-layer.md` —— 为什么 `src/domain/` 存在，`server/` 不得被客户端非类型导入
-  - `0006-bun-to-node-scope.md` —— 为什么包管理器层去 Bun 推迟到批次 7 独立执行（含入口条件与完整评估）
-- [ ] `docs/implementation-report.md` 是 HEAD `83fd694` 的历史快照，其中「DB: SQLite via `bun:sqlite`」与「scripts bake in `bun --bun`」已与当前 HEAD 不符（`6c826b9` 已换成 `better-sqlite3`，CI 走 `bun run verify`）→ 顶部加时效标注，指明当前驱动以 `src/db/client.ts` 为准。
-- [ ] 在 `docs/superpowers/plans/execution-notes.md` 追加本次批次记录表。
+- [x] `CONTEXT.md`：术语表 —— `CanonicalSize`（EU 整档 35–48，唯一存储形式）、`Product`/`ProductView`、
+      `Mode`、`SizeAdvice`、`CatalogAdapter`、`RetrievalResult`、`Guardrails`、`PageProductRef`、
+      `ChatEvent`/`ChatMessage`，每项含定义 + 不变量，并补一节「目录层」依赖规则表。
+- [x] `docs/adr/0001-canonical-eu-size-storage.md`
+- [x] `docs/adr/0002-dual-db-driver-thin-adapters.md`
+- [x] `docs/adr/0003-zero-migration-idempotent-ddl.md`
+- [x] `docs/adr/0004-ai-never-emits-price.md`
+- [x] `docs/adr/0005-shared-domain-layer.md`
+- [x] `docs/adr/0006-bun-to-node-scope.md`
+- [x] `docs/implementation-report.md` 顶部加时效标注（实际有 **3** 处与当前 HEAD 不符，计划只列了 2 处）。
+- [x] `docs/superpowers/plans/execution-notes.md` 追加本次批次记录表。
 
-### 任务 6.6（可选）—— 重复 UI 基元收敛
+### 任务 6.6 —— 重复 UI 基元收敛
 
-- [ ] 心形 SVG path 在 `wishlist-button.tsx` / `product-result-card.tsx` / `saved-pairs.tsx` 出现 3 次 → 抽 `components/shop/wishlist-icon.tsx`。
-- [ ] `error.tsx` 与 `not-found.tsx` 的外壳类名（3 组）完全重复 → 抽 `components/marketing/status-shell.tsx`。
-- [ ] 图片包裹层类名（`product-card` / `gift-gallery` / `collection-cards`）重复 → 仅在改动其他内容时顺带处理，不单独开任务。
+- [x] 心形 SVG path（`wishlist-button` / `product-result-card` / `saved-pairs` 三份）→
+      抽出 `components/shop/wishlist-icon.tsx`，全仓该 path 由 3 份降为 **1 份**。
+- [x] `error.tsx` / `not-found.tsx` 外壳 → 抽出 `components/marketing/status-shell.tsx`，
+      并把重复 3 次的长 CTA class 收敛为 `STATUS_CTA_CLASS`；两文件合计 −55 行。
+- [x] 图片包裹层类名（`product-card` / `gift-gallery` / `collection-cards`）：按计划**不单独开任务**，未动。
+
+### 执行记录（与计划的偏差）
+
+① **6.1 跳过，且理由与计划的预设方向相反。** 计划要求先确认「Shopify 通道是否仍要保持休眠可启用」，
+不确定则跳过。核实结果是**确定要保留**：`README.md:108` 写明 `SHOPIFY_DOMAIN`/`SHOPIFY_STOREFRONT_TOKEN`
+与 `SHOPIFY_BUY_*` 分离是「**on purpose**」、设前者会「trip the catalog stub」；`README.md:107` 标注
+「Reserved / not yet active」；`.env.example:67` 重复了同一警告；spec #14 记为「远期仍可选」。
+既然答案是「保留」，计划给的选项 (b)（**删除** `shopify-stub` 与 `shopifyEnabled()`）就与本意相反 ——
+所以跳过不是犹豫，而是结论。
+附带确认：`getBuyUrl` 的确是死接口面（4 处实现全返回 `null`，唯一消费点永远拿不到非 null），
+但删除它是**产品可见**的决定（去掉一条休眠的购买路径），计划把它与前置条件捆在一起，
+故不在本批次单方面执行。**留作后续一次性决策。**
+② **6.4 的编号引用是「已被验证失效」，不是照着描述删。** spec 中 `决策 #15`–`#20` 的标签**已不存在**
+（列表裁剪后重编号，见 `09ac764`），而 `src/` 里有 **36 处**引用它们；`§8.5.2` / `§8.5.6` / `§8.3.4`
+在 spec 中**从未出现**（spec 只到 `### 8.5`）。即编号已自行腐烂，故一律删编号、保留描述性文字。
+机械替换产生了几处破损片段（`（，消费端措辞`、`（：本地程序化`、`（/§8.5.5`、`（注）`、`（+ P1`），
+逐条读 diff 后修掉。
+③ **`product-filter-bar.tsx` 只压缩注释，未收敛逻辑。** 计划写「若该逻辑本身可收敛则优先收敛」。
+评估结论是不收敛：`baseRef` + 无依赖数组的 effect 是处理「RSC 提交渲染与在途意图竞争」的正确形态，
+改写它属于**冒真实回归风险换取更短代码**，与本次「等价改写」的原则相悖。
+④ **6.6 两项都做了**（计划标「可选」），因为两处都满足「真有重复 + 抽取后不新增抽象」。
+心形 path 从 3 份降到 1 份；两处页面壳合计减 55 行。
+⑤ **6.5 的时效标注纠正了计划的事实**：计划说 2 处不符，实际是 **3** 处（还漏了
+`bun --bun run build` 这条 gate 命令本身）。
+⑥ **自己制造并修掉的缺陷：** 追加 `execution-notes.md` 时新起了第二个 H1（MD025）；
+替换 care-instructions 关闭按钮时误删 `onClick`（批次 5）。
+另：本轮有**两次实验设计错误**——第一次 boundary 探针没插进 `'use client'` 文件（探针无效，
+「✓ clean」无意义），已用真探针重做并确认 guard 会以 exit 1 报 2 处违规。
 
 **回滚点：** `git commit -m "chore: prune dead seams, tighten types, audit comments, add CONTEXT and ADRs"`
 

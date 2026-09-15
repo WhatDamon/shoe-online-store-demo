@@ -11,7 +11,7 @@ const VIEW_LABELS: { view: ProductVisualView; label: string }[] = [
   { view: 'detail', label: 'Detail' },
 ]
 
-// PDP 画廊（决策 #16）：有真实照片（public/products/…）时用照片相册（首图为主图，缩略切换）；
+// PDP 画廊：有真实照片（public/products/…）时用照片相册（首图为主图，缩略切换）；
 // 无图产品回落到本地程序化 SVG 三视图（side/sole/detail）。
 // 缩略图按钮 aria-hidden 内联图，可访问名由按钮自身的 label 承担，避免重复播报。
 export function ProductGallery({ product }: { product: ProductView }) {

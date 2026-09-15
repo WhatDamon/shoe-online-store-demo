@@ -43,7 +43,7 @@ export async function generateMetadata({
   })
 }
 
-// PDP（SSG，规格 §9）：/product/[handle] 由 generateStaticParams 预渲染。
+// PDP（SSG）：/product/[handle] 由 generateStaticParams 预渲染。
 // 未知 handle 在 dynamicParams=true（默认）下走按需渲染 → getProductForMarket null → notFound()，
 // 实测返回品牌化 not-found 壳（HTTP 200 + robots noindex）；若将来需要真 404 再设 dynamicParams=false。
 export default async function ProductPage({ params }: { params: Promise<{ handle: string }> }) {
@@ -51,7 +51,7 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
   const product = await getProductForMarket(handle)
   if (!product) notFound()
 
-  // 商店直购（决策 #15 重启用，2026-09-06 全目录映射）：商店有同 handle 商品且 SHOPIFY_BUY_* env 已配 →
+  // 商店直购（2026-09-06 全目录映射）：商店有同 handle 商品且 SHOPIFY_BUY_* env 已配 →
   // 该 PDP 由 Shopify Buy Button 接管变体选择与结算（隐藏 demo 价与选择器）；否则维持 demo 购买条。
   const buyConfig = shopifyBuyConfigFor(product.handle)
   const [buyUrl, related] = await Promise.all([
@@ -133,7 +133,7 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
                     </AccordionContent>
                   </AccordionItem>
                 </Accordion>
-                {/* 护理说明海报入口（决策 #19）：每 PDP 通用，弹窗查看，不占首屏。 */}
+                {/* 护理说明海报入口：每 PDP 通用，弹窗查看，不占首屏。 */}
                 <CareInstructionsButton />
               </div>
             </ProductActions>

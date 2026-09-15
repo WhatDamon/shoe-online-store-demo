@@ -6,7 +6,7 @@ import { XIcon } from 'lucide-react'
 import { useModalDismiss } from '@/lib/use-modal'
 import carePoster from '@/assets/product-care-instructions.webp'
 
-// 护理说明海报（决策 #19）：站点通用资产，每个 PDP 详情区提供查看入口。
+// 护理说明海报：站点通用资产，每个 PDP 详情区提供查看入口。
 // 海报为竖版长图 → 点击以全屏遮罩展示（可滚动/可关闭），不占 PDP 首屏（克制 P1）。
 // import 在 vitest（asset→string）与 Next（{src,height,width}）下形态不同 → 统一取 src 字符串，
 // 显式给出按原图等比缩放的显示尺寸（原 2480×3507 ÷2），避免依赖 import 形态的宽高字段。

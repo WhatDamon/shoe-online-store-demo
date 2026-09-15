@@ -1,6 +1,6 @@
 import { bigint, doublePrecision, integer, pgTable, serial, text } from 'drizzle-orm/pg-core'
 
-// Postgres 方言 schema（spec 决策 #13）：列语义与 sqlite 版对齐，
+// Postgres 方言 schema：列语义与 sqlite 版对齐，
 // 由 schema-parity 契约测试防漂移。createdAt 用 bigint（毫秒值超出 int32）。
 export const productEmbeddings = pgTable('product_embeddings', {
   productId: text('product_id').primaryKey(),

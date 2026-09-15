@@ -6,7 +6,7 @@ import { type ProductRecord, withoutId } from '@/db/product-row'
 import { parseVector } from './vector'
 import type { EmbeddingRow } from './embedding-row'
 
-/** Postgres 实现（决策 #13）：方法形状与 sqlite 版完全一致 → 可当 Repository 用。 */
+/** Postgres 实现：方法形状与 sqlite 版完全一致 → 可当 Repository 用。 */
 export function createPostgresRepository(db: PgAppDb) {
   return {
     async getEmbedding(productId: string): Promise<EmbeddingRow | null> {
@@ -84,7 +84,7 @@ export function createPostgresRepository(db: PgAppDb) {
       await db.delete(aiUsage)
       await db.delete(products)
     },
-    // ---- products 表（决策 #17：DB 为运行时目录源；与 sqlite 实现同形）----
+    // ---- products 表（DB 为运行时目录源；与 sqlite 实现同形）----
     async countProducts(): Promise<number> {
       await ensurePgTables(db)
       const [row] = await db.select({ n: sql<number>`count(*)` }).from(products)

@@ -1,4 +1,4 @@
-// POST /api/ai/chat → SSE 流（规格 §8.4）。匿名开放，成本护栏在 chat() 内全链执行。
+// POST /api/ai/chat → SSE 流。匿名开放，成本护栏在 chat() 内全链执行。
 // 每帧 = encodeEvent 输出（data: {…}\n\n）；客户端 parseEvent 消费。
 import { chat, FALLBACK_ERROR_TEXT } from '@/server/ai/chat'
 import { encodeEvent } from '@/domain/chat-events'

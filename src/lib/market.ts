@@ -10,7 +10,7 @@ const MARKET_SIZE_SYSTEM = {
 } as const
 
 export const market = {
-  // 惰性读取：配置级单市场切换（决策 #9），不缓存模块级快照，
+  // 惰性读取：配置级单市场切换，不缓存模块级快照，
   // 使 vi.stubEnv 类测试与运行时配置变更均生效。
   get code(): string {
     return envStr('SITE_MARKET', 'US')

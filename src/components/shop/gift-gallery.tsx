@@ -7,7 +7,7 @@ import type { GiftItem } from '@/server/catalog/gifts'
 import { GIFT_OFFER } from '@/lib/gift-offer'
 import { useModalDismiss } from '@/lib/use-modal'
 
-// 赠品画廊（决策 #16）：满 $50 赠一的边角料小件 —— 仅展示（不售卖、无 PDP）。
+// 赠品画廊：满 $50 赠一的边角料小件 —— 仅展示（不售卖、无 PDP）。
 // 点击任一小件打开灯箱轮播该件全部图片；Esc/背景/关闭按钮退出。
 export function GiftGallery({ gifts }: { gifts: GiftItem[] }) {
   const [active, setActive] = useState<{ gift: GiftItem; idx: number } | null>(null)

@@ -5,14 +5,14 @@
 // 实亡 —— 客户端一旦非类型 import 服务端模块，DB 与 AI 的代码就会被拖进浏览器包。
 export type SizeSystem = 'US' | 'EU' | 'UK' | 'JP' | 'CN'
 export type CanonicalSize = number // EU 整档，35–48（唯一 canonical 存储）
-type CurrencyCode = 'USD' // 市场决策 #9：本版锁定 USD
+type CurrencyCode = 'USD' // 本版锁定 USD
 
 export interface Price {
   amount: number
   currencyCode: CurrencyCode // amount 为美元数值
 }
 
-/** 可选色卡（决策 #16 供应链颜色词典）：营销名 + 近似 hex（小写）。仅用于下单前选色。 */
+/** 可选色卡（供应链颜色词典）：营销名 + 近似 hex（小写）。仅用于下单前选色。 */
 export interface Colorway {
   name: string
   hex: string
@@ -37,7 +37,7 @@ export interface Product {
     printedUpper: boolean
   }
   visual: { palette: [string, string]; accent: string; views: 3 } // 驱动 SVG（无图兜底）
-  /** 真实商品照片（public/products/<handle>/*.webp，决策 #16）；缺省/空 → SVG 视觉兜底。 */
+  /** 真实商品照片（public/products/<handle>/*.webp）；缺省/空 → SVG 视觉兜底。 */
   images?: string[]
   /** 可选色卡；缺省/单色 → PDP 不渲染色卡选择（照片不代表具体色）。 */
   colors?: Colorway[]

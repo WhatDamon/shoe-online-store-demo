@@ -1,4 +1,4 @@
-// 真实流式客户端（规格 §8.3.2：AI_API_KEY + AI_BASE_URL/AI_MODEL 可配；OpenAI 兼容网关）。
+// 真实流式客户端（AI_API_KEY + AI_BASE_URL/AI_MODEL 可配；OpenAI 兼容网关）。
 // OpenAI client 每次调用惰性构造：既避免无 key 模块加载即抛错，也让 env 变更（测试 stub/部署重启）生效。
 import OpenAI from 'openai'
 import { envInt, envStr } from '@/config'
@@ -27,7 +27,7 @@ export class OpenAICompatProvider implements AiProvider {
         messages: [{ role: 'system', content: ctx.system }, ...ctx.messages],
         stream: true,
       },
-      // 规格 §8.5.2 默认 20s（调用时读 env）
+      // 默认 20s（调用时读 env）
       { signal: AbortSignal.timeout(envInt('AI_REQUEST_TIMEOUT_MS', 20_000)) },
     )
     for await (const chunk of stream) {

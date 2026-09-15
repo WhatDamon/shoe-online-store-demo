@@ -73,7 +73,7 @@ export function sqliteDb(): AppDb {
   return _db
 }
 
-/** 默认连接（决策 #13）：按 DB_DRIVER 懒分派 sqlite/postgres；单例缓存。 */
+/** 默认连接：按 DB_DRIVER 懒分派 sqlite/postgres；单例缓存。 */
 export function db(): AnyDb {
   return resolveDbDriver() === 'postgres' ? (_pg ??= createPostgresDb()) : sqliteDb()
 }

@@ -38,7 +38,7 @@ const handleSizeFit: ModeHandler = async function* (ctx) {
   // 「我的尺码」预填（Find my size）：文本无显式尺码且脚长 mm 在表内 → adviceFor 直接采用。
   const known =
     ctx.req.footMm != null && Number.isFinite(ctx.req.footMm) ? footMmToEU(ctx.req.footMm) : null
-  const advice = adviceFor(view, ctx.text, null, known)
+  const advice = adviceFor(view, ctx.text, known)
   // 追问问题 / 附近无在库 —— 都只回文本，不出 sizeFit 事件。
   if (!advice.askedForInput && advice.recommended !== null) {
     yield createSizeFitEvent({
