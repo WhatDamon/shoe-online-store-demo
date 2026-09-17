@@ -192,6 +192,29 @@ describe('find-shoes / shopping（共用检索分支）', () => {
     expect(turn.systems[0]).toContain(seedProducts[0].title)
   })
 
+  it('answers an anchored product question even when retrieval has no matches', async () => {
+    mockRetrieveProducts.mockResolvedValue([])
+    const turn = makeTurn({ mode: 'shopping', text: '防水吗？', product: PRODUCT })
+    const events = await run('shopping', turn)
+    expect(turn.systems[0]).toContain('Code: DC-1001.')
+    expect(turn.sent[0]).toContainEqual({ role: 'user', content: '防水吗？' })
+    expect(events).toEqual([{ type: 'delta', text: 'ok' }, { type: 'done' }])
+  })
+
+  it('keeps the no-match reply for an unknown product and an empty search', async () => {
+    mockRetrieveProducts.mockResolvedValue([])
+    const turn = makeTurn({
+      mode: 'shopping',
+      text: 'zzz',
+      product: { handle: 'missing', title: 'Ghost' },
+    })
+    expect(await run('shopping', turn)).toEqual([
+      { type: 'delta', text: NO_MATCH_TEXT },
+      { type: 'done' },
+    ])
+    expect(turn.sent).toHaveLength(0)
+  })
+
   it('shopping 带未知 handle → 静默回退纯 digest（不报错、无商品块）', async () => {
     const turn = makeTurn({
       mode: 'shopping',

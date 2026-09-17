@@ -1,6 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { act, renderHook, waitFor } from '@testing-library/react'
+import { encodeEvent, type ChatEvent } from '@/domain/chat-events'
 import type { ProductCard } from '@/domain/chat-events'
-import { applyEvent, type ChatMessage } from './use-chat-stream'
+import { applyEvent, useChatStream, type ChatMessage } from './use-chat-stream'
 
 const message = (over: Partial<ChatMessage> = {}): ChatMessage => ({
   id: 'a1',
@@ -21,6 +23,144 @@ const card: ProductCard = {
   colorCount: 3,
   palette: ['#a', '#b'],
 }
+
+afterEach(() => vi.unstubAllGlobals())
+
+function responseWith(events: ChatEvent[], bytewise = false) {
+  const bytes = new TextEncoder().encode(events.map(encodeEvent).join(''))
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      if (bytewise) {
+        for (const byte of bytes) controller.enqueue(new Uint8Array([byte]))
+      } else {
+        controller.enqueue(bytes)
+      }
+      controller.close()
+    },
+  })
+  return { ok: true, body } as Response
+}
+
+describe('useChatStream request lifecycle', () => {
+  it('reports a truncated reply and preserves its partial text for retry', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(responseWith([{ type: 'delta', text: 'part' }])),
+    )
+    const { result } = renderHook(() => useChatStream())
+    act(() => result.current.send('shopping', 'hello'))
+    await waitFor(() => expect(result.current.isStreaming).toBe(false))
+    expect(result.current.errorCode).toBe('provider')
+    expect(result.current.messages.at(-1)).toMatchObject({ content: 'part', streaming: false })
+    expect(result.current.messages.at(-1)?.error).toBeTruthy()
+  })
+
+  it('treats an empty response as a retryable failure', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(responseWith([])))
+    const { result } = renderHook(() => useChatStream())
+    act(() => result.current.send('shopping', 'hello'))
+    await waitFor(() => expect(result.current.isStreaming).toBe(false))
+    expect(result.current.errorCode).toBe('provider')
+  })
+
+  it('ignores frames after a terminal event', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          responseWith([
+            { type: 'delta', text: 'complete' },
+            { type: 'done' },
+            { type: 'delta', text: 'late' },
+          ]),
+        ),
+    )
+    const { result } = renderHook(() => useChatStream())
+    act(() => result.current.send('shopping', 'hello'))
+    await waitFor(() => expect(result.current.isStreaming).toBe(false))
+    expect(result.current.messages.at(-1)?.content).toBe('complete')
+    expect(result.current.error).toBeNull()
+  })
+
+  it('does not mix a superseded response into the new reply', async () => {
+    let resolveFirst!: (response: Response) => void
+    let resolveSecond!: (response: Response) => void
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveFirst = resolve
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveSecond = resolve
+          }),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+    const { result } = renderHook(() => useChatStream())
+    act(() => result.current.send('shopping', 'first'))
+    act(() => result.current.send('shopping', 'second'))
+    await act(async () => {
+      resolveFirst(responseWith([{ type: 'delta', text: 'stale' }, { type: 'done' }]))
+    })
+    expect(result.current.messages.at(-1)).toMatchObject({ content: '', streaming: true })
+    expect(result.current.messages[1].streaming).toBe(false)
+    await act(async () => {
+      resolveSecond(responseWith([{ type: 'delta', text: 'fresh' }, { type: 'done' }]))
+    })
+    expect(result.current.messages.at(-1)).toMatchObject({ content: 'fresh', streaming: false })
+  })
+
+  it('aborts the active request and releases the stream on unmount', async () => {
+    const cancelled = vi.fn()
+    const body = new ReadableStream<Uint8Array>({ cancel: cancelled })
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, body })
+    vi.stubGlobal('fetch', fetchMock)
+    const { result, unmount } = renderHook(() => useChatStream())
+    await act(async () => result.current.send('shopping', 'hello'))
+    const signal = fetchMock.mock.calls[0][1].signal as AbortSignal
+    unmount()
+    expect(signal.aborted).toBe(true)
+    await waitFor(() => expect(cancelled).toHaveBeenCalledOnce())
+    expect(body.locked).toBe(false)
+  })
+
+  it('decodes UTF-8 split across chunks and completes normally', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          responseWith([{ type: 'delta', text: '你好 👟' }, { type: 'done' }], true),
+        ),
+    )
+    const { result } = renderHook(() => useChatStream())
+    act(() => result.current.send('shopping', 'hello'))
+    await waitFor(() => expect(result.current.isStreaming).toBe(false))
+    expect(result.current.messages.at(-1)).toMatchObject({ content: '你好 👟', streaming: false })
+    expect(result.current.error).toBeNull()
+  })
+
+  it('preserves a server refusal instead of replacing it with a network error', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          responseWith([{ type: 'error', code: 'turns', message: 'Take a break.' }]),
+        ),
+    )
+    const { result } = renderHook(() => useChatStream())
+    act(() => result.current.send('shopping', 'hello'))
+    await waitFor(() => expect(result.current.isStreaming).toBe(false))
+    expect(result.current.errorCode).toBe('turns')
+    expect(result.current.error).toBe('Take a break.')
+  })
+})
 
 describe('applyEvent（SSE 帧 → 助手消息，纯函数）', () => {
   it('delta：把增量追加到正文，不动其他字段、不结束流', () => {

@@ -81,12 +81,6 @@ const handleSupport: ModeHandler = async function* (ctx) {
 const handleCatalogModes: ModeHandler = async function* (ctx) {
   const { req, text } = ctx
   const products = await retrieveProducts(text)
-  if (products.length === 0) {
-    yield { type: 'delta', text: NO_MATCH_TEXT }
-    await ctx.record(systemFor(req.mode, {}), text, NO_MATCH_TEXT)
-    yield { type: 'done' }
-    return
-  }
   const digest = digestLines(products)
   // PDP 锚定（设计：FAB 打开带上当前鞋，shopping 自由提问也能针对该鞋回答）：
   // handle 可查 → 注入该鞋真实事实块（同 size-fit/outfit）；无效/未知 → 静默回退纯 digest
@@ -95,6 +89,12 @@ const handleCatalogModes: ModeHandler = async function* (ctx) {
   if (req.mode === 'shopping' && req.product?.handle) {
     const anchored = await getProductForMarket(req.product.handle)
     if (anchored) productCtx = productContextOf(anchored)
+  }
+  if (products.length === 0 && !productCtx) {
+    yield { type: 'delta', text: NO_MATCH_TEXT }
+    await ctx.record(systemFor(req.mode, {}), text, NO_MATCH_TEXT)
+    yield { type: 'done' }
+    return
   }
   const system = systemFor(req.mode, { catalogDigest: digest, product: productCtx })
   const messages: AiContext['messages'] = [...ctx.history, { role: 'user', content: text }]

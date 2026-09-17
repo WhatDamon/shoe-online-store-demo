@@ -23,7 +23,10 @@ export class DbCatalogAdapter implements CatalogAdapter {
   }
 
   private ensureSynced(): Promise<void> {
-    this.synced ??= this.syncSeed()
+    this.synced ??= this.syncSeed().catch((error) => {
+      this.synced = null
+      throw error
+    })
     return this.synced
   }
 
