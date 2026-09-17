@@ -2,7 +2,7 @@
 
 // SSE 会话消费 hook：管理消息流、流式增量、结构化事件（productCards/sizeFit）
 // 与错误恢复。帧解析委托 events.ts 的 parseEvent（客户端可导入纯函数，不在 UI 侧重复造解析）。
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { parseEvent } from '@/domain/chat-events'
 import type { ChatErrorCode, ChatEvent, Mode, ProductCard } from '@/domain/chat-events'
 import type { CanonicalSize } from '@/domain/product'
@@ -81,22 +81,37 @@ const uid = (): string =>
 async function consumeSSE(
   body: ReadableStream<Uint8Array>,
   onEvent: (event: ChatEvent) => void,
+  signal: AbortSignal,
 ): Promise<void> {
   const reader = body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    let nl: number
-    while ((nl = buffer.indexOf('\n')) !== -1) {
-      const line = buffer.slice(0, nl).trim()
-      buffer = buffer.slice(nl + 1)
-      if (!line) continue
-      const event = parseEvent(line)
-      if (event) onEvent(event)
+  const cancel = () => {
+    void reader.cancel().catch(() => {})
+  }
+  signal.addEventListener('abort', cancel, { once: true })
+  try {
+    while (!signal.aborted) {
+      const { done, value } = await reader.read()
+      if (signal.aborted) return
+      if (done) throw new Error('Chat stream ended before a terminal event')
+      buffer += decoder.decode(value, { stream: true })
+      let nl: number
+      while ((nl = buffer.indexOf('\n')) !== -1) {
+        const line = buffer.slice(0, nl).trim()
+        buffer = buffer.slice(nl + 1)
+        if (!line) continue
+        const event = parseEvent(line)
+        if (event) {
+          onEvent(event)
+          if (event.type === 'done' || event.type === 'error') return
+        }
+      }
     }
+  } finally {
+    signal.removeEventListener('abort', cancel)
+    await reader.cancel().catch(() => {})
+    reader.releaseLock()
   }
 }
 
@@ -130,7 +145,6 @@ export function useChatStream(): ChatStream {
   const [error, setError] = useState<string | null>(null)
   const [errorCode, setErrorCode] = useState<ChatErrorCode | null>(null)
   const sessionKeyRef = useRef<string | null>(null)
-  const activeIdRef = useRef<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const lastReqRef = useRef<{
     mode: Mode
@@ -138,6 +152,14 @@ export function useChatStream(): ChatStream {
     product: ChatProductRef | null
     footMm: number | null
   } | null>(null)
+
+  useEffect(
+    () => () => {
+      abortRef.current?.abort()
+      abortRef.current = null
+    },
+    [],
+  )
 
   const send = useCallback(
     (mode: Mode, text: string, product?: ChatProductRef | null, footMm?: number | null) => {
@@ -162,15 +184,19 @@ export function useChatStream(): ChatStream {
         content: '',
         streaming: true,
       }
-      activeIdRef.current = assistantMessage.id
-      setMessages((prev) =>
-        userMessage ? [...prev, userMessage, assistantMessage] : [...prev, assistantMessage],
-      )
+      setMessages((prev) => {
+        const settled = prev.map((message) =>
+          message.streaming ? { ...message, streaming: false } : message,
+        )
+        return userMessage
+          ? [...settled, userMessage, assistantMessage]
+          : [...settled, assistantMessage]
+      })
       setIsStreaming(true)
 
       const onEvent = (event: ChatEvent) => {
-        const id = activeIdRef.current
-        if (!id) return
+        if (controller.signal.aborted || abortRef.current !== controller) return
+        const id = assistantMessage.id
         setMessages((prev) => prev.map((m) => (m.id === id ? applyEvent(m, event) : m)))
         if (event.type === 'error') {
           setError(event.message)
@@ -194,7 +220,7 @@ export function useChatStream(): ChatStream {
             signal: controller.signal,
           })
           if (!res.ok || !res.body) throw new Error(`chat request failed: HTTP ${res.status}`)
-          await consumeSSE(res.body, onEvent)
+          await consumeSSE(res.body, onEvent, controller.signal)
         } catch {
           // 被新请求终止：静默（onEvent 不再有意义，新流接管）
           if (controller.signal.aborted) return
@@ -204,12 +230,10 @@ export function useChatStream(): ChatStream {
           }
           setError(NETWORK_ERROR_TEXT)
           setErrorCode('provider')
-          const id = activeIdRef.current
-          if (id) {
-            setMessages((prev) =>
-              prev.map((m) => (m.id === id ? { ...m, streaming: false, error: failure } : m)),
-            )
-          }
+          const id = assistantMessage.id
+          setMessages((prev) =>
+            prev.map((m) => (m.id === id ? { ...m, streaming: false, error: failure } : m)),
+          )
         } finally {
           if (abortRef.current === controller) {
             abortRef.current = null

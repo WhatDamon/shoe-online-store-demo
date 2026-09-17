@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createDb } from '@/db/client'
 import { createRepository } from '@/server/search/repository'
 import { DbCatalogAdapter } from './db-adapter'
@@ -58,5 +58,25 @@ describe('DbCatalogAdapter', () => {
     const asc = await adapter.getProducts({ sort: 'price-asc' })
     const prices = asc.map((p) => p.price.amount)
     expect([...prices].sort((a, b) => a - b)).toEqual(prices)
+  })
+
+  it('retries initialization after a transient database failure', async () => {
+    const { adapter, repo } = make()
+    vi.spyOn(repo, 'listAllProducts').mockRejectedValueOnce(new Error('connection interrupted'))
+    await expect(adapter.getProducts()).rejects.toThrow('connection interrupted')
+    await expect(adapter.getProducts()).resolves.toHaveLength(seedProducts.length)
+    expect(await repo.countProducts()).toBe(seedProducts.length)
+  })
+
+  it('shares initialization between concurrent catalog reads', async () => {
+    const { adapter, repo } = make()
+    const seed = vi.spyOn(repo, 'upsertProducts')
+    const [products, product] = await Promise.all([
+      adapter.getProducts(),
+      adapter.getProductByHandle(seedProducts[0].handle),
+    ])
+    expect(products).toHaveLength(seedProducts.length)
+    expect(product?.handle).toBe(seedProducts[0].handle)
+    expect(seed).toHaveBeenCalledOnce()
   })
 })

@@ -32,12 +32,12 @@ const OFF_TOPIC = [
 export const REDIRECT_TEXT =
   "I'm here to help with shoes and finding your next pair — want to tell me what you're looking for?"
 
-const wordList = (s: string) => s.trim().split(/\s+/).filter(Boolean)
-
 // 模拟流式：整段文案按 ~8 词切成一串 delta；离题 redirect 不切分（单 delta）。
 function* toDeltas(text: string, step = 8): Generator<string> {
-  const ws = wordList(text)
-  for (let i = 0; i < ws.length; i += step) yield ws.slice(i, i + step).join(' ')
+  const words = text.match(/\S+\s*/g) ?? []
+  for (let offset = 0; offset < words.length; offset += step) {
+    yield words.slice(offset, offset + step).join('')
+  }
 }
 
 // 从 system 的 digest/商品上下文抽取可引用标题：匹配 "- Title (Type):" 行。
@@ -96,15 +96,17 @@ export class MockProvider implements AiProvider {
       )
       return
     }
-    const [a, b] = titles
+    const anchored = productTitle(ctx.system)
+    const candidates = anchored ? [anchored] : titles
+    const [a, b] = candidates
     const recommendation =
-      titles.length === 0
+      candidates.length === 0
         ? 'I could not find a style matching that in the catalog just yet.'
-        : titles.length === 1
+        : candidates.length === 1
           ? `I would start with the ${a} — it reads as a strong match for what you described.`
           : `I would start with the ${a} and the ${b} — both read as strong matches for what you described.`
     // 满 $50 赠一行：事实来自 lib/gift-offer 单源，与 prompts 的 GIFT_OFFER_FACT 同源，只回一次。
     const offer = ` And heads-up: orders over $${GIFT_OFFER.thresholdUsd} include one free ${GIFT_OFFER.name} — ${GIFT_OFFER.composition} — ${GIFT_OFFER.availability}.`
-    yield* toDeltas(recommendation + (titles.length > 0 ? offer : ''))
+    yield* toDeltas(recommendation + (candidates.length > 0 ? offer : ''))
   }
 }
