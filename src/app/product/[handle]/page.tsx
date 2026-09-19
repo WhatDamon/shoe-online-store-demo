@@ -7,6 +7,7 @@ import { getProductForMarket, getRelatedProducts } from '@/server/catalog/servic
 import { shopifyBuyConfigFor } from '@/server/catalog/shopify-buy'
 import { ProductGallery } from '@/components/shop/product-gallery'
 import { ProductActions } from '@/components/shop/product-actions'
+import { ProductColorSelectionProvider } from '@/components/shop/product-color-selection'
 import { CareInstructionsButton } from '@/components/shop/care-instructions'
 import { PrintSpecSheetButton } from '@/components/shop/print-spec-sheet-button'
 import { PrintSpecSheet } from '@/components/shop/print-spec-sheet'
@@ -75,70 +76,74 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
 
         {/* 网格基础列显式 minmax(0,1fr)：无 lg 双列时若省略列模板，隐式 auto 轨道会按内容
           max-content 撑宽（缩略图条等不可折内容 → 窄屏横向滚动），显式约束让轨道尊重容器宽度。 */}
-        <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-14">
-          <ProductGallery product={product} />
+        <ProductColorSelectionProvider key={product.handle} product={product}>
+          <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-14">
+            <ProductGallery product={product} />
 
-          <div className="flex flex-col gap-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h1 className="font-heading text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-                  {product.title}
-                </h1>
-                {/* 真实货号：import.py 以 slugify(code) 生成 handle（29/29 code === handle.toUpperCase()），
+            <div className="flex flex-col gap-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h1 className="font-heading text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
+                    {product.title}
+                  </h1>
+                  {/* 真实货号：import.py 以 slugify(code) 生成 handle（29/29 code === handle.toUpperCase()），
                   故展示层由 handle 回大写即得供应商货号（如 DC-1001 / 26016-M）。原副标题
                   （"Unisex · 5 colorways"）与描述首句重复且无货号价值，替换为货号行更疏朗。
                   若未来 handle 不再由货号派生（如 Shopify 商品），此推导需改为显式 code 字段。 */}
-                <p className="mt-1.5 text-[13px] uppercase tracking-wider text-neutral-500">
-                  {product.handle.toUpperCase()}
-                </p>
-              </div>
-              {/* 工具类动作角落：收藏心形 + 打印规格图标（用户 2026-09-06：打印入口
+                  <p className="mt-1.5 text-[13px] uppercase tracking-wider text-neutral-500">
+                    {product.handle.toUpperCase()}
+                  </p>
+                </div>
+                {/* 工具类动作角落：收藏心形 + 打印规格图标（用户 2026-09-06：打印入口
                  由详情区移至此，轻量图标、不挤占详情区）。 */}
-              <div className="flex shrink-0 items-center gap-1">
-                <WishlistButton handle={product.handle} />
-                <PrintSpecSheetButton />
+                <div className="flex shrink-0 items-center gap-1">
+                  <WishlistButton handle={product.handle} />
+                  <PrintSpecSheetButton />
+                </div>
               </div>
-            </div>
 
-            {/* 商店直购形态：demo $ 价不显示（价格仅由 Buy Button 以店币呈现，决策：不并存误导） */}
-            {buyConfig == null ? (
-              <p className="text-2xl font-semibold text-ink">{formatPrice(product.price.amount)}</p>
-            ) : null}
+              {/* 商店直购形态：demo $ 价不显示（价格仅由 Buy Button 以店币呈现，决策：不并存误导） */}
+              {buyConfig == null ? (
+                <p className="text-2xl font-semibold text-ink">
+                  {formatPrice(product.price.amount)}
+                </p>
+              ) : null}
 
-            <p className="text-[15px] leading-7 text-neutral-600">{product.description}</p>
+              <p className="text-[15px] leading-7 text-neutral-600">{product.description}</p>
 
-            <ProductActions product={product} buyUrl={buyUrl} buyConfig={buyConfig}>
-              <div className="flex flex-col gap-3">
-                {/* 详情手风琴分区标题：base-ui AccordionHeader 固定渲染 h3，
+              <ProductActions product={product} buyUrl={buyUrl} buyConfig={buyConfig}>
+                <div className="flex flex-col gap-3">
+                  {/* 详情手风琴分区标题：base-ui AccordionHeader 固定渲染 h3，
                   需 h2 祖先承接 h1 → h3 的标题层级（heading-order 修复）。 */}
-                <h2 className="sr-only">Product details</h2>
-                <Accordion className="border-t border-neutral-200">
-                  <AccordionItem value="materials-fit">
-                    <AccordionTrigger>Materials &amp; fit</AccordionTrigger>
-                    <AccordionContent>
-                      <ul className="mb-4 list-disc space-y-1 pl-4 text-neutral-600">
-                        {product.features.map((feature) => (
-                          <li key={feature}>{feature}</li>
-                        ))}
-                      </ul>
-                      <p className="text-neutral-600">{product.fitNotes}</p>
-                    </AccordionContent>
-                  </AccordionItem>
-                  <AccordionItem value="shipping">
-                    <AccordionTrigger>Shipping &amp; returns</AccordionTrigger>
-                    <AccordionContent>
-                      {/* 文案单源（store-policy.ts）：与 AI support 客服注入同一份，禁止在此另写。 */}
-                      <p className="mb-3 text-neutral-600">{POLICY_PRODUCTION}</p>
-                      <p className="text-neutral-600">{POLICY_RETURNS}</p>
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-                {/* 护理说明海报入口：每 PDP 通用，弹窗查看，不占首屏。 */}
-                <CareInstructionsButton />
-              </div>
-            </ProductActions>
+                  <h2 className="sr-only">Product details</h2>
+                  <Accordion className="border-t border-neutral-200">
+                    <AccordionItem value="materials-fit">
+                      <AccordionTrigger>Materials &amp; fit</AccordionTrigger>
+                      <AccordionContent>
+                        <ul className="mb-4 list-disc space-y-1 pl-4 text-neutral-600">
+                          {product.features.map((feature) => (
+                            <li key={feature}>{feature}</li>
+                          ))}
+                        </ul>
+                        <p className="text-neutral-600">{product.fitNotes}</p>
+                      </AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="shipping">
+                      <AccordionTrigger>Shipping &amp; returns</AccordionTrigger>
+                      <AccordionContent>
+                        {/* 文案单源（store-policy.ts）：与 AI support 客服注入同一份，禁止在此另写。 */}
+                        <p className="mb-3 text-neutral-600">{POLICY_PRODUCTION}</p>
+                        <p className="text-neutral-600">{POLICY_RETURNS}</p>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+                  {/* 护理说明海报入口：每 PDP 通用，弹窗查看，不占首屏。 */}
+                  <CareInstructionsButton />
+                </div>
+              </ProductActions>
+            </div>
           </div>
-        </div>
+        </ProductColorSelectionProvider>
 
         {related.length > 0 ? (
           <section aria-labelledby="related-heading" className="mt-16 sm:mt-20">

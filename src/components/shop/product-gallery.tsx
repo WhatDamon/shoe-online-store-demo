@@ -4,6 +4,7 @@ import Image from 'next/image'
 import { useState } from 'react'
 import type { ProductView } from '@/domain/product'
 import { ProductVisual, type ProductVisualView } from './product-visual'
+import { useOptionalProductColorSelection } from './product-color-selection'
 
 const VIEW_LABELS: { view: ProductVisualView; label: string }[] = [
   { view: 'side', label: 'Side' },
@@ -19,7 +20,16 @@ export function ProductGallery({ product }: { product: ProductView }) {
   const hasPhotos = photos.length > 0
   const [photoIdx, setPhotoIdx] = useState(0)
   const [active, setActive] = useState<ProductVisualView>('side')
-  const activePhoto = hasPhotos ? photos[Math.min(photoIdx, photos.length - 1)] : null
+  const colorSelection = useOptionalProductColorSelection()
+  const linkedToColors = colorSelection?.imagesFollowColors === true
+  const activePhotoIdx = linkedToColors ? colorSelection.colorIndex : photoIdx
+  const activePhoto = hasPhotos ? photos[Math.min(activePhotoIdx, photos.length - 1)] : null
+  const activeColor = linkedToColors ? product.colors?.[activePhotoIdx] : null
+
+  const selectPhoto = (index: number) => {
+    setPhotoIdx(index)
+    if (linkedToColors) colorSelection.setColorIndex(index)
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -28,9 +38,13 @@ export function ProductGallery({ product }: { product: ProductView }) {
           <Image
             key={activePhoto}
             src={activePhoto}
-            alt={`${product.title} photo ${photoIdx + 1}`}
+            alt={
+              activeColor
+                ? `${product.title} in ${activeColor.name}`
+                : `${product.title} photo ${activePhotoIdx + 1}`
+            }
             fill
-            priority={photoIdx === 0}
+            loading="eager"
             sizes="(min-width:1024px) 50vw, 100vw"
             className="object-contain"
           />
@@ -50,14 +64,15 @@ export function ProductGallery({ product }: { product: ProductView }) {
       <div className="flex flex-wrap gap-2" role="group" aria-label={`${product.title} views`}>
         {hasPhotos
           ? photos.map((src, i) => {
-              const current = photoIdx === i
+              const current = activePhotoIdx === i
+              const color = linkedToColors ? product.colors?.[i] : null
               return (
                 <button
                   key={src}
                   type="button"
-                  onClick={() => setPhotoIdx(i)}
+                  onClick={() => selectPhoto(i)}
                   aria-pressed={current}
-                  aria-label={`Show photo ${i + 1}`}
+                  aria-label={color ? `Show ${color.name}` : `Show photo ${i + 1}`}
                   className={`rounded-xl border p-1 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400 ${
                     current
                       ? 'border-neutral-400 ring-1 ring-neutral-300'

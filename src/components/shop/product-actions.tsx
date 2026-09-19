@@ -12,6 +12,7 @@ import { SizeSelector } from './size-selector'
 import { ProductBuyBar } from './product-buy-bar'
 import { ShopifyBuyButton } from './shopify-buy-button'
 import { MySizeGuide } from './my-size-guide'
+import { useOptionalProductColorSelection } from './product-color-selection'
 
 interface ProductActionsProps {
   product: ProductView
@@ -44,8 +45,11 @@ export function ProductActions({
   // 「我的尺码」快照：demo 分支 Select-size 命中高亮（产品在库才显形，天然自然）。
   const myMm = useSyncExternalStore(mySize.subscribe, mySize.getSnapshot, mySize.getServerSnapshot)
   const myCanonical = myMm != null ? footMmToEU(myMm) : null
-  // 多色款下单前选色：照片未按颜色拆分，色卡仅记录意向，主图保持代表图。
-  const [colorIdx, setColorIdx] = useState(0)
+  // 页面 Provider 存在时与图库共享色号；孤立渲染（测试/复用）时保留本地状态。
+  const colorSelection = useOptionalProductColorSelection()
+  const [localColorIdx, setLocalColorIdx] = useState(0)
+  const colorIdx = colorSelection?.colorIndex ?? localColorIdx
+  const setColorIdx = colorSelection?.setColorIndex ?? setLocalColorIdx
   const [selected, setSelected] = useState<CanonicalSize | null>(null)
   // 面板打开 + 预置 size-fit 上下文由 AssistantProvider 处理；context 为空（Provider 未挂载的孤立渲染）时静默。
   const assistant = useAssistant()
@@ -113,9 +117,7 @@ export function ProductActions({
               )
             })}
           </div>
-          <p className="text-xs leading-5 text-neutral-500">
-            Photos are representative — the actual shade can vary on screen.
-          </p>
+          <p className="text-xs leading-5 text-neutral-500">Colors may vary slightly on screen.</p>
         </fieldset>
       ) : null}
       <SizeSelector
