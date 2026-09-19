@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { ProductActions } from './product-actions'
+import { ProductGallery } from './product-gallery'
+import { ProductColorSelectionProvider } from './product-color-selection'
 import type { ProductView } from '@/domain/product'
 
 const p: ProductView = {
@@ -55,6 +57,11 @@ describe('ProductActions layout order', () => {
 
 const multiColor = {
   ...p,
+  images: [
+    '/products/daily-drift/1.webp',
+    '/products/daily-drift/2.webp',
+    '/products/daily-drift/3.webp',
+  ],
   colors: [
     { name: 'Ink Black', hex: '#1a1a1a' },
     { name: 'Ivory', hex: '#f3ede2' },
@@ -85,10 +92,7 @@ describe('PDP colorway picker (decision #16: color selectable pre-order)', () =>
     const ivory = screen.getByRole('radio', { name: 'Ivory' }) as HTMLInputElement
     expect(ink.checked).toBe(true)
     expect(ivory.checked).toBe(false)
-    // 图库未按颜色拆分：代表照片 + 色名标签，含诚实说明
-    expect(
-      screen.getByText('Photos are representative — the actual shade can vary on screen.'),
-    ).toBeInTheDocument()
+    expect(screen.getByText('Colors may vary slightly on screen.')).toBeInTheDocument()
 
     fireEvent.click(ivory)
     expect(ivory.checked).toBe(true)
@@ -97,6 +101,31 @@ describe('PDP colorway picker (decision #16: color selectable pre-order)', () =>
     )
     // legend 内选中色名（唯一可见文本实例）
     expect(screen.getByText('Ivory')).toBeInTheDocument()
+  })
+
+  it('keeps the selected color and gallery image in sync', () => {
+    render(
+      <ProductColorSelectionProvider product={multiColor}>
+        <ProductGallery product={multiColor} />
+        <ProductActions product={multiColor} buyUrl={null} />
+      </ProductColorSelectionProvider>,
+    )
+
+    expect(screen.getByRole('img', { name: 'Daily Drift in Ink Black' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Ivory' }))
+
+    expect(screen.getByRole('img', { name: 'Daily Drift in Ivory' })).toHaveAttribute(
+      'src',
+      expect.stringContaining('2.webp'),
+    )
+    expect(screen.getByRole('button', { name: 'Show Ivory' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show Peach' }))
+    expect(screen.getByRole('radio', { name: 'Peach' })).toBeChecked()
   })
 })
 
