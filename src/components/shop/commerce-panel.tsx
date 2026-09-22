@@ -107,13 +107,38 @@ export function CommercePanel({
       {order && (
         <div className="space-y-2 rounded-xl border border-neutral-200 bg-surface p-5">
           <p className="break-all">Order ID: {order.id}</p>
-          <p>Status: {order.status === 'cancelled' ? 'Cancelled' : 'Pending payment'}</p>
+          <p>
+            Status:{' '}
+            {order.status === 'cancelled'
+              ? order.cancellation_reason === 'expired'
+                ? 'Expired'
+                : 'Cancelled'
+              : 'Pending payment'}
+          </p>
           <p role="status" className="font-semibold">
             Payments are not available yet.
           </p>
           <p className="text-sm text-neutral-600">
-            No payment has been taken. This order reserves inventory until you cancel it.
+            {order.status === 'cancelled'
+              ? 'No payment has been taken. Inventory has been released. Add the item to your cart again to purchase.'
+              : 'No payment has been taken. Inventory will be released automatically when this order expires, or you can cancel it sooner.'}
           </p>
+          {order.status === 'pending_payment' && order.expires_at && (
+            <p className="text-sm text-neutral-600">
+              Inventory reserved until:{' '}
+              <time dateTime={order.expires_at}>{new Date(order.expires_at).toLocaleString()}</time>
+            </p>
+          )}
+          <button
+            type="button"
+            className="text-sm underline"
+            disabled={busy}
+            onClick={() =>
+              act(async () => setOrder(await commerceRequest<OrderView>(`orders/${order.id}`)))
+            }
+          >
+            Refresh order status
+          </button>
           <Link href={`/orders/${order.id}`} className="text-sm underline">
             Permanent order link (available only in this shopping session)
           </Link>
