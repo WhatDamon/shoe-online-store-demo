@@ -1,4 +1,6 @@
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
+import { X509Certificate } from 'node:crypto'
+import { checkServerIdentity, type PeerCertificate } from 'node:tls'
 import Database from 'better-sqlite3'
 import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
@@ -79,21 +81,71 @@ export function db(): AnyDb {
 }
 
 export function createPostgresDb(url: string = process.env.DATABASE_URL ?? ''): PgAppDb {
-  if (!url) throw new Error('DB_DRIVER=postgres requires DATABASE_URL (postgres://…) URL')
-  const ssl = pgConnectOptions()
-  const client = ssl ? postgres(url, { max: 10, ssl }) : postgres(url, { max: 10 })
-  return drizzlePg(client, { schema: pgSchema })
+  return drizzlePg(createPostgresClient(url), { schema: pgSchema })
 }
 
-// Cloud SQL（公网 IP）强制 TLS。serverless（Vercel）无法随部署携带 CA 证书文件、
-// Cloud SQL 公网证书链也不在 Node 系统根链内，故等价 sslmode=require（加密但跳过证书验证），
-// 配合强密码 + 授权网段收紧使用（详见 docs/shopify-store-setup 同款取舍文档/README env 表）。
-// PG_SSL 非空且非 '0' 即开启（Vercel 注入空串的安全默认：不误开）。
+export function createPostgresClient(
+  url: string,
+  env: Record<string, string | undefined> = process.env,
+) {
+  if (!url) throw new Error('DB_DRIVER=postgres requires DATABASE_URL (postgres://…) URL')
+  const ssl = pgConnectOptions(env)
+  let hostname = ''
+  if (ssl) {
+    try {
+      const parsed = new URL(url)
+      hostname = parsed.hostname.replace(/^\[|\]$/g, '')
+      if (
+        !['postgres:', 'postgresql:'].includes(parsed.protocol) ||
+        !hostname ||
+        hostname.includes(',')
+      ) {
+        throw new Error('invalid endpoint')
+      }
+    } catch {
+      throw new Error('Verified PostgreSQL TLS requires one explicit DATABASE_URL hostname')
+    }
+  }
+  // Always pass ssl explicitly: URL/PGSSL options must not weaken this policy.
+  return postgres(url, {
+    max: 10,
+    ssl: ssl
+      ? {
+          ...ssl,
+          // postgres.js omits SNI for IPs; Node can otherwise validate 'localhost'.
+          checkServerIdentity: (_name: string, certificate: PeerCertificate) =>
+            checkServerIdentity(hostname, certificate),
+        }
+      : false,
+  })
+}
+
+// Production always verifies TLS. Development can use an explicit local plaintext
+// connection; neither connection strings nor legacy `require` disable verification.
 export function pgConnectOptions(
   env: Record<string, string | undefined> = process.env,
-): { rejectUnauthorized: false } | null {
-  const ssl = (env.PG_SSL ?? '').trim()
-  return ssl !== '' && ssl !== '0' ? { rejectUnauthorized: false } : null
+): { rejectUnauthorized: true; ca?: string } | null {
+  const mode = (env.PG_SSL ?? '').trim().toLowerCase()
+  const caFile = (env.PG_SSL_CA_FILE ?? '').trim()
+  const production = env.NODE_ENV === 'production'
+  if (!['', '0', 'false', '1', 'true', 'require', 'verify-full'].includes(mode)) {
+    throw new Error('Invalid PG_SSL: use 1/verify-full, or 0 for local development')
+  }
+  const disabled = mode === '0' || mode === 'false'
+  if (disabled && (production || caFile)) {
+    throw new Error('PostgreSQL TLS cannot be disabled in production or with PG_SSL_CA_FILE')
+  }
+  if (disabled || (!mode && !production && !caFile)) return null
+  if (!caFile) return { rejectUnauthorized: true }
+  try {
+    const ca = readFileSync(caFile, 'utf8')
+    // Reject empty/malformed mounts before attempting a network connection.
+    new X509Certificate(ca)
+    return { rejectUnauthorized: true, ca }
+  } catch {
+    // Do not expose the file path, certificate, or underlying filesystem error.
+    throw new Error('PG_SSL_CA_FILE must contain a readable PEM certificate bundle')
+  }
 }
 
 // 启动自动建表（零迁移 DX，两侧一致）：每个 pg 实例只执行一次，失败可重试。

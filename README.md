@@ -140,6 +140,34 @@ See [`.env.example`](.env.example) for the annotated template. Summary:
 | `SHOPIFY_DOMAIN`, `SHOPIFY_STOREFRONT_TOKEN` | *(empty)* | Reserved. Catalog adapter switches to Shopify only when `SHOPIFY_ENABLED=true` and **both** are set (not yet active). |
 | `SHOPIFY_BUY_DOMAIN`, `SHOPIFY_BUY_TOKEN` | *(empty)* | **PDP Shopify Buy Button channel** (2026-09): only with `SHOPIFY_ENABLED=true` and **both** credentials set, every PDP mapped in `src/server/catalog/shopify-buy.ts` (29/29 store products, handle-keyed) renders a real Buy Button that takes over variant selection + checkout; unset keeps the local commerce flow. Independent of the two vars above on purpose (setting those would trip the catalog stub). |
 
+### PostgreSQL TLS
+
+The TypeScript PostgreSQL client always verifies the server certificate in
+`NODE_ENV=production`, including when `PG_SSL` is absent or blank. `PG_SSL=0` or
+`false` fails in production. In development, unset/`0` allows a local plaintext
+PostgreSQL instance; `PG_SSL=1`, `true`, `require` or `verify-full` enables verified
+TLS. The legacy `require` spelling no longer skips verification. The explicit
+policy overrides `DATABASE_URL` SSL parameters and postgres.js `PGSSL`. Verified
+connections require a single explicit hostname/IP in `DATABASE_URL`; certificate
+identity is checked against that endpoint even for IP connections (no implicit
+localhost fallback). Multi-host URLs and implicit `PGHOST` are not supported in
+this mode.
+
+By default Node's trusted roots are used. For a private CA, mount a PEM bundle on
+the server and set `PG_SSL_CA_FILE` to its path. Missing or malformed files fail
+without printing their path or contents. An untrusted server or hostname mismatch
+must fail the connection; never disable verification to work around it. SQLite
+does not use these settings. No schema migration is required.
+
+For managed PostgreSQL, prefer a private network or an authenticated database
+connector. The current production client still requires verified TLS at its
+connection endpoint; a plaintext Auth Proxy socket is not a supported production
+configuration. Use the provider's supported TLS endpoint and matching DNS name.
+For CA rotation, deploy a bundle trusting both old and new CAs, restart and check
+connectivity, rotate the server certificate, then remove the old CA and restart.
+Rollback a bad rotation by restoring the previous trusted bundle and certificate,
+not by setting `PG_SSL=0`. Monitor connection failures without logging credentials.
+
 ### Enabling real AI
 
 1. Put a real key in `AI_API_KEY` (optionally `AI_BASE_URL` for a gateway / custom endpoint).
