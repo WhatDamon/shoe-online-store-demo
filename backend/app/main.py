@@ -6,9 +6,11 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.api.v1.routes import DB, router
+from app.application.errors import CommerceError
 from app.application.expiry import expiry_loop
 from app.config import settings
 
@@ -30,6 +32,14 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="Evoloop local commerce", version="0.1.0", lifespan=lifespan)
 app.include_router(router)
+
+
+@app.exception_handler(CommerceError)
+async def commerce_error(_request: Request, exc: CommerceError) -> JSONResponse:
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"code": exc.code, "detail": exc.message},
+    )
 
 
 @app.middleware("http")

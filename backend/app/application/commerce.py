@@ -2,12 +2,16 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
-from fastapi import HTTPException
 from sqlalchemy import delete, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
+from app.application.errors import (
+    EmptyCart,
+    InsufficientStock,
+    OrderNotFound,
+)
 from app.config import settings
 from app.domain.models import (
     AuditLog,
@@ -50,7 +54,7 @@ def cart_view(db: Session, session_id: str, *, check_stock: bool = False) -> dic
     total = Decimal("0.00")
     for item, variant, product, stock in rows:
         if check_stock and item.quantity > stock.available:
-            raise HTTPException(409, "insufficient_stock")
+            raise InsufficientStock()
         subtotal = variant.price * item.quantity
         total += subtotal
         items.append(
@@ -73,7 +77,7 @@ def cart_view(db: Session, session_id: str, *, check_stock: bool = False) -> dic
 def owned_order(db: Session, session_id: str, order_id: str) -> Order:
     order = db.scalar(select(Order).where(Order.id == order_id, Order.cart_id == session_id))
     if order is None:
-        raise HTTPException(404, "order_not_found")
+        raise OrderNotFound()
     return order
 
 
@@ -114,7 +118,7 @@ def create_order(db: Session, session_id: str, key: str) -> dict:
         return order_view(db, existing)
     cart = cart_view(db, session_id, check_stock=True)
     if not cart["items"]:
-        raise HTTPException(409, "empty_cart")
+        raise EmptyCart()
     order = Order(
         cart_id=session_id,
         idempotency_key=key,
@@ -136,7 +140,7 @@ def create_order(db: Session, session_id: str, key: str) -> dict:
             )
         )
         if changed.rowcount != 1:  # type: ignore[attr-defined]
-            raise HTTPException(409, "insufficient_stock")
+            raise InsufficientStock()
         db.add(
             OrderItem(
                 order_id=order.id,
