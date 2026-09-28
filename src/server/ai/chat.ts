@@ -48,34 +48,52 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
   const text = truncateMessage(req.text ?? '')
   // 记账模型与实际选中的 provider 同源（修复：勿用 AI_MODEL ?? 'mock'，会把真实调用记成 mock）。
   const model = aiModel()
+  const budgetDay = today()
 
   let history: SessionMessage[]
   try {
     guardrails.assertRate(req.ip, req.sessionKey)
-    await guardrails.assertBudget()
+    // Fast-fail an already exhausted day. The authoritative decision is the
+    // atomic reservation immediately before provider work below.
+    await guardrails.assertBudget(budgetDay)
     history = guardrails.assertTurn(req.sessionKey)
   } catch (e) {
     yield toErrorEvent(e)
     return
   }
 
+  const requestId = crypto.randomUUID()
+  let activeReservation = false
+
+  const reserveFor = async (system: string, messages: AiContext['messages']) => {
+    const prompt = [system, ...messages.map((message) => message.content)]
+      .filter(Boolean)
+      .join('\n')
+    await guardrails.reserveBudget(requestId, estTokens(prompt) + maxOutputTokens(), budgetDay)
+    activeReservation = true
+  }
+
   // 护栏全过，回合已领取（claim 在 provider 调用前；失败/中止的请求同样计入一次尝试——注释见 guardrails）。
   const record: TurnContext['record'] = async (system, userText, assistantText) => {
+    const prompt = [system, ...history.map((m) => m.content), userText].filter(Boolean).join('\n')
+    if (!activeReservation) {
+      await guardrails.reserveBudget(
+        requestId,
+        estTokens(prompt) + estTokens(assistantText),
+        budgetDay,
+      )
+      activeReservation = true
+    }
+    await guardrails.settleBudget(requestId, {
+      day: budgetDay,
+      model,
+      promptTokens: estTokens(prompt),
+      completionTokens: estTokens(assistantText),
+      sessionKey: req.sessionKey,
+    })
+    activeReservation = false
     guardrails.pushTurn(req.sessionKey, 'user', userText)
     guardrails.pushTurn(req.sessionKey, 'assistant', assistantText)
-    const prompt = [system, ...history.map((m) => m.content), userText].filter(Boolean).join('\n')
-    try {
-      await guardrails.noteUsage({
-        day: today(),
-        model,
-        promptTokens: estTokens(prompt),
-        completionTokens: estTokens(assistantText),
-        sessionKey: req.sessionKey,
-      })
-    } catch (err) {
-      // 用量记账失败不打断用户回复（仅影响成本审计，属于内部路径）。
-      console.error('[chat] noteUsage failed', err)
-    }
   }
 
   /** 流式转发 provider 输出：每段 delta 透传为 SSE 帧，返回完整回复文本供落库。
@@ -85,6 +103,7 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
     system: string,
     messages: AiContext['messages'],
   ): AsyncGenerator<{ type: 'delta'; text: string }, string> {
+    await reserveFor(system, messages)
     let assistant = ''
     for await (const delta of provider.stream({
       system,
@@ -102,5 +121,13 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
   } catch (e) {
     // provider 运行期失败 → 显式 error + UI 重试（P3：绝不静默降级到 Mock）
     yield toErrorEvent(e)
+  } finally {
+    if (activeReservation) {
+      try {
+        await guardrails.releaseBudget(requestId)
+      } catch (releaseError) {
+        console.error('[chat] budget release failed', releaseError)
+      }
+    }
   }
 }

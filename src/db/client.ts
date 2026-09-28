@@ -34,6 +34,20 @@ export function createDb(file: string = process.env.DATABASE_URL ?? './data/loca
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_ai_usage_day ON ai_usage(day);
+    CREATE TABLE IF NOT EXISTS ai_budget_days (
+      day TEXT PRIMARY KEY,
+      reserved_tokens INTEGER NOT NULL DEFAULT 0,
+      used_tokens INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS ai_budget_reservations (
+      request_id TEXT PRIMARY KEY,
+      day TEXT NOT NULL,
+      reserved_tokens INTEGER NOT NULL,
+      actual_tokens INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_ai_budget_reservations_day ON ai_budget_reservations(day);
     CREATE TABLE IF NOT EXISTS products (
       id TEXT PRIMARY KEY,
       handle TEXT NOT NULL UNIQUE,
@@ -128,6 +142,20 @@ async function runPgDdl(db: PgAppDb): Promise<void> {
       created_at bigint NOT NULL
     )`,
     sql`CREATE INDEX IF NOT EXISTS idx_ai_usage_day ON ai_usage (day)`,
+    sql`CREATE TABLE IF NOT EXISTS ai_budget_days (
+      day text PRIMARY KEY,
+      reserved_tokens integer NOT NULL DEFAULT 0,
+      used_tokens integer NOT NULL DEFAULT 0
+    )`,
+    sql`CREATE TABLE IF NOT EXISTS ai_budget_reservations (
+      request_id text PRIMARY KEY,
+      day text NOT NULL,
+      reserved_tokens integer NOT NULL,
+      actual_tokens integer NOT NULL DEFAULT 0,
+      status text NOT NULL,
+      created_at bigint NOT NULL
+    )`,
+    sql`CREATE INDEX IF NOT EXISTS idx_ai_budget_reservations_day ON ai_budget_reservations (day)`,
     sql`CREATE TABLE IF NOT EXISTS products (
       id text PRIMARY KEY,
       handle text NOT NULL UNIQUE,

@@ -5,6 +5,55 @@ import { createRepository } from '@/server/search/repository'
 import { dailyTokenCap, today, underDailyBudget } from './budget'
 
 describe('budget', () => {
+  it('原子预占在并发请求下不会超过 cap，结算只写入一次实际用量', async () => {
+    const repo = createRepository(createDb(':memory:'))
+    const requests = await Promise.all(
+      ['r1', 'r2', 'r3'].map((requestId) =>
+        repo.reserveDailyBudget({ requestId, day: '2026-09-28', tokens: 60, cap: 100 }),
+      ),
+    )
+    expect(requests.filter(Boolean)).toHaveLength(1)
+    expect(
+      await repo.reserveDailyBudget({ requestId: 'r1', day: '2026-09-28', tokens: 60, cap: 100 }),
+    ).toBe(true)
+    expect(
+      await repo.settleDailyBudget({
+        requestId: 'r1',
+        usage: {
+          day: '2026-09-28',
+          model: 'mock',
+          promptTokens: 10,
+          completionTokens: 5,
+          sessionKey: 's1',
+        },
+      }),
+    ).toBe(true)
+    expect(
+      await repo.settleDailyBudget({
+        requestId: 'r1',
+        usage: {
+          day: '2026-09-28',
+          model: 'mock',
+          promptTokens: 10,
+          completionTokens: 5,
+          sessionKey: 's1',
+        },
+      }),
+    ).toBe(true)
+    expect(await repo.dayTokenUsage('2026-09-28')).toBe(15)
+  })
+
+  it('provider 失败释放 pending 预占，之后可再次申请', async () => {
+    const repo = createRepository(createDb(':memory:'))
+    await expect(
+      repo.reserveDailyBudget({ requestId: 'failed', day: '2026-09-28', tokens: 90, cap: 100 }),
+    ).resolves.toBe(true)
+    await expect(repo.releaseDailyBudget('failed')).resolves.toBe(true)
+    await expect(
+      repo.reserveDailyBudget({ requestId: 'retry', day: '2026-09-28', tokens: 90, cap: 100 }),
+    ).resolves.toBe(true)
+  })
+
   it('当日用量为零时放行', async () => {
     const repo = createRepository(createDb(':memory:'))
     expect(await underDailyBudget(repo)).toBe(true)

@@ -1,5 +1,11 @@
-import { eq, sql } from 'drizzle-orm'
-import { aiUsage, productEmbeddings, products } from '@/db/schema'
+import { and, eq, sql } from 'drizzle-orm'
+import {
+  aiBudgetDays,
+  aiBudgetReservations,
+  aiUsage,
+  productEmbeddings,
+  products,
+} from '@/db/schema'
 import { db } from '@/db/client'
 import type { AppDb, PgAppDb } from '@/db/client'
 import { resolveDbDriver } from '@/db/dialect'
@@ -13,6 +19,156 @@ import type { EmbeddingRow } from './embedding-row'
 // 若增长到 10⁴ 量级，需把筛选下推到 SQL（Repository 增加 query 方法）。
 export function createRepository(db: AppDb) {
   return {
+    async reserveDailyBudget(input: {
+      requestId: string
+      day: string
+      tokens: number
+      cap: number
+    }): Promise<boolean> {
+      const tokens = Math.max(0, Math.floor(input.tokens))
+      const cap = Math.max(0, Math.floor(input.cap))
+      if (!input.requestId || !input.day || tokens <= 0 || cap <= 0) return false
+      return db.transaction((tx) => {
+        const [existing] = tx
+          .select({ status: aiBudgetReservations.status })
+          .from(aiBudgetReservations)
+          .where(eq(aiBudgetReservations.requestId, input.requestId))
+          .limit(1)
+          .all()
+        if (existing) return existing.status === 'pending'
+
+        tx.insert(aiBudgetDays)
+          .values({ day: input.day, reservedTokens: 0, usedTokens: 0 })
+          .onConflictDoNothing()
+          .run()
+        const [updated] = tx
+          .update(aiBudgetDays)
+          .set({ reservedTokens: sql`${aiBudgetDays.reservedTokens} + ${tokens}` })
+          .where(
+            and(
+              eq(aiBudgetDays.day, input.day),
+              sql`${aiBudgetDays.reservedTokens} + ${aiBudgetDays.usedTokens} + ${tokens} <= ${cap}`,
+            ),
+          )
+          .returning({ day: aiBudgetDays.day })
+          .all()
+        if (!updated) return false
+        tx.insert(aiBudgetReservations)
+          .values({
+            requestId: input.requestId,
+            day: input.day,
+            reservedTokens: tokens,
+            actualTokens: 0,
+            status: 'pending',
+            createdAt: Date.now(),
+          })
+          .run()
+        return true
+      })
+    },
+    async settleDailyBudget(input: {
+      requestId: string
+      usage: {
+        day: string
+        model: string
+        promptTokens: number
+        completionTokens: number
+        sessionKey: string
+      }
+      cap?: number
+    }): Promise<boolean> {
+      const actualTokens = Math.max(
+        0,
+        Math.floor(input.usage.promptTokens) + Math.floor(input.usage.completionTokens),
+      )
+      return db.transaction((tx) => {
+        const [reservation] = tx
+          .select()
+          .from(aiBudgetReservations)
+          .where(eq(aiBudgetReservations.requestId, input.requestId))
+          .limit(1)
+          .all()
+        if (!reservation) return false
+        if (reservation.status === 'settled') return true
+        if (reservation.status !== 'pending') return false
+        const [claimed] = tx
+          .update(aiBudgetReservations)
+          .set({ status: 'settling' })
+          .where(
+            and(
+              eq(aiBudgetReservations.requestId, input.requestId),
+              eq(aiBudgetReservations.status, 'pending'),
+            ),
+          )
+          .returning()
+          .all()
+        if (!claimed) return false
+        const extra = Math.max(0, actualTokens - claimed.reservedTokens)
+        if (extra > 0) {
+          const cap =
+            input.cap == null ? Number.MAX_SAFE_INTEGER : Math.max(0, Math.floor(input.cap))
+          const [toppedUp] = tx
+            .update(aiBudgetDays)
+            .set({ reservedTokens: sql`${aiBudgetDays.reservedTokens} + ${extra}` })
+            .where(
+              and(
+                eq(aiBudgetDays.day, claimed.day),
+                sql`${aiBudgetDays.reservedTokens} + ${aiBudgetDays.usedTokens} + ${extra} <= ${cap}`,
+              ),
+            )
+            .returning({ day: aiBudgetDays.day })
+            .all()
+          if (!toppedUp) throw new Error('AI budget reservation day is missing')
+        }
+        tx.update(aiBudgetDays)
+          .set({
+            reservedTokens: sql`${aiBudgetDays.reservedTokens} - ${claimed.reservedTokens + extra}`,
+            usedTokens: sql`${aiBudgetDays.usedTokens} + ${actualTokens}`,
+          })
+          .where(eq(aiBudgetDays.day, claimed.day))
+          .run()
+        tx.insert(aiUsage)
+          .values({ ...input.usage, createdAt: Date.now() })
+          .run()
+        tx.update(aiBudgetReservations)
+          .set({ status: 'settled', actualTokens })
+          .where(eq(aiBudgetReservations.requestId, input.requestId))
+          .run()
+        return true
+      })
+    },
+    async releaseDailyBudget(requestId: string): Promise<boolean> {
+      return db.transaction((tx) => {
+        const [reservation] = tx
+          .select()
+          .from(aiBudgetReservations)
+          .where(eq(aiBudgetReservations.requestId, requestId))
+          .limit(1)
+          .all()
+        if (!reservation) return false
+        if (reservation.status === 'released') return true
+        if (reservation.status !== 'pending') return false
+        const [claimed] = tx
+          .update(aiBudgetReservations)
+          .set({ status: 'released' })
+          .where(
+            and(
+              eq(aiBudgetReservations.requestId, requestId),
+              eq(aiBudgetReservations.status, 'pending'),
+            ),
+          )
+          .returning()
+          .all()
+        if (!claimed) return false
+        tx.update(aiBudgetDays)
+          .set({
+            reservedTokens: sql`${aiBudgetDays.reservedTokens} - ${claimed.reservedTokens}`,
+          })
+          .where(eq(aiBudgetDays.day, claimed.day))
+          .run()
+        return true
+      })
+    },
     async getEmbedding(productId: string): Promise<EmbeddingRow | null> {
       const row = await db
         .select()
@@ -78,6 +234,8 @@ export function createRepository(db: AppDb) {
     },
     async wipe(): Promise<void> {
       // 仅测试
+      await db.delete(aiBudgetReservations)
+      await db.delete(aiBudgetDays)
       await db.delete(productEmbeddings)
       await db.delete(aiUsage)
       await db.delete(products)
