@@ -176,6 +176,29 @@ not by setting `PG_SSL=0`. Monitor connection failures without logging credentia
 3. Restart. Guardrails (rate limit, turn cap, daily budget) apply to real and Mock alike.
    `AI_DISABLE_REAL=1` is the one-switch rollback to Mock.
 
+### AI memory limits and deployment boundary
+
+Each process holds at most 1,000 assistant sessions and 10,000 rate-limit buckets
+per dimension (IP and session). Keys are limited to 128 ASCII letters, digits,
+colons, dots, underscores or hyphens. Invalid keys and new keys beyond capacity
+are refused using the existing soft guardrail response; live limits are never
+evicted to make room. The IP check runs before allocating a session bucket.
+
+Idle sessions expire after 30 minutes. A rate bucket expires only after at least
+its full refill period. A timer physically deletes expired records every minute,
+including while idle; requests also trigger overdue cleanup after a suspended
+timer. Each session stores only its latest 12 messages, each capped at 4,000
+characters. Returned history is detached from the stored data. Timers do not keep
+Node alive and can be explicitly disposed in tests/process lifecycle code.
+
+These bounds protect one process only. **Do not horizontally scale this assistant
+or treat independently scaled serverless instances as a shared abuse boundary.**
+Server-generated AI sessions, trusted-proxy IP handling and atomic daily budget
+reservations remain separate security work; client session rotation and spoofed
+forwarding headers are not solved by bounded storage. Keep real AI disabled until
+those production gates are verified. No Redis, schema migration or new environment
+variables are introduced here.
+
 ### Switching market / sizes
 
 `SITE_MARKET` is a **deployment-level, single-market** setting (no runtime market switching):
