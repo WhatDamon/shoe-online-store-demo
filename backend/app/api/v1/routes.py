@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Response
+from fastapi import APIRouter, Depends, Header, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -13,6 +13,12 @@ from app.application.commerce import (
     lock_cart,
     order_view,
     owned_order,
+)
+from app.application.errors import (
+    CartItemNotFound,
+    ProductNotFound,
+    QuantityLimitExceeded,
+    VariantNotFound,
 )
 from app.dependencies import anonymous_session, database
 from app.domain.models import CartItem, Inventory, Media, Product, Variant
@@ -62,7 +68,7 @@ def products(db: DB) -> list[dict]:
 def product(handle: str, db: DB) -> dict:
     p = db.scalar(select(Product).where(Product.handle == handle))
     if p is None:
-        raise HTTPException(404, "product_not_found")
+        raise ProductNotFound()
     return product_view(db, p)
 
 
@@ -76,13 +82,13 @@ def add_item(body: AddItem, db: DB, sid: SessionID) -> dict:
     lock_cart(db, sid)
     variant_id = str(body.variant_id)
     if db.get(Variant, variant_id) is None:
-        raise HTTPException(404, "variant_not_found")
+        raise VariantNotFound()
     item = db.scalar(
         select(CartItem).where(CartItem.cart_id == sid, CartItem.variant_id == variant_id)
     )
     quantity = body.quantity + (item.quantity if item else 0)
     if quantity > 99:
-        raise HTTPException(422, "quantity_limit")
+        raise QuantityLimitExceeded()
     if item:
         item.quantity = quantity
     else:
@@ -94,7 +100,7 @@ def add_item(body: AddItem, db: DB, sid: SessionID) -> dict:
 def owned_item(db: Session, sid: str, item_id: str) -> CartItem:
     item = db.scalar(select(CartItem).where(CartItem.id == item_id, CartItem.cart_id == sid))
     if item is None:
-        raise HTTPException(404, "item_not_found")
+        raise CartItemNotFound()
     return item
 
 

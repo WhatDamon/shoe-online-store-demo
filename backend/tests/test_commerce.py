@@ -66,7 +66,9 @@ def test_health_catalog_and_stable_variants(commerce):
     assert len({v["id"] for p in products for v in p["variants"]}) == sum(
         len(p["variants"]) for p in products
     )
-    assert client.get("/api/v1/catalog/products/missing").status_code == 404
+    missing = client.get("/api/v1/catalog/products/missing")
+    assert missing.status_code == 404
+    assert missing.json() == {"code": "product_not_found", "detail": "Product not found"}
     with Session(engine) as db, db.begin():
         seed(db)
     assert client.get("/api/v1/catalog/products/dc-1001").json() == product
