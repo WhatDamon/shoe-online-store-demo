@@ -3,26 +3,30 @@
 import { chat, FALLBACK_ERROR_TEXT } from '@/server/ai/chat'
 import { encodeEvent } from '@/domain/chat-events'
 import type { ChatEvent, Mode } from '@/domain/chat-events'
+import {
+  AI_SESSION_COOKIE,
+  AI_SESSION_MAX_AGE_SECONDS,
+  requestIp,
+  sessionIdFrom,
+} from '@/server/guardrails/request'
+import { NextRequest, NextResponse } from 'next/server'
+
+export const dynamic = 'force-dynamic'
 
 const MODES: readonly string[] = ['shopping', 'size-fit', 'outfit', 'find-shoes', 'support']
 
 type Body = {
-  sessionKey?: unknown
   mode?: unknown
   text?: unknown
   product?: unknown
   footMm?: unknown
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   const raw = (await req.json().catch(() => null)) as Body | null
   const body = raw && typeof raw === 'object' ? raw : {}
-
-  const sessionKey =
-    typeof body.sessionKey === 'string' && body.sessionKey !== ''
-      ? body.sessionKey
-      : crypto.randomUUID() // 未带会话 → 新匿名会话
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'local'
+  const session = sessionIdFrom(req)
+  const ip = requestIp(req)
   const mode: Mode =
     typeof body.mode === 'string' && MODES.includes(body.mode) ? (body.mode as Mode) : 'shopping'
   const text = typeof body.text === 'string' ? body.text : ''
@@ -44,7 +48,7 @@ export async function POST(req: Request) {
       const enc = new TextEncoder()
       const send = (ev: ChatEvent) => controller.enqueue(enc.encode(encodeEvent(ev)))
       try {
-        for await (const ev of chat({ sessionKey, ip, mode, text, product, footMm })) {
+        for await (const ev of chat({ sessionKey: session.id, ip, mode, text, product, footMm })) {
           send(ev)
           if (ev.type === 'done' || ev.type === 'error') break
         }
@@ -58,11 +62,19 @@ export async function POST(req: Request) {
       controller.close()
     },
   })
-  return new Response(stream, {
+  const response = new NextResponse(stream, {
     headers: {
       'content-type': 'text/event-stream',
       'cache-control': 'no-cache',
       connection: 'keep-alive',
     },
   })
+  response.cookies.set(AI_SESSION_COOKIE, session.id, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: req.nextUrl.protocol === 'https:',
+    path: '/',
+    maxAge: AI_SESSION_MAX_AGE_SECONDS,
+  })
+  return response
 }

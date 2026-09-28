@@ -176,7 +176,23 @@ not by setting `PG_SSL=0`. Monitor connection failures without logging credentia
 3. Restart. Guardrails (rate limit, turn cap, daily budget) apply to real and Mock alike.
    `AI_DISABLE_REAL=1` is the one-switch rollback to Mock.
 
-### AI memory limits and deployment boundary
+### AI session, IP and memory limits
+
+The browser never chooses the assistant session. The route issues a random UUID in
+an HttpOnly, SameSite=Lax cookie with a 30-minute expiry and ignores any legacy
+`sessionKey` request field. HTTPS deployments set Secure. Losing or expiring the
+cookie starts a new server-owned session; rotating a request body value cannot
+reset the existing server state. The session state is still anonymous and does
+not provide account recovery.
+
+By default the route does not trust `x-forwarded-for`; it uses the runtime's
+direct peer when available, otherwise one bounded `untrusted` bucket. If a reverse
+proxy is configured, set `TRUSTED_PROXY_IPS` to exact peer addresses only after
+the proxy strips client-supplied forwarding headers and the runtime exposes that
+peer as `request.ip`. The first forwarded address is then used. CIDR, wildcard,
+or browser-provided proxy identity values are rejected. A wrong or missing list
+fails closed to the direct/untrusted limiter key. This setting does not prove
+proxy configuration; verify it at deployment and monitor refusal rates.
 
 Each process holds at most 1,000 assistant sessions and 10,000 rate-limit buckets
 per dimension (IP and session). Keys are limited to 128 ASCII letters, digits,
