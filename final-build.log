@@ -1,0 +1,48 @@
+
+> app@0.1.0 build
+> next build
+
+▲ Next.js 16.3.4 (Turbopack)
+✓ Running next.config.ts took 21ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 727ms
+  Running TypeScript ...
+  Finished TypeScript in 1913ms ...
+  Collecting page data using 15 workers ...
+  Generating static pages using 15 workers (0/44) ...
+  Generating static pages using 15 workers (11/44) 
+  Generating static pages using 15 workers (22/44) 
+  Generating static pages using 15 workers (33/44) 
+✓ Generating static pages using 15 workers (44/44) in 562ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/ai/chat
+├ ƒ /api/catalog
+├ ƒ /api/commerce/[...path]
+├ ○ /blog
+├   /blog/[slug]
+│ ├ ● /blog/finding-your-evoloop-size
+│ ├ ● /blog/3d-printed-shoes-daily-commute
+│ ├ ● /blog/how-to-choose-shoes-for-wide-feet
+│ └ ● [+2 more paths]
+├ ○ /cart
+├ ○ /checkout
+├ ƒ /og
+├ ƒ /orders/[id]
+├   /product/[handle]
+│ ├ ● /product/dc-1001
+│ ├ ● /product/dc-1002
+│ ├ ● /product/dc-1003
+│ └ ● [+26 more paths]
+├ ○ /saved
+└ ƒ /shop
+
+
+○  (Static)   prerendered as static content
+●  (SSG)      prerendered as static HTML (uses generateStaticParams)
+ƒ  (Dynamic)  server-rendered on demand
+

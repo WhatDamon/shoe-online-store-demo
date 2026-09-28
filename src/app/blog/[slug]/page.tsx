@@ -6,7 +6,9 @@ import { ArrowLeft } from 'lucide-react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { getPost, listPosts } from '@/lib/blog'
-import { pageMetadata } from '@/lib/seo'
+import { absoluteUrl, pageMetadata } from '@/lib/seo'
+import { JsonLd } from '@/components/seo/json-ld'
+import { articleSchema, breadcrumbSchema } from '@/lib/structured-data'
 
 export const dynamicParams = true
 
@@ -22,7 +24,19 @@ export async function generateMetadata({
   const { slug } = await params
   const post = getPost(slug)
   if (!post) return {}
-  return pageMetadata({ title: post.title, description: post.description ?? undefined })
+  const description = post.description ?? `An Evoloop Journal article: ${post.title}.`
+  return pageMetadata({
+    title: post.title,
+    description,
+    alternates: { canonical: `/blog/${post.slug}` },
+    openGraph: {
+      type: 'article',
+      url: absoluteUrl(`/blog/${post.slug}`),
+      description,
+      ...(post.cover ? { images: [{ url: absoluteUrl(post.cover), alt: post.title }] } : {}),
+      publishedTime: `${post.date}T00:00:00Z`,
+    },
+  })
 }
 
 // 文章页（SSG）：/blog/[slug] 由 generateStaticParams 预渲染（与 PDP 同约定：新增/改动文章需重建）。
@@ -33,6 +47,22 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
 
   return (
     <article className="mx-auto w-full max-w-3xl px-4 pb-16 pt-10 sm:pt-14">
+      <JsonLd
+        data={breadcrumbSchema([
+          { name: 'Home', path: '/' },
+          { name: 'Journal', path: '/blog' },
+          { name: post.title, path: `/blog/${post.slug}` },
+        ])}
+      />
+      <JsonLd
+        data={articleSchema({
+          slug: post.slug,
+          title: post.title,
+          description: post.description ?? `An Evoloop Journal article: ${post.title}.`,
+          date: post.date,
+          image: post.cover,
+        })}
+      />
       <Link
         href="/blog"
         className="inline-flex items-center gap-1.5 text-sm text-neutral-500 transition-colors hover:text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"

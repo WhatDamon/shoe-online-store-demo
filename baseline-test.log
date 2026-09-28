@@ -1,0 +1,22 @@
+
+> app@0.1.0 test
+> vitest run
+
+
+ RUN  v5.0.0 F:/shoe-online-store-demo
+
+
+ Test Files  64 passed (64)
+      Tests  389 passed (389)
+   Start at  19:55:42
+   Duration  11.26s (environment 56%, setup 16%, tests 14%, import 10%, transform 4%)
+
+Environment  jsdom was created 64 times · 79.28s total, 56% of tracked time
+             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)
+             learn more: https://vitest.dev/guide/improving-performance#test-environments
+
+npm notice
+npm notice New major version of npm available! 11.19.0 -> 12.0.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2
+npm notice To update run: npm install -g npm@12.0.2
+npm notice

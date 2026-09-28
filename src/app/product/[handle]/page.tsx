@@ -22,6 +22,9 @@ import {
 } from '@/components/ui/accordion'
 import { formatPrice } from '@/lib/format'
 import { pageMetadata } from '@/lib/seo'
+import { absoluteUrl } from '@/lib/seo'
+import { JsonLd } from '@/components/seo/json-ld'
+import { breadcrumbSchema, productSchema } from '@/lib/structured-data'
 import { POLICY_PRODUCTION, POLICY_RETURNS } from '@/lib/store-policy'
 
 export async function generateStaticParams() {
@@ -41,6 +44,16 @@ export async function generateMetadata({
   return pageMetadata({
     title: product.title,
     description: product.description,
+    alternates: { canonical: `/product/${product.handle}` },
+    keywords: [product.title, product.productType, ...product.tags],
+    openGraph: {
+      url: absoluteUrl(`/product/${product.handle}`),
+      type: 'website',
+      description: product.description,
+      ...(product.images?.[0]
+        ? { images: [{ url: absoluteUrl(product.images[0]), alt: product.title }] }
+        : {}),
+    },
   })
 }
 
@@ -62,6 +75,14 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:py-8">
+      <JsonLd
+        data={breadcrumbSchema([
+          { name: 'Home', path: '/' },
+          { name: 'Shop', path: '/shop' },
+          { name: product.title, path: `/product/${product.handle}` },
+        ])}
+      />
+      <JsonLd data={productSchema(product)} />
       {/* 页面锚点（渲染 null）：FAB 打开时把当前鞋带给助手（设计：PDP 针对性介绍）。 */}
       <AssistantPageAnchor handle={product.handle} title={product.title} />
       {/* 打印规格说明：可交互主体包 .print-hidden，@media print 只保留 .print-spec-sheet。 */}

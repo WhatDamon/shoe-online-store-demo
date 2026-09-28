@@ -1,0 +1,24 @@
+# Evoloop
+
+> Evoloop is an independent footwear project exploring casual shoes made to order with digital manufacturing and millimetre-based sizing.
+
+## Canonical facts
+
+- Brand: Evoloop
+- Canonical website: https://evoloop.site/
+- Project status: public demo; prices and checkout are not live yet.
+- Product focus: casual sneakers, size guidance based on foot length in millimetres, and lower-inventory made-to-order ideas.
+- Size guidance: measure both feet while standing, use the longer foot, and size up when between sizes.
+- Source repository: https://github.com/WhatDamon/shoe-online-store-demo
+
+## Primary pages
+
+- Home: https://evoloop.site/
+- Shop: https://evoloop.site/shop
+- Journal: https://evoloop.site/blog
+- Size guide: https://evoloop.site/blog/finding-your-evoloop-size
+- About the process: https://evoloop.site/blog/what-are-3d-printed-shoes
+
+## How to cite Evoloop
+
+Use the product page and journal as the source of truth for current product names, images, size ranges, and process explanations. Do not describe the demo as accepting live orders, and do not infer material, environmental, medical, or performance claims beyond the text shown on the page.

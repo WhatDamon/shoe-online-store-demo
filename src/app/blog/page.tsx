@@ -2,11 +2,15 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
 import { listPosts, type BlogPost } from '@/lib/blog'
-import { pageMetadata } from '@/lib/seo'
+import { absoluteUrl, pageMetadata } from '@/lib/seo'
+import { JsonLd } from '@/components/seo/json-ld'
+import { webPageSchema } from '@/lib/structured-data'
 
 export const metadata: Metadata = pageMetadata({
   title: 'Blog',
   description: 'Stories, guides and notes from the Evoloop studio.',
+  alternates: { canonical: '/blog' },
+  openGraph: { url: absoluteUrl('/blog'), type: 'website' },
 })
 
 // 封面占位：无封面文章的品牌渐变替图（克制：低饱和径向光晕 + 对角微光，跟随主题令牌）。
@@ -48,6 +52,14 @@ export default function BlogPage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 pb-16 pt-10 sm:pt-14">
+      <JsonLd
+        data={webPageSchema({
+          name: 'Evoloop Journal',
+          description: 'Stories and practical guides from the Evoloop studio.',
+          path: '/blog',
+          type: 'CollectionPage',
+        })}
+      />
       <p className="text-sm font-medium text-brand">Journal</p>
       <h1 className="mt-2 font-heading text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
         Blog

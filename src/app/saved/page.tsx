@@ -9,6 +9,7 @@ import { SavedPairs } from '@/components/shop/saved-pairs'
 export const metadata: Metadata = pageMetadata({
   title: 'Saved pairs',
   description: 'Your saved pairs — pick up where you left off.',
+  robots: { index: false, follow: false },
 })
 
 export default function SavedPage() {

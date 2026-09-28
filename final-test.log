@@ -1,0 +1,17 @@
+
+> app@0.1.0 test
+> vitest run
+
+
+ RUN  v5.0.1 F:/shoe-online-store-demo
+
+
+ Test Files  66 passed (66)
+      Tests  395 passed (395)
+   Start at  21:01:39
+   Duration  10.47s (environment 58%, tests 15%, setup 12%, import 11%, transform 3%)
+
+Environment  jsdom was created 66 times · 75.59s total, 58% of tracked time
+             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)
+             learn more: https://vitest.dev/guide/improving-performance#test-environments
+
