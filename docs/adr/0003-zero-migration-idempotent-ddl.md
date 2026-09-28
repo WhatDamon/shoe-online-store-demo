@@ -19,7 +19,7 @@
 - 演示站的运行时库是 SQLite，落在 Vercel 函数的 `/tmp/evoloop.db` —— **每个实例冷启动都是空库**。
   `DbCatalogAdapter` 的设计正是「表空则从导入层灌种一次」。没有需要跨版本保留的数据，
   迁移脚本无从谈起。
-- 需要建的表只有三张（`products` / `product_embeddings` / `ai_usage`），且 DDL 只有
+- 当前展示/AI 数据库的表由 `products`、`product_embeddings`、`ai_usage` 以及预算日计数器和预占表组成，且 DDL 只有
   `CREATE TABLE IF NOT EXISTS` 这一种形态，没有 `ALTER`。
 - 引入迁移会带来一条**必须在部署前手工执行**的步骤，这是演示站最不该有的运维面。
 
@@ -32,7 +32,7 @@
 
 #### 正面
 
-- 部署零步骤：冷启动直接可用。
+- 部署零步骤：冷启动直接可用；预算预占表也会由同一组幂等 DDL 创建。
 - 无迁移产物、无 `drizzle-kit` 依赖、无 schema 快照文件需要维护。
 
 #### 负面 / 接受的风险

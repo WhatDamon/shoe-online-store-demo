@@ -57,8 +57,8 @@ npm run dev               # http://localhost:3000
 > `DB_DRIVER=postgres` (with a `DATABASE_URL=postgres://…`) switches to `postgres.js` —
 > both drivers run on Node, Vercel-ready.
 
-The **legacy TypeScript display/AI database** auto-creates its schema (**three** tables: `products` + `product_embeddings`,
-`ai_usage`) via idempotent `CREATE TABLE IF NOT EXISTS` on **either** driver — SQLite file at
+The **legacy TypeScript display/AI database** auto-creates its schema (catalog/search tables plus
+`ai_usage`, `ai_budget_days`, and `ai_budget_reservations`) via idempotent `CREATE TABLE IF NOT EXISTS` on **either** driver — SQLite file at
 `./data/local.db`, or the Postgres database behind `DATABASE_URL`. This legacy behavior is retained. The new Python commerce database is separate and requires **Alembic migrations**; it never auto-creates tables at runtime.
 
 **Catalog lives in the `products` table.** The catalog adapter defaults to reading the table;
@@ -132,7 +132,7 @@ See [`.env.example`](.env.example) for the annotated template. Summary:
 | `AI_MAX_OUTPUT_TOKENS` | `500` | Max output tokens per provider response |
 | `AI_REQUEST_TIMEOUT_MS` | `20000` | Provider request timeout |
 | `AI_MAX_MESSAGE_CHARS` | `800` | Max characters per incoming user message |
-| `AI_DAILY_TOKEN_CAP` | `1000000` | Daily token budget (SUM over `ai_usage` per UTC day) |
+| `AI_DAILY_TOKEN_CAP` | `1000000` | Daily token cap; in-flight reservations are atomic, settled usage is recorded per UTC day |
 | `AI_DISABLE_REAL` | `0` | `1` forces Mock mode even with a key (abuse kill switch) |
 | `DB_DRIVER` | `sqlite` | `sqlite` (default) or `postgres` — selects the app DB driver |
 | `CATALOG_SOURCE` | `db` | Runtime catalog source: `db` = `products` table (default, auto-seeded when empty); `seed` = in-memory import layer (tests); Shopify requires explicit `SHOPIFY_ENABLED=true` |
@@ -203,10 +203,10 @@ src/
   injected content only. Modes: `shopping`, `size-fit` (deterministic), `outfit`, `find-shoes`,
   and `support` (store-policy Q&A from the shared `src/lib/store-policy` facts).
 - **Guardrails** (all anonymous, no PII): in-memory token bucket rate limit (IP + session),
-  per-session turn cap + history trim + idle TTL, output-token cap + timeout, and a **persisted**
-  daily token budget on `ai_usage`. Soft copy everywhere ("taking a short break"), never
-  "rate limited". Runs entirely in-process (single-instance assumption — adequate for this demo
-  deployment; revisit before multi-instance hosting).
+  per-session turn cap + history trim + idle TTL, output-token cap + timeout, and a **database-atomic**
+  daily token budget with pending reservations plus settled `ai_usage`. Soft copy everywhere
+  ("taking a short break"), never "rate limited". Rate/session state still runs in-process;
+  multi-instance hosting requires a shared-state design before horizontal scaling.
 - **Search**: embedding vectors cached in `product_embeddings` (contentHash-validated), keyed by
   `Product.id` (unchanged by the DB move), cosine in
   app code (fine below ~2k products — beyond that, move to a native vector backend).

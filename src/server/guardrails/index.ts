@@ -1,7 +1,7 @@
 import type { createRepository } from '@/server/search/repository'
 import { tokenBucket } from './rate-limit'
 import { createSessionStore, type SessionMessage } from './session-state'
-import { underDailyBudget, today } from './budget'
+import { dailyTokenCap, underDailyBudget, today } from './budget'
 
 /** IP/会话双维内存令牌桶限流速率（默认 10 次/分）。 */
 export const RATE_PER_MIN = 10
@@ -55,6 +55,28 @@ export function createGuardrails(
     /** 当日用量达到 AI_DAILY_TOKEN_CAP 后抛 code='budget'。 */
     async assertBudget(day = today()): Promise<void> {
       if (!(await underDailyBudget(repo, day))) deny('budget')
+    },
+    /** Atomically reserve an estimated prompt+completion budget for one request. */
+    async reserveBudget(requestId: string, tokens: number, day = today()): Promise<void> {
+      const accepted = await repo.reserveDailyBudget({
+        requestId,
+        day,
+        tokens,
+        cap: dailyTokenCap(),
+      })
+      if (!accepted) deny('budget')
+    },
+    /** Settle a reservation and write the actual usage in one database transaction. */
+    async settleBudget(
+      requestId: string,
+      usage: Parameters<ReturnType<typeof createRepository>['insertUsage']>[0],
+    ): Promise<void> {
+      const settled = await repo.settleDailyBudget({ requestId, usage, cap: dailyTokenCap() })
+      if (!settled) throw new Error('AI budget reservation is no longer pending')
+    },
+    /** Release a reservation after provider failure, timeout, or stream interruption. */
+    async releaseBudget(requestId: string): Promise<void> {
+      await repo.releaseDailyBudget(requestId)
     },
     /** 估算 token 落库 ai_usage（匿名成本计量）。 */
     async noteUsage(
