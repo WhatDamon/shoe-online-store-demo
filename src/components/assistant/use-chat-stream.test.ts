@@ -42,6 +42,15 @@ function responseWith(events: ChatEvent[], bytewise = false) {
 }
 
 describe('useChatStream request lifecycle', () => {
+  it('does not send a client-controlled session key', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(responseWith([{ type: 'done' }]))
+    vi.stubGlobal('fetch', fetchMock)
+    const { result } = renderHook(() => useChatStream())
+    act(() => result.current.send('shopping', 'hello'))
+    await waitFor(() => expect(result.current.isStreaming).toBe(false))
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body as string)).not.toHaveProperty('sessionKey')
+  })
+
   it('reports a truncated reply and preserves its partial text for retry', async () => {
     vi.stubGlobal(
       'fetch',

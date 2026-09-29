@@ -129,6 +129,7 @@ See [`.env.example`](.env.example) for the annotated template. Summary:
 | `AI_MODEL` | `gpt-5.6-luna` | Chat model for the real provider (2026-09: GPT-5.6 budget tier; quality-upgrade: `gpt-5.6-terra`) |
 | `AI_EMBEDDING_MODEL` | `text-embedding-3-small` | Embedding model for semantic search (cached locally) |
 | `AI_MAX_TURNS` | `20` | Per-session turn cap (soft message when exceeded) |
+| `AI_SESSION_SECRET` | *(empty locally)* | Server-only signing key; at least 32 bytes, required in production, including Mock mode. Generate a random value; do not use `NEXT_PUBLIC_`. |
 | `AI_MAX_OUTPUT_TOKENS` | `500` | Max output tokens per provider response |
 | `AI_REQUEST_TIMEOUT_MS` | `20000` | Provider request timeout |
 | `AI_MAX_MESSAGE_CHARS` | `800` | Max characters per incoming user message |
@@ -140,6 +141,34 @@ See [`.env.example`](.env.example) for the annotated template. Summary:
 | `SHOPIFY_DOMAIN`, `SHOPIFY_STOREFRONT_TOKEN` | *(empty)* | Reserved. Catalog adapter switches to Shopify only when `SHOPIFY_ENABLED=true` and **both** are set (not yet active). |
 | `SHOPIFY_BUY_DOMAIN`, `SHOPIFY_BUY_TOKEN` | *(empty)* | **PDP Shopify Buy Button channel** (2026-09): only with `SHOPIFY_ENABLED=true` and **both** credentials set, every PDP mapped in `src/server/catalog/shopify-buy.ts` (29/29 store products, handle-keyed) renders a real Buy Button that takes over variant selection + checkout; unset keeps the local commerce flow. Independent of the two vars above on purpose (setting those would trip the catalog stub). |
 
+### PostgreSQL TLS
+
+The TypeScript PostgreSQL client always verifies the server certificate in
+`NODE_ENV=production`, including when `PG_SSL` is absent or blank. `PG_SSL=0` or
+`false` fails in production. In development, unset/`0` allows a local plaintext
+PostgreSQL instance; `PG_SSL=1`, `true`, `require` or `verify-full` enables verified
+TLS. The legacy `require` spelling no longer skips verification. The explicit
+policy overrides `DATABASE_URL` SSL parameters and postgres.js `PGSSL`. Verified
+connections require a single explicit hostname/IP in `DATABASE_URL`; certificate
+identity is checked against that endpoint even for IP connections (no implicit
+localhost fallback). Multi-host URLs and implicit `PGHOST` are not supported in
+this mode.
+
+By default Node's trusted roots are used. For a private CA, mount a PEM bundle on
+the server and set `PG_SSL_CA_FILE` to its path. Missing or malformed files fail
+without printing their path or contents. An untrusted server or hostname mismatch
+must fail the connection; never disable verification to work around it. SQLite
+does not use these settings. No schema migration is required.
+
+For managed PostgreSQL, prefer a private network or an authenticated database
+connector. The current production client still requires verified TLS at its
+connection endpoint; a plaintext Auth Proxy socket is not a supported production
+configuration. Use the provider's supported TLS endpoint and matching DNS name.
+For CA rotation, deploy a bundle trusting both old and new CAs, restart and check
+connectivity, rotate the server certificate, then remove the old CA and restart.
+Rollback a bad rotation by restoring the previous trusted bundle and certificate,
+not by setting `PG_SSL=0`. Monitor connection failures without logging credentials.
+
 ### Enabling real AI
 
 1. Put a real key in `AI_API_KEY` (optionally `AI_BASE_URL` for a gateway / custom endpoint).
@@ -147,6 +176,80 @@ See [`.env.example`](.env.example) for the annotated template. Summary:
    assistant transparently uses keyword search over the catalog.
 3. Restart. Guardrails (rate limit, turn cap, daily budget) apply to real and Mock alike.
    `AI_DISABLE_REAL=1` is the one-switch rollback to Mock.
+
+### AI session, IP and memory limits
+
+The assistant route creates a random UUID and signs its version, ID and absolute
+expiry with HMAC-SHA256. Each request verifies the signature with a constant-time
+comparison and enforces the original 30-minute deadline. Reusing a cookie does
+not renew that deadline. Only the verified UUID reaches the chat/history store;
+legacy body `sessionKey` values and unsigned UUID cookies cannot choose a session.
+Malformed, tampered, expired or old unsigned cookies receive a new random session.
+The cookie is HttpOnly, SameSite=Lax and Secure in production (also on local HTTPS).
+Responses use `Cache-Control: no-store`. No database migration is needed. Existing
+unsigned cookies lose their previous anonymous AI history on the first request.
+
+Set `AI_SESSION_SECRET` in the server secret manager before deploying or running
+`npm run start`. Use at least 32 cryptographically random bytes encoded as base64url,
+for example generate a value locally with:
+
+```powershell
+node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"
+```
+
+Never commit that value, prefix it with `NEXT_PUBLIC_`, reuse it for another
+application, or print it in application logs. The runtime rejects missing/short
+production keys with HTTP 503 and `session_unavailable` before invoking AI, even
+in Mock mode. Build-time configuration is not required. Development/test alone
+may use an ephemeral process key when the setting is empty; restarting invalidates
+those local cookies. An explicitly short key is rejected in every environment.
+To rotate, replace the secret and restart: old cookies are rejected and sessions
+start fresh. Monitor 503 responses during rollout. Do not roll back to accepting
+unsigned cookies; restore a valid signing key or temporarily disable access to
+the route. `AI_DISABLE_REAL=1` disables paid provider calls but does not bypass
+session validation.
+
+The route rejects a supplied Origin that differs from the request URL origin,
+including `null`, and rejects cross-site/same-site Fetch Metadata. Configure the
+reverse proxy to preserve the public request origin; forwarded headers cannot
+override this check. The comparison reads the native Request URL accessor because
+NextURL normalizes loopback hosts to localhost; distinct origins must stay distinct.
+Requests without Origin/Fetch Metadata remain available to
+non-browser clients; these headers are not authentication. A signed cookie is
+an anonymous bearer credential, not an account or a per-person identity. Deleting
+cookies still starts a new session, and a stolen valid cookie can be replayed
+until expiry. IP limits, global budget controls and secret custody remain required.
+
+By default the route does not trust `x-forwarded-for`; it uses the runtime's
+direct peer when available, otherwise one bounded `untrusted` bucket. If a reverse
+proxy is configured, set `TRUSTED_PROXY_IPS` to exact peer addresses only after
+the proxy strips client-supplied forwarding headers and the runtime exposes that
+peer as `request.ip`. The first forwarded address is then used. CIDR, wildcard,
+or browser-provided proxy identity values are rejected. A wrong or missing list
+fails closed to the direct/untrusted limiter key. This setting does not prove
+proxy configuration; verify it at deployment and monitor refusal rates.
+
+Each process holds at most 1,000 assistant sessions and 10,000 rate-limit buckets
+per dimension (IP and session). Keys are limited to 128 ASCII letters, digits,
+colons, dots, underscores or hyphens. Invalid keys and new keys beyond capacity
+are refused using the existing soft guardrail response; live limits are never
+evicted to make room. The IP check runs before allocating a session bucket.
+
+Idle sessions expire after 30 minutes. A rate bucket expires only after at least
+its full refill period. A timer physically deletes expired records every minute,
+including while idle; requests also trigger overdue cleanup after a suspended
+timer. Each session stores only its latest 12 messages, each capped at 4,000
+characters. Returned history is detached from the stored data. Timers do not keep
+Node alive and can be explicitly disposed in tests/process lifecycle code.
+
+These bounds protect one process only. **Do not horizontally scale this assistant
+or treat independently scaled serverless instances as a shared abuse boundary.**
+Signed sessions do not provide shared turn counts or global rate limits across
+instances. This branch still requires atomic budget integration and a deployment
+check of trusted-proxy IP handling: standard NextRequest no longer exposes `ip`,
+so the default adapter uses the shared `untrusted` bucket. Monitor refusal rates
+and keep real AI disabled until those production gates are verified. No Redis
+or database schema migration is introduced by the session fix.
 
 ### Switching market / sizes
 

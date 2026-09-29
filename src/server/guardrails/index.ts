@@ -28,8 +28,8 @@ export function createGuardrails(
 ) {
   const nowMs = () => options?.now?.() ?? Date.now()
   const sessions = createSessionStore(nowMs)
-  const ipBuckets = tokenBucket(RATE_PER_MIN)
-  const sessionBuckets = tokenBucket(RATE_PER_MIN)
+  const ipBuckets = tokenBucket(RATE_PER_MIN, RATE_PER_MIN, { now: nowMs })
+  const sessionBuckets = tokenBucket(RATE_PER_MIN, RATE_PER_MIN, { now: nowMs })
 
   const deny = (code: GuardrailError['code']): never => {
     throw new GuardrailError(code, GUARDRAIL_MESSAGE)
@@ -48,9 +48,10 @@ export function createGuardrails(
     },
     /** IP+session 双维令牌桶；任一维度超限抛 code='rate_limited'。 */
     assertRate(ip: string, sessionKey: string): void {
-      const ipOk = ipBuckets.allow(`ip:${ip}`, nowMs())
-      const sessionOk = sessionBuckets.allow(`session:${sessionKey}`, nowMs())
-      if (!ipOk || !sessionOk) deny('rate_limited')
+      // Reject at the IP boundary before allocating a fresh session bucket.
+      if (!ipBuckets.allow(ip, nowMs()) || !sessionBuckets.allow(sessionKey, nowMs())) {
+        deny('rate_limited')
+      }
     },
     /** 当日用量达到 AI_DAILY_TOKEN_CAP 后抛 code='budget'。 */
     async assertBudget(day = today()): Promise<void> {
@@ -61,6 +62,11 @@ export function createGuardrails(
       u: Parameters<ReturnType<typeof createRepository>['insertUsage']>[0],
     ): Promise<void> {
       await repo.insertUsage(u)
+    },
+    dispose() {
+      sessions.dispose()
+      ipBuckets.dispose()
+      sessionBuckets.dispose()
     },
   }
 }
