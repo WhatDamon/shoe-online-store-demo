@@ -129,6 +129,7 @@ See [`.env.example`](.env.example) for the annotated template. Summary:
 | `AI_MODEL` | `gpt-5.6-luna` | Chat model for the real provider (2026-09: GPT-5.6 budget tier; quality-upgrade: `gpt-5.6-terra`) |
 | `AI_EMBEDDING_MODEL` | `text-embedding-3-small` | Embedding model for semantic search (cached locally) |
 | `AI_MAX_TURNS` | `20` | Per-session turn cap (soft message when exceeded) |
+| `AI_SESSION_SECRET` | *(empty locally)* | Server-only signing key; at least 32 bytes, required in production, including Mock mode. Generate a random value; do not use `NEXT_PUBLIC_`. |
 | `AI_MAX_OUTPUT_TOKENS` | `500` | Max output tokens per provider response |
 | `AI_REQUEST_TIMEOUT_MS` | `20000` | Provider request timeout |
 | `AI_MAX_MESSAGE_CHARS` | `800` | Max characters per incoming user message |
@@ -178,12 +179,46 @@ not by setting `PG_SSL=0`. Monitor connection failures without logging credentia
 
 ### AI session, IP and memory limits
 
-The browser never chooses the assistant session. The route issues a random UUID in
-an HttpOnly, SameSite=Lax cookie with a 30-minute expiry and ignores any legacy
-`sessionKey` request field. HTTPS deployments set Secure. Losing or expiring the
-cookie starts a new server-owned session; rotating a request body value cannot
-reset the existing server state. The session state is still anonymous and does
-not provide account recovery.
+The assistant route creates a random UUID and signs its version, ID and absolute
+expiry with HMAC-SHA256. Each request verifies the signature with a constant-time
+comparison and enforces the original 30-minute deadline. Reusing a cookie does
+not renew that deadline. Only the verified UUID reaches the chat/history store;
+legacy body `sessionKey` values and unsigned UUID cookies cannot choose a session.
+Malformed, tampered, expired or old unsigned cookies receive a new random session.
+The cookie is HttpOnly, SameSite=Lax and Secure in production (also on local HTTPS).
+Responses use `Cache-Control: no-store`. No database migration is needed. Existing
+unsigned cookies lose their previous anonymous AI history on the first request.
+
+Set `AI_SESSION_SECRET` in the server secret manager before deploying or running
+`npm run start`. Use at least 32 cryptographically random bytes encoded as base64url,
+for example generate a value locally with:
+
+```powershell
+node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"
+```
+
+Never commit that value, prefix it with `NEXT_PUBLIC_`, reuse it for another
+application, or print it in application logs. The runtime rejects missing/short
+production keys with HTTP 503 and `session_unavailable` before invoking AI, even
+in Mock mode. Build-time configuration is not required. Development/test alone
+may use an ephemeral process key when the setting is empty; restarting invalidates
+those local cookies. An explicitly short key is rejected in every environment.
+To rotate, replace the secret and restart: old cookies are rejected and sessions
+start fresh. Monitor 503 responses during rollout. Do not roll back to accepting
+unsigned cookies; restore a valid signing key or temporarily disable access to
+the route. `AI_DISABLE_REAL=1` disables paid provider calls but does not bypass
+session validation.
+
+The route rejects a supplied Origin that differs from the request URL origin,
+including `null`, and rejects cross-site/same-site Fetch Metadata. Configure the
+reverse proxy to preserve the public request origin; forwarded headers cannot
+override this check. The comparison reads the native Request URL accessor because
+NextURL normalizes loopback hosts to localhost; distinct origins must stay distinct.
+Requests without Origin/Fetch Metadata remain available to
+non-browser clients; these headers are not authentication. A signed cookie is
+an anonymous bearer credential, not an account or a per-person identity. Deleting
+cookies still starts a new session, and a stolen valid cookie can be replayed
+until expiry. IP limits, global budget controls and secret custody remain required.
 
 By default the route does not trust `x-forwarded-for`; it uses the runtime's
 direct peer when available, otherwise one bounded `untrusted` bucket. If a reverse
@@ -209,11 +244,12 @@ Node alive and can be explicitly disposed in tests/process lifecycle code.
 
 These bounds protect one process only. **Do not horizontally scale this assistant
 or treat independently scaled serverless instances as a shared abuse boundary.**
-Server-generated AI sessions, trusted-proxy IP handling and atomic daily budget
-reservations remain separate security work; client session rotation and spoofed
-forwarding headers are not solved by bounded storage. Keep real AI disabled until
-those production gates are verified. No Redis, schema migration or new environment
-variables are introduced here.
+Signed sessions do not provide shared turn counts or global rate limits across
+instances. This branch still requires atomic budget integration and a deployment
+check of trusted-proxy IP handling: standard NextRequest no longer exposes `ip`,
+so the default adapter uses the shared `untrusted` bucket. Monitor refusal rates
+and keep real AI disabled until those production gates are verified. No Redis
+or database schema migration is introduced by the session fix.
 
 ### Switching market / sizes
 

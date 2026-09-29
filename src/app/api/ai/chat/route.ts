@@ -5,13 +5,16 @@ import { encodeEvent } from '@/domain/chat-events'
 import type { ChatEvent, Mode } from '@/domain/chat-events'
 import {
   AI_SESSION_COOKIE,
-  AI_SESSION_MAX_AGE_SECONDS,
+  isSameOriginRequest,
   requestIp,
   sessionIdFrom,
+  SessionConfigurationError,
+  type AISession,
 } from '@/server/guardrails/request'
 import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 const MODES: readonly string[] = ['shopping', 'size-fit', 'outfit', 'find-shoes', 'support']
 
@@ -23,9 +26,24 @@ type Body = {
 }
 
 export async function POST(req: NextRequest) {
+  if (!isSameOriginRequest(req)) {
+    return NextResponse.json(
+      { code: 'invalid_origin', message: 'Request origin is not allowed.' },
+      { status: 403, headers: { 'cache-control': 'no-store' } },
+    )
+  }
+  let session: AISession
+  try {
+    session = sessionIdFrom(req)
+  } catch (error) {
+    if (!(error instanceof SessionConfigurationError)) throw error
+    return NextResponse.json(
+      { code: 'session_unavailable', message: FALLBACK_ERROR_TEXT },
+      { status: 503, headers: { 'cache-control': 'no-store' } },
+    )
+  }
   const raw = (await req.json().catch(() => null)) as Body | null
   const body = raw && typeof raw === 'object' ? raw : {}
-  const session = sessionIdFrom(req)
   const ip = requestIp(req)
   const mode: Mode =
     typeof body.mode === 'string' && MODES.includes(body.mode) ? (body.mode as Mode) : 'shopping'
@@ -65,16 +83,17 @@ export async function POST(req: NextRequest) {
   const response = new NextResponse(stream, {
     headers: {
       'content-type': 'text/event-stream',
-      'cache-control': 'no-cache',
+      'cache-control': 'no-store',
       connection: 'keep-alive',
     },
   })
-  response.cookies.set(AI_SESSION_COOKIE, session.id, {
+  response.cookies.set(AI_SESSION_COOKIE, session.cookieValue, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: req.nextUrl.protocol === 'https:',
+    secure: process.env.NODE_ENV === 'production' || req.nextUrl.protocol === 'https:',
     path: '/',
-    maxAge: AI_SESSION_MAX_AGE_SECONDS,
+    maxAge: Math.max(0, session.expiresAt - Math.floor(Date.now() / 1000)),
+    expires: new Date(session.expiresAt * 1000),
   })
   return response
 }
