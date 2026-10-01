@@ -1,5 +1,7 @@
 # 新 Agent 工作交接 — Evoloop
 
+> **PostgreSQL 实测更新：2026-10-01。** 在独立本地 PostgreSQL 16.4 上已通过 commerce 双数据库测试（112 项）及 AI 预算并发、真实 TLS 查询/拒绝验收。同请求结算/释放的竞态已修复，重试不能改变预占日期或金额；相应测试已接入 CI 配置，远端 CI 尚未执行。证据与下一步见 [PostgreSQL 验收报告](./docs/postgres-acceptance-2026-10-01.md)。下方“PostgreSQL 未执行”仅为对应历史轮次状态。
+
 > **继续实施：2026-10-01。** 用户已授权自行提交。上一轮统一基线已提交为 `4177ec5`；本轮继续补齐安全错误合同、请求追踪，以及隔离 PostgreSQL 测试/CI 入口。当前事实、实际结果和待验收范围见 [可靠性更新报告](./docs/reliability-2026-10-01.md)。下方 2026-09-30 的“未提交”是历史状态；本轮不 push、不部署。
 
 > **实施更新：2026-09-30，F:/shoe-online-store-demo。** 用户本次要求继续推进更新后，已在原分支 `sql-certificate-and-AI-stock` / HEAD `dd76ad8` 上形成未提交的统一工作树。当前目录已经恢复 Python commerce 源码、代理、购物车/订单 UI 与响应合同；原有文档、SEO 页面和业务数据库保留。

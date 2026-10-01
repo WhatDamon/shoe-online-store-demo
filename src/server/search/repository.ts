@@ -30,12 +30,17 @@ export function createRepository(db: AppDb) {
       if (!input.requestId || !input.day || tokens <= 0 || cap <= 0) return false
       return db.transaction((tx) => {
         const [existing] = tx
-          .select({ status: aiBudgetReservations.status })
+          .select()
           .from(aiBudgetReservations)
           .where(eq(aiBudgetReservations.requestId, input.requestId))
           .limit(1)
           .all()
-        if (existing) return existing.status === 'pending'
+        if (existing)
+          return (
+            existing.status === 'pending' &&
+            existing.day === input.day &&
+            existing.reservedTokens === tokens
+          )
 
         tx.insert(aiBudgetDays)
           .values({
@@ -93,7 +98,7 @@ export function createRepository(db: AppDb) {
           .where(eq(aiBudgetReservations.requestId, input.requestId))
           .limit(1)
           .all()
-        if (!reservation) return false
+        if (!reservation || reservation.day !== input.usage.day) return false
         if (reservation.status === 'settled') return true
         if (reservation.status !== 'pending') return false
         const [claimed] = tx

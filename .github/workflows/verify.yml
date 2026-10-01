@@ -70,6 +70,8 @@ jobs:
     env:
       PYTHONDONTWRITEBYTECODE: '1'
       COMMERCE_TEST_POSTGRES_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/commerce_test
+      AI_TEST_POSTGRES_URL: postgresql://postgres:postgres@127.0.0.1:5432/commerce_test
+      AI_TEST_POSTGRES_TLS_URL: postgresql://postgres:postgres@localhost:5432/commerce_test
     services:
       postgres:
         image: postgres:16
@@ -95,3 +97,35 @@ jobs:
       # COMMERCE_TEST_POSTGRES_URL adds PostgreSQL to the shared commerce tests.
       # Each test migrates/seeds a random schema and cleans up only its own schema.
       - run: python -m pytest -q
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+        working-directory: .
+      - run: npm test -- src/server/search/repository-postgres.integration.test.ts
+        working-directory: .
+      # Public, localhost-only fixture; never use these keys for a deployed server.
+      - name: Configure disposable PostgreSQL TLS fixture
+        working-directory: .
+        env:
+          TEST_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          node -e "const fs = require('node:fs'); const f = require('./src/test/fixtures/postgres-tls.json'); fs.mkdirSync('.vitest/pg-tls', {recursive:true}); fs.writeFileSync('.vitest/pg-tls/server.crt', f.cert); fs.writeFileSync('.vitest/pg-tls/server.key', f.key);"
+          docker cp .vitest/pg-tls/server.crt "$TEST_POSTGRES_CONTAINER:/tmp/server.crt"
+          docker cp .vitest/pg-tls/server.key "$TEST_POSTGRES_CONTAINER:/tmp/server.key"
+          docker exec "$TEST_POSTGRES_CONTAINER" chown postgres:postgres /tmp/server.crt /tmp/server.key
+          docker exec "$TEST_POSTGRES_CONTAINER" chmod 600 /tmp/server.key
+          docker exec "$TEST_POSTGRES_CONTAINER" psql -U postgres -d commerce_test -c "ALTER SYSTEM SET ssl_cert_file = '/tmp/server.crt'"
+          docker exec "$TEST_POSTGRES_CONTAINER" psql -U postgres -d commerce_test -c "ALTER SYSTEM SET ssl_key_file = '/tmp/server.key'"
+          docker exec "$TEST_POSTGRES_CONTAINER" psql -U postgres -d commerce_test -c "ALTER SYSTEM SET ssl = 'on'"
+          docker exec "$TEST_POSTGRES_CONTAINER" psql -U postgres -d commerce_test -c "SELECT pg_reload_conf()"
+          for attempt in {1..20}; do
+            if [ "$(docker exec "$TEST_POSTGRES_CONTAINER" psql -U postgres -d commerce_test -Atc 'SHOW ssl')" = on ]; then
+              exit 0
+            fi
+            sleep 0.2
+          done
+          exit 1
+      - run: npm test -- src/db/postgres-tls.integration.test.ts
+        working-directory: .

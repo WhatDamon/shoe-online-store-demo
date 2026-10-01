@@ -12,6 +12,10 @@ import { type ProductRecord, withoutId } from '@/db/product-row'
 import { parseVector } from './vector'
 import type { EmbeddingRow } from './embedding-row'
 
+// Lock an ID even before its reservation row exists; retries share this transaction lock.
+const lockBudgetRequest = (tx: Pick<PgAppDb, 'execute'>, requestId: string) =>
+  tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`ai_budget:${requestId}`}, 0))`)
+
 /** Postgres 实现：方法形状与 sqlite 版完全一致 → 可当 Repository 用。 */
 export function createPostgresRepository(db: PgAppDb) {
   return {
@@ -26,12 +30,18 @@ export function createPostgresRepository(db: PgAppDb) {
       if (!input.requestId || !input.day || tokens <= 0 || cap <= 0) return false
       await ensurePgTables(db)
       return db.transaction(async (tx) => {
+        await lockBudgetRequest(tx, input.requestId)
         const [existing] = await tx
-          .select({ status: aiBudgetReservations.status })
+          .select()
           .from(aiBudgetReservations)
           .where(eq(aiBudgetReservations.requestId, input.requestId))
           .limit(1)
-        if (existing) return existing.status === 'pending'
+        if (existing)
+          return (
+            existing.status === 'pending' &&
+            existing.day === input.day &&
+            existing.reservedTokens === tokens
+          )
 
         await tx
           .insert(aiBudgetDays)
@@ -81,12 +91,13 @@ export function createPostgresRepository(db: PgAppDb) {
       )
       await ensurePgTables(db)
       return db.transaction(async (tx) => {
+        await lockBudgetRequest(tx, input.requestId)
         const [reservation] = await tx
           .select()
           .from(aiBudgetReservations)
           .where(eq(aiBudgetReservations.requestId, input.requestId))
           .limit(1)
-        if (!reservation) return false
+        if (!reservation || reservation.day !== input.usage.day) return false
         if (reservation.status === 'settled') return true
         if (reservation.status !== 'pending') return false
         const [claimed] = await tx
@@ -134,6 +145,7 @@ export function createPostgresRepository(db: PgAppDb) {
     async releaseDailyBudget(requestId: string): Promise<boolean> {
       await ensurePgTables(db)
       return db.transaction(async (tx) => {
+        await lockBudgetRequest(tx, requestId)
         const [reservation] = await tx
           .select()
           .from(aiBudgetReservations)

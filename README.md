@@ -1,6 +1,6 @@
 # Evoloop — 3D-Printed Casual Shoes
 
-> **Current local integration (2026-10-01):** The integrated commerce/security baseline is committed as `4177ec5`. Read [HANDOVER.md](./HANDOVER.md), the [integration report](./docs/unified-baseline-2026-09-30.md), and the [reliability update](./docs/reliability-2026-10-01.md). Safe error contracts and request tracing are implemented; PostgreSQL integration has a CI entry point but still needs an actual run. Local verification is distinct from deployment and production acceptance.
+> **Current local integration (2026-10-01):** The integrated commerce/security baseline is committed as `4177ec5`, with error contracts and tracing in `847e32e`. Real PostgreSQL commerce, AI budget concurrency and verified TLS queries have now run locally. Read [HANDOVER.md](./HANDOVER.md), the [integration report](./docs/unified-baseline-2026-09-30.md), the [reliability update](./docs/reliability-2026-10-01.md) and the [PostgreSQL acceptance report](./docs/postgres-acceptance-2026-10-01.md). Local results do not establish deployment or remote CI success.
 
 **Evoloop** began as a student hackathon project and has grown into an **independent footwear
 project**. This repository is its consumer-facing storefront front-end — landing page, `/shop`
@@ -117,6 +117,21 @@ tests); the reserved Shopify adapter takes priority only with `SHOPIFY_ENABLED=t
 The acceptance gate is **format:check + typecheck + check:boundary + lint + test** (`npm run verify`),
 with **`npm run build`** run separately. CI is configured for Node 22 / 24 and Python 3.12;
 local results do not establish the current remote CI or deployment state.
+
+### Isolated PostgreSQL acceptance
+
+Set `AI_TEST_POSTGRES_URL` only in a test process, pointing to a dedicated loopback
+database whose name ends in `_test`. Run
+`npm test -- src/server/search/repository-postgres.integration.test.ts`. The suite owns
+and removes one random schema, warms independent connections and verifies competing
+reservations, duplicate retries and rollback. Without the variable it is explicitly skipped.
+
+For TLS, use a disposable server configured with the public localhost-only fixture in
+`src/test/fixtures/postgres-tls.json`, set `AI_TEST_POSTGRES_TLS_URL` with hostname `localhost`,
+then run `npm test -- src/db/postgres-tls.integration.test.ts`. It executes a real encrypted
+query and rejects untrusted certificates and mismatched hostnames. These test keys must
+never be used for production. The PostgreSQL CI job prepares its own disposable server.
+See the acceptance report for local evidence and the separate Python test command.
 
 ## Environment variables
 

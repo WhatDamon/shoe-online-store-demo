@@ -6,6 +6,30 @@ import { createRepository } from '@/server/search/repository'
 import { dailyTokenCap, today, underDailyBudget } from './budget'
 
 describe('budget', () => {
+  it('rejects changed retry inputs and cross-day settlement without altering the reservation', async () => {
+    const repo = createRepository(createDb(':memory:'))
+    const input = { requestId: 'identity', day: '2026-10-01', tokens: 80, cap: 100 }
+    expect(await repo.reserveDailyBudget(input)).toBe(true)
+    expect(await repo.reserveDailyBudget({ ...input, tokens: 20 })).toBe(false)
+    expect(await repo.reserveDailyBudget({ ...input, day: '2026-10-02' })).toBe(false)
+    expect(
+      await repo.settleDailyBudget({
+        requestId: input.requestId,
+        usage: {
+          day: '2026-10-02',
+          model: 'mock',
+          promptTokens: 10,
+          completionTokens: 5,
+          sessionKey: 'test',
+        },
+      }),
+    ).toBe(false)
+    expect(
+      await repo.reserveDailyBudget({ requestId: 'another', day: input.day, tokens: 30, cap: 100 }),
+    ).toBe(false)
+    expect(await repo.dayTokenUsage(input.day)).toBe(0)
+  })
+
   it('counts usage written before the atomic budget tables were introduced', async () => {
     const database = createDb(':memory:')
     // Reproduce an existing deployment with a legacy ledger but no day counter.
