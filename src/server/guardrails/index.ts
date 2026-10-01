@@ -1,7 +1,7 @@
 import type { createRepository } from '@/server/search/repository'
 import { tokenBucket } from './rate-limit'
 import { createSessionStore, type SessionMessage } from './session-state'
-import { underDailyBudget, today } from './budget'
+import { dailyTokenCap, underDailyBudget, today } from './budget'
 
 /** IP/会话双维内存令牌桶限流速率（默认 10 次/分）。 */
 export const RATE_PER_MIN = 10
@@ -28,8 +28,8 @@ export function createGuardrails(
 ) {
   const nowMs = () => options?.now?.() ?? Date.now()
   const sessions = createSessionStore(nowMs)
-  const ipBuckets = tokenBucket(RATE_PER_MIN)
-  const sessionBuckets = tokenBucket(RATE_PER_MIN)
+  const ipBuckets = tokenBucket(RATE_PER_MIN, RATE_PER_MIN, { now: nowMs })
+  const sessionBuckets = tokenBucket(RATE_PER_MIN, RATE_PER_MIN, { now: nowMs })
 
   const deny = (code: GuardrailError['code']): never => {
     throw new GuardrailError(code, GUARDRAIL_MESSAGE)
@@ -48,19 +48,47 @@ export function createGuardrails(
     },
     /** IP+session 双维令牌桶；任一维度超限抛 code='rate_limited'。 */
     assertRate(ip: string, sessionKey: string): void {
-      const ipOk = ipBuckets.allow(`ip:${ip}`, nowMs())
-      const sessionOk = sessionBuckets.allow(`session:${sessionKey}`, nowMs())
-      if (!ipOk || !sessionOk) deny('rate_limited')
+      // Reject at the IP boundary before allocating a fresh session bucket.
+      if (!ipBuckets.allow(ip, nowMs()) || !sessionBuckets.allow(sessionKey, nowMs())) {
+        deny('rate_limited')
+      }
     },
     /** 当日用量达到 AI_DAILY_TOKEN_CAP 后抛 code='budget'。 */
     async assertBudget(day = today()): Promise<void> {
       if (!(await underDailyBudget(repo, day))) deny('budget')
+    },
+    /** Atomically reserve an estimated prompt+completion budget for one request. */
+    async reserveBudget(requestId: string, tokens: number, day = today()): Promise<void> {
+      const accepted = await repo.reserveDailyBudget({
+        requestId,
+        day,
+        tokens,
+        cap: dailyTokenCap(),
+      })
+      if (!accepted) deny('budget')
+    },
+    /** Settle a reservation and write the actual usage in one database transaction. */
+    async settleBudget(
+      requestId: string,
+      usage: Parameters<ReturnType<typeof createRepository>['insertUsage']>[0],
+    ): Promise<void> {
+      const settled = await repo.settleDailyBudget({ requestId, usage, cap: dailyTokenCap() })
+      if (!settled) throw new Error('AI budget reservation is no longer pending')
+    },
+    /** Release a reservation after provider failure, timeout, or stream interruption. */
+    async releaseBudget(requestId: string): Promise<void> {
+      await repo.releaseDailyBudget(requestId)
     },
     /** 估算 token 落库 ai_usage（匿名成本计量）。 */
     async noteUsage(
       u: Parameters<ReturnType<typeof createRepository>['insertUsage']>[0],
     ): Promise<void> {
       await repo.insertUsage(u)
+    },
+    dispose() {
+      sessions.dispose()
+      ipBuckets.dispose()
+      sessionBuckets.dispose()
     },
   }
 }

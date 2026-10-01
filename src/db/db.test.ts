@@ -63,9 +63,9 @@ describe('pgConnectOptions', () => {
     expect(pgConnectOptions({ PG_SSL: '0' })).toBeNull()
     expect(pgConnectOptions({ PG_SSL: '   ' })).toBeNull()
   })
-  it('enables TLS-without-verification for Cloud SQL public IP when PG_SSL set', () => {
-    expect(pgConnectOptions({ PG_SSL: '1' })).toEqual({ rejectUnauthorized: false })
-    expect(pgConnectOptions({ PG_SSL: 'require' })).toEqual({ rejectUnauthorized: false })
+  it('verifies TLS even for the legacy require setting', () => {
+    expect(pgConnectOptions({ PG_SSL: '1' })).toEqual({ rejectUnauthorized: true })
+    expect(pgConnectOptions({ PG_SSL: 'require' })).toEqual({ rejectUnauthorized: true })
   })
 })
 

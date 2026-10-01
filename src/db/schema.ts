@@ -14,6 +14,19 @@ export const aiUsage = sqliteTable('ai_usage', {
   sessionKey: text('session_key').notNull(),
   createdAt: integer('created_at').notNull(),
 })
+export const aiBudgetDays = sqliteTable('ai_budget_days', {
+  day: text('day').primaryKey(),
+  reservedTokens: integer('reserved_tokens').notNull().default(0),
+  usedTokens: integer('used_tokens').notNull().default(0),
+})
+export const aiBudgetReservations = sqliteTable('ai_budget_reservations', {
+  requestId: text('request_id').primaryKey(),
+  day: text('day').notNull(),
+  reservedTokens: integer('reserved_tokens').notNull(),
+  actualTokens: integer('actual_tokens').notNull().default(0),
+  status: text('status').notNull(),
+  createdAt: integer('created_at').notNull(),
+})
 export const products = sqliteTable('products', {
   id: text('id').primaryKey(),
   handle: text('handle').notNull().unique(),
@@ -35,4 +48,10 @@ export const products = sqliteTable('products', {
   createdAt: text('created_at').notNull(),
 })
 
-export const schema = { productEmbeddings, aiUsage, products }
+export const schema = {
+  productEmbeddings,
+  aiUsage,
+  aiBudgetDays,
+  aiBudgetReservations,
+  products,
+}

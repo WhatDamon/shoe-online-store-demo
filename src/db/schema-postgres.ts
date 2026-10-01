@@ -18,6 +18,19 @@ export const aiUsage = pgTable('ai_usage', {
   sessionKey: text('session_key').notNull(),
   createdAt: bigint('created_at', { mode: 'number' }).notNull(), // sqlite INTEGER(64) 等价
 })
+export const aiBudgetDays = pgTable('ai_budget_days', {
+  day: text('day').primaryKey(),
+  reservedTokens: integer('reserved_tokens').notNull().default(0),
+  usedTokens: integer('used_tokens').notNull().default(0),
+})
+export const aiBudgetReservations = pgTable('ai_budget_reservations', {
+  requestId: text('request_id').primaryKey(),
+  day: text('day').notNull(),
+  reservedTokens: integer('reserved_tokens').notNull(),
+  actualTokens: integer('actual_tokens').notNull().default(0),
+  status: text('status').notNull(),
+  createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+})
 
 export const products = pgTable('products', {
   id: text('id').primaryKey(),
@@ -40,4 +53,10 @@ export const products = pgTable('products', {
   createdAt: text('created_at').notNull(),
 })
 
-export const schema = { productEmbeddings, aiUsage, products }
+export const schema = {
+  productEmbeddings,
+  aiUsage,
+  aiBudgetDays,
+  aiBudgetReservations,
+  products,
+}
