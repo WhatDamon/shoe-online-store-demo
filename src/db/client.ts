@@ -50,6 +50,7 @@ export function createDb(file: string = process.env.DATABASE_URL ?? './data/loca
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_ai_budget_reservations_day ON ai_budget_reservations(day);
+    CREATE INDEX IF NOT EXISTS idx_ai_budget_reservations_recovery ON ai_budget_reservations(status, created_at, request_id);
     CREATE TABLE IF NOT EXISTS products (
       id TEXT PRIMARY KEY,
       handle TEXT NOT NULL UNIQUE,
@@ -208,6 +209,7 @@ async function runPgDdl(db: PgAppDb): Promise<void> {
       created_at bigint NOT NULL
     )`,
     sql`CREATE INDEX IF NOT EXISTS idx_ai_budget_reservations_day ON ai_budget_reservations (day)`,
+    sql`CREATE INDEX IF NOT EXISTS idx_ai_budget_reservations_recovery ON ai_budget_reservations (status, created_at, request_id)`,
     sql`CREATE TABLE IF NOT EXISTS products (
       id text PRIMARY KEY,
       handle text NOT NULL UNIQUE,

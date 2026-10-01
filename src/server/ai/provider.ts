@@ -6,6 +6,7 @@
 // 往本文件加运行时 import 会立刻把环带回来。
 export interface AiContext {
   messages: { role: 'user' | 'assistant'; content: string }[]
+  signal?: AbortSignal
 }
 
 export interface AiProvider {

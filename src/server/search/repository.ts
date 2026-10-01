@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm'
+import { and, asc, eq, lt, sql } from 'drizzle-orm'
 import {
   aiBudgetDays,
   aiBudgetReservations,
@@ -13,21 +13,85 @@ import { type ProductRecord, withoutId } from '@/db/product-row'
 import { parseVector } from './vector'
 import { createPostgresRepository } from './repository-postgres'
 import type { EmbeddingRow } from './embedding-row'
+import type {
+  BudgetReservationInput,
+  BudgetSettlementInput,
+  BudgetUsage,
+} from '@/server/guardrails/budget-contract'
 
 // 仓储只做持久化与整表读写：筛选/查找留在内存（catalog/filter.ts）。
 // 前提是目录规模 ~10²（当前 29 款），全表 listAllProducts 再 find/filter 的成本可忽略；
 // 若增长到 10⁴ 量级，需把筛选下推到 SQL（Repository 增加 query 方法）。
 export function createRepository(db: AppDb) {
+  async function abandonDailyBudget(requestId: string, before?: number): Promise<boolean> {
+    return db.transaction((tx) => {
+      const [reservation] = tx
+        .select()
+        .from(aiBudgetReservations)
+        .where(eq(aiBudgetReservations.requestId, requestId))
+        .limit(1)
+        .all()
+      if (!reservation) return false
+      if (reservation.status === 'abandoned') return before === undefined
+      if (
+        reservation.status !== 'pending' ||
+        (before !== undefined && reservation.createdAt >= before)
+      )
+        return false
+      const [updated] = tx
+        .update(aiBudgetDays)
+        .set({
+          reservedTokens: sql`${aiBudgetDays.reservedTokens} - ${reservation.reservedTokens}`,
+          usedTokens: sql`${aiBudgetDays.usedTokens} + ${reservation.reservedTokens}`,
+        })
+        .where(eq(aiBudgetDays.day, reservation.day))
+        .returning()
+        .all()
+      if (!updated) throw new Error('AI budget reservation day is missing')
+      tx.update(aiBudgetReservations)
+        .set({
+          status: 'abandoned',
+          actualTokens: reservation.reservedTokens,
+        })
+        .where(eq(aiBudgetReservations.requestId, requestId))
+        .run()
+      return true
+    })
+  }
+
   return {
-    async reserveDailyBudget(input: {
-      requestId: string
-      day: string
-      tokens: number
-      cap: number
-    }): Promise<boolean> {
+    // Unknown provider costs retain the full estimate rather than refunding the budget.
+    abandonDailyBudget,
+    async recoverDailyBudgetReservations(before: number, limit = 100): Promise<number> {
+      if (!Number.isFinite(before) || before <= 0 || !Number.isFinite(limit) || limit <= 0) return 0
+      const rows = db
+        .select({ requestId: aiBudgetReservations.requestId })
+        .from(aiBudgetReservations)
+        .where(
+          and(
+            eq(aiBudgetReservations.status, 'pending'),
+            lt(aiBudgetReservations.createdAt, before),
+          ),
+        )
+        .orderBy(asc(aiBudgetReservations.createdAt), asc(aiBudgetReservations.requestId))
+        .limit(Math.min(100, Math.floor(limit)))
+        .all()
+      let recovered = 0
+      for (const row of rows) if (await abandonDailyBudget(row.requestId, before)) recovered++
+      return recovered
+    },
+    async reserveDailyBudget(input: BudgetReservationInput): Promise<boolean> {
       const tokens = Math.max(0, Math.floor(input.tokens))
       const cap = Math.max(0, Math.floor(input.cap))
-      if (!input.requestId || !input.day || tokens <= 0 || cap <= 0) return false
+      if (
+        !input.requestId ||
+        !input.day ||
+        !Number.isSafeInteger(tokens) ||
+        !Number.isSafeInteger(cap) ||
+        tokens <= 0 ||
+        cap <= 0
+      )
+        return false
       return db.transaction((tx) => {
         const [existing] = tx
           .select()
@@ -76,21 +140,15 @@ export function createRepository(db: AppDb) {
         return true
       })
     },
-    async settleDailyBudget(input: {
-      requestId: string
-      usage: {
-        day: string
-        model: string
-        promptTokens: number
-        completionTokens: number
-        sessionKey: string
-      }
-      cap?: number
-    }): Promise<boolean> {
-      const actualTokens = Math.max(
-        0,
-        Math.floor(input.usage.promptTokens) + Math.floor(input.usage.completionTokens),
+    async settleDailyBudget(input: BudgetSettlementInput): Promise<boolean> {
+      if (
+        ![input.usage.promptTokens, input.usage.completionTokens].every(
+          (tokens) => Number.isSafeInteger(tokens) && tokens >= 0,
+        )
       )
+        return false
+      const actualTokens = input.usage.promptTokens + input.usage.completionTokens
+      if (!Number.isSafeInteger(actualTokens)) return false
       return db.transaction((tx) => {
         const [reservation] = tx
           .select()
@@ -99,7 +157,7 @@ export function createRepository(db: AppDb) {
           .limit(1)
           .all()
         if (!reservation || reservation.day !== input.usage.day) return false
-        if (reservation.status === 'settled') return true
+        if (reservation.status === 'settled') return reservation.actualTokens === actualTokens
         if (reservation.status !== 'pending') return false
         const [claimed] = tx
           .update(aiBudgetReservations)
@@ -113,30 +171,17 @@ export function createRepository(db: AppDb) {
           .returning()
           .all()
         if (!claimed) return false
-        const extra = Math.max(0, actualTokens - claimed.reservedTokens)
-        if (extra > 0) {
-          const cap =
-            input.cap == null ? Number.MAX_SAFE_INTEGER : Math.max(0, Math.floor(input.cap))
-          const [toppedUp] = tx
-            .update(aiBudgetDays)
-            .set({ reservedTokens: sql`${aiBudgetDays.reservedTokens} + ${extra}` })
-            .where(
-              and(
-                eq(aiBudgetDays.day, claimed.day),
-                sql`${aiBudgetDays.reservedTokens} + ${aiBudgetDays.usedTokens} + ${extra} <= ${cap}`,
-              ),
-            )
-            .returning({ day: aiBudgetDays.day })
-            .all()
-          if (!toppedUp) throw new Error('AI budget reservation day is missing')
-        }
-        tx.update(aiBudgetDays)
+        // Admission enforces the cap; already incurred usage must still be accounted for.
+        const [updated] = tx
+          .update(aiBudgetDays)
           .set({
-            reservedTokens: sql`${aiBudgetDays.reservedTokens} - ${claimed.reservedTokens + extra}`,
+            reservedTokens: sql`${aiBudgetDays.reservedTokens} - ${claimed.reservedTokens}`,
             usedTokens: sql`${aiBudgetDays.usedTokens} + ${actualTokens}`,
           })
           .where(eq(aiBudgetDays.day, claimed.day))
-          .run()
+          .returning()
+          .all()
+        if (!updated) throw new Error('AI budget reservation day is missing')
         tx.insert(aiUsage)
           .values({ ...input.usage, createdAt: Date.now() })
           .run()
@@ -224,19 +269,15 @@ export function createRepository(db: AppDb) {
         vector: parseVector(r.vector),
       }))
     },
-    async insertUsage(u: {
-      day: string
-      model: string
-      promptTokens: number
-      completionTokens: number
-      sessionKey: string
-    }): Promise<void> {
+    async insertUsage(u: BudgetUsage): Promise<void> {
       await db.insert(aiUsage).values({ ...u, createdAt: Date.now() })
     },
     async dayTokenUsage(day: string): Promise<number> {
       const [row] = await db
         .select({
-          total: sql<number>`coalesce(sum(${aiUsage.promptTokens} + ${aiUsage.completionTokens}), 0)`,
+          total: sql<number>`coalesce(sum(${aiUsage.promptTokens} + ${aiUsage.completionTokens}), 0)
+            + (select coalesce(sum(actual_tokens), 0) from ai_budget_reservations
+               where day = ${day} and status = 'abandoned')`,
         })
         .from(aiUsage)
         .where(eq(aiUsage.day, day))

@@ -1,4 +1,4 @@
-import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 export const productEmbeddings = sqliteTable('product_embeddings', {
   productId: text('product_id').primaryKey(),
   contentHash: text('content_hash').notNull(),
@@ -19,14 +19,20 @@ export const aiBudgetDays = sqliteTable('ai_budget_days', {
   reservedTokens: integer('reserved_tokens').notNull().default(0),
   usedTokens: integer('used_tokens').notNull().default(0),
 })
-export const aiBudgetReservations = sqliteTable('ai_budget_reservations', {
-  requestId: text('request_id').primaryKey(),
-  day: text('day').notNull(),
-  reservedTokens: integer('reserved_tokens').notNull(),
-  actualTokens: integer('actual_tokens').notNull().default(0),
-  status: text('status').notNull(),
-  createdAt: integer('created_at').notNull(),
-})
+export const aiBudgetReservations = sqliteTable(
+  'ai_budget_reservations',
+  {
+    requestId: text('request_id').primaryKey(),
+    day: text('day').notNull(),
+    reservedTokens: integer('reserved_tokens').notNull(),
+    actualTokens: integer('actual_tokens').notNull().default(0),
+    status: text('status').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (table) => [
+    index('idx_ai_budget_reservations_recovery').on(table.status, table.createdAt, table.requestId),
+  ],
+)
 export const products = sqliteTable('products', {
   id: text('id').primaryKey(),
   handle: text('handle').notNull().unique(),

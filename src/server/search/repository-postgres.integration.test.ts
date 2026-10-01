@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { beforeAll, beforeEach, afterAll, describe, expect, it } from 'vitest'
 import postgres from 'postgres'
 import { drizzle } from 'drizzle-orm/postgres-js'
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { ensurePgTables, type PgAppDb } from '@/db/client'
 import { schema, aiBudgetDays, aiBudgetReservations, aiUsage } from '@/db/schema-postgres'
 import { createPostgresRepository } from './repository-postgres'
@@ -109,6 +109,92 @@ describe.runIf(Boolean(testUrl))('PostgreSQL atomic budget integration', () => {
     expect(results).toEqual(Array(8).fill(true))
     expect(await db.select().from(aiBudgetDays)).toMatchObject([
       { reservedTokens: 0, usedTokens: 0 },
+    ])
+  })
+
+  it('records usage above the admission cap and rejects changed settlement retries', async () => {
+    await repo.reserveDailyBudget({ requestId: 'overrun', day, tokens: 80, cap: 100 })
+    const input = { requestId: 'overrun', usage: { ...usage, completionTokens: 100 }, cap: 100 }
+    expect(await repo.settleDailyBudget(input)).toBe(true)
+    expect(await repo.settleDailyBudget(input)).toBe(true)
+    expect(await repo.settleDailyBudget({ ...input, usage })).toBe(false)
+    expect(await repo.reserveDailyBudget({ requestId: 'next', day, tokens: 1, cap: 100 })).toBe(
+      false,
+    )
+    expect(await db.select().from(aiBudgetDays)).toMatchObject([
+      { reservedTokens: 0, usedTokens: 120 },
+    ])
+    expect(await repo.dayTokenUsage(day)).toBe(120)
+    expect(await db.select().from(aiUsage)).toHaveLength(1)
+  })
+
+  it('recovers at most 100 old reservations per batch and leaves live work pending', async () => {
+    for (let i = 0; i < 101; i++)
+      await repo.reserveDailyBudget({ requestId: `old-${i}`, day, tokens: 1, cap: 1000 })
+    await db.update(aiBudgetReservations).set({ createdAt: 0 })
+    await repo.reserveDailyBudget({ requestId: 'live', day, tokens: 1, cap: 1000 })
+    expect(await repo.recoverDailyBudgetReservations(1, 1000)).toBe(100)
+    expect(await db.select().from(aiBudgetDays)).toMatchObject([
+      { reservedTokens: 2, usedTokens: 100 },
+    ])
+    expect(await repo.recoverDailyBudgetReservations(1)).toBe(1)
+    expect(await repo.recoverDailyBudgetReservations(1)).toBe(0)
+    expect(
+      await db
+        .select()
+        .from(aiBudgetReservations)
+        .where(eq(aiBudgetReservations.requestId, 'live')),
+    ).toMatchObject([{ status: 'pending' }])
+    expect(await repo.dayTokenUsage(day)).toBe(101)
+    expect(await db.select().from(aiUsage)).toHaveLength(0)
+  })
+
+  it.each(['settle', 'release'] as const)(
+    'serializes stale recovery racing with %s',
+    async (operation) => {
+      await repo.reserveDailyBudget({ requestId: 'race', day, tokens: 80, cap: 100 })
+      await db.update(aiBudgetReservations).set({ createdAt: 0 })
+      await Promise.all([
+        ...Array.from({ length: 8 }, () => repo.recoverDailyBudgetReservations(1)),
+        operation === 'settle'
+          ? repo.settleDailyBudget({ requestId: 'race', usage })
+          : repo.releaseDailyBudget('race'),
+      ])
+      const [reservation] = await db.select().from(aiBudgetReservations)
+      const usedTokens = reservation.status === 'abandoned' ? 80 : operation === 'settle' ? 30 : 0
+      expect(['abandoned', operation === 'settle' ? 'settled' : 'released']).toContain(
+        reservation.status,
+      )
+      expect(await db.select().from(aiBudgetDays)).toMatchObject([
+        { reservedTokens: 0, usedTokens },
+      ])
+      expect(await repo.dayTokenUsage(day)).toBe(usedTokens)
+      expect(await repo.recoverDailyBudgetReservations(1)).toBe(0)
+      if (reservation.status === 'abandoned') {
+        expect(await repo.settleDailyBudget({ requestId: 'race', usage })).toBe(false)
+        expect(await repo.releaseDailyBudget('race')).toBe(false)
+      }
+    },
+  )
+
+  it('rolls back recovery counters if persisting the abandoned status fails', async () => {
+    await repo.reserveDailyBudget({ requestId: 'recovery-failure', day, tokens: 80, cap: 100 })
+    await db.execute(
+      sql`ALTER TABLE ai_budget_reservations ADD CONSTRAINT reject_recovery CHECK (status <> 'abandoned')`,
+    )
+    try {
+      await expect(repo.abandonDailyBudget('recovery-failure')).rejects.toThrow()
+      expect(await db.select().from(aiBudgetDays)).toMatchObject([
+        { reservedTokens: 80, usedTokens: 0 },
+      ])
+      expect(await db.select().from(aiBudgetReservations)).toMatchObject([{ status: 'pending' }])
+    } finally {
+      await db.execute(sql`ALTER TABLE ai_budget_reservations DROP CONSTRAINT reject_recovery`)
+    }
+    expect(await repo.abandonDailyBudget('recovery-failure')).toBe(true)
+    expect(await repo.abandonDailyBudget('recovery-failure')).toBe(true)
+    expect(await db.select().from(aiBudgetDays)).toMatchObject([
+      { reservedTokens: 0, usedTokens: 80 },
     ])
   })
 

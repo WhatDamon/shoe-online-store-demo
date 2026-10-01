@@ -19,7 +19,14 @@ export class OpenAICompatProvider implements AiProvider {
     const client = new OpenAI({
       apiKey: envStr('AI_API_KEY'),
       baseURL: envStr('AI_BASE_URL') || undefined,
+      // Each application attempt owns one reservation; retries require a new attempt.
+      maxRetries: 0,
+      logLevel: 'off',
     })
+    const signal = AbortSignal.any([
+      AbortSignal.timeout(envInt('AI_REQUEST_TIMEOUT_MS', 20_000)),
+      ...(ctx.signal ? [ctx.signal] : []),
+    ])
     const stream = await client.chat.completions.create(
       {
         model: aiModelName(),
@@ -27,12 +34,14 @@ export class OpenAICompatProvider implements AiProvider {
         messages: [{ role: 'system', content: ctx.system }, ...ctx.messages],
         stream: true,
       },
-      // 默认 20s（调用时读 env）
-      { signal: AbortSignal.timeout(envInt('AI_REQUEST_TIMEOUT_MS', 20_000)) },
+      { signal },
     )
     for await (const chunk of stream) {
+      signal.throwIfAborted()
       const delta = chunk.choices[0]?.delta?.content ?? ''
       if (delta) yield delta
     }
+    // The SDK can finish its iterator silently after transport cancellation.
+    signal.throwIfAborted()
   }
 }

@@ -2,6 +2,8 @@
 
 工作区 `F:/shoe-online-store-demo`，分支 `sql-certificate-and-AI-stock`。在 `4177ec5`、`847e32e` 的统一基线上继续阶段 C；用户授权本地提交，未 push、部署或修改正式数据库。
 
+> 本报告对应本地提交 `128a762`。其后的 AI 预算恢复与流式取消修复、553 项门禁及双服务复测见 [后续报告](./ai-budget-recovery-2026-10-01.md)。本轮自建 PostgreSQL 验收 cluster 已停止；历史“下一步恢复未实现”按此后续记录更新，不改写历史验证数字。
+
 ## 范围与已确认问题
 
 此前 PostgreSQL 测试只有入口，缺少实际执行证据。本轮启动独立的 loopback PostgreSQL，实际验证 commerce、预算和 TLS。真实并发暴露同一请求结算/释放时部分重试错误返回 false；为每个预算请求增加事务级 advisory lock，锁在提交/回滚时自动释放。日总量仍由条件 UPDATE 原子控制，锁不会代替日容量检查。

@@ -1,6 +1,6 @@
 # Evoloop — 3D-Printed Casual Shoes
 
-> **Current local integration (2026-10-01):** The integrated commerce/security baseline is committed as `4177ec5`, with error contracts and tracing in `847e32e`. Real PostgreSQL commerce, AI budget concurrency and verified TLS queries have now run locally. Read [HANDOVER.md](./HANDOVER.md), the [integration report](./docs/unified-baseline-2026-09-30.md), the [reliability update](./docs/reliability-2026-10-01.md) and the [PostgreSQL acceptance report](./docs/postgres-acceptance-2026-10-01.md). Local results do not establish deployment or remote CI success.
+> **Current local integration (2026-10-01):** Commerce/security baseline `4177ec5`, error contracts/tracing `847e32e`, and actual PostgreSQL/TLS acceptance `128a762` are committed locally. AI now conservatively accounts for interrupted provider calls, recovers stale reservations and propagates stream cancellation. Read [HANDOVER.md](./HANDOVER.md), the [integration report](./docs/unified-baseline-2026-09-30.md), the [reliability update](./docs/reliability-2026-10-01.md), the [PostgreSQL acceptance report](./docs/postgres-acceptance-2026-10-01.md) and the [budget recovery report](./docs/ai-budget-recovery-2026-10-01.md). Local results do not establish deployment or remote CI success.
 
 **Evoloop** began as a student hackathon project and has grown into an **independent footwear
 project**. This repository is its consumer-facing storefront front-end — landing page, `/shop`
@@ -109,12 +109,13 @@ tests); the reserved Shopify adapter takes priority only with `SHOPIFY_ENABLED=t
 | `npm run start` | Serve the production build (Node runtime). |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run check:boundary` | Guards that `'use client'` modules carry no runtime `@/server/**` import. |
+| `npm run check:coupling` | Checks runtime import cycles, domain independence and guardrails' budget port. |
 | `npm run lint` | ESLint over the repo |
 | `npm run test` | Vitest unit and integration tests on Node; see the dated integration report for actual counts. |
 | `npm run verify` | One-shot acceptance gate: `format:check` + `typecheck` + `check:boundary` + `lint` + `test`. |
 | `npm run test:watch` | Vitest watch mode |
 
-The acceptance gate is **format:check + typecheck + check:boundary + lint + test** (`npm run verify`),
+The acceptance gate is **format:check + typecheck + check:boundary + check:coupling + lint + test** (`npm run verify`),
 with **`npm run build`** run separately. CI is configured for Node 22 / 24 and Python 3.12;
 local results do not establish the current remote CI or deployment state.
 
@@ -148,7 +149,7 @@ See [`.env.example`](.env.example) for the annotated template. Summary:
 | `AI_MAX_OUTPUT_TOKENS` | `500` | Max output tokens per provider response |
 | `AI_REQUEST_TIMEOUT_MS` | `20000` | Provider request timeout |
 | `AI_MAX_MESSAGE_CHARS` | `800` | Max characters per incoming user message |
-| `AI_DAILY_TOKEN_CAP` | `1000000` | UTC budget with atomic reservation, estimated usage settlement and failure/interruption release |
+| `AI_DAILY_TOKEN_CAP` | `1000000` | UTC estimated-token budget; atomic admission, completed usage settlement and conservative accounting for uncertain calls |
 | `AI_SESSION_SECRET` | *(required in production)* | Private signing secret, at least 32 bytes; missing/short configuration fails closed |
 | `TRUSTED_PROXY_IPS` | *(empty)* | Exact trusted immediate peer IPs; XFF is ignored without a verified peer |
 | `AI_DISABLE_REAL` | `0` | `1` forces Mock mode even with a key (abuse kill switch) |
@@ -169,6 +170,22 @@ See [`.env.example`](.env.example) for the annotated template. Summary:
    assistant transparently uses keyword search over the catalog.
 3. Restart. Guardrails (rate limit, turn cap, daily budget) apply to real and Mock alike.
    `AI_DISABLE_REAL=1` is the one-switch rollback to Mock.
+
+Each provider attempt owns one budget reservation. SDK automatic retries are disabled,
+and upstream SDK logs are suppressed so private response content cannot bypass the
+application's safe error logging. Completed usage is still a character-based estimate,
+not an exact token count or billing cap. Completed usage above the admission estimate
+is recorded even if it exceeds the configured cap; subsequent reservations are rejected.
+
+Once provider work starts, failure, timeout or cancellation marks its reservation
+`abandoned` and consumes the full reserved estimate. This can overcount unbilled failures,
+but prevents uncertain work from receiving a refund. These amounts are audit estimates,
+not fake completed replies in `ai_usage`. Before-provider failures may release their budget.
+Reservation attempts recover at most 100 stale pending rows per minute per instance,
+after at least five minutes (or `3*AI_REQUEST_TIMEOUT_MS+60000`, whichever is greater).
+Recovery preserves accounting and uses an indexed scan; idle applications recover on
+their next reservation attempt. A recovery database failure stops admission and is retried
+on the next attempt. See the budget report for rollback and remaining production limits.
 
 ### Switching market / sizes
 

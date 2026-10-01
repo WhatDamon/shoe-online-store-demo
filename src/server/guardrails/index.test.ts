@@ -1,7 +1,8 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createDb } from '@/db/client'
 import { createRepository } from '@/server/search/repository'
+import { aiBudgetReservations } from '@/db/schema'
 import { dailyTokenCap, today } from './budget'
 import { maxTurns } from './session-state'
 import { GUARDRAIL_MESSAGE, GuardrailError, RATE_PER_MIN, createGuardrails } from './index'
@@ -9,6 +10,52 @@ import { GUARDRAIL_MESSAGE, GuardrailError, RATE_PER_MIN, createGuardrails } fro
 const fresh = () => createGuardrails(createRepository(createDb(':memory:')))
 
 describe('createGuardrails', () => {
+  it('shares one recovery scan, throttles it, and discovers stale work after a restart', async () => {
+    const database = createDb(':memory:')
+    const repo = createRepository(database)
+    const day = '2026-10-01'
+    await repo.reserveDailyBudget({ requestId: 'crashed', day, tokens: 10, cap: 100 })
+    database.update(aiBudgetReservations).set({ createdAt: 0 }).run()
+    const scan = vi.spyOn(repo, 'recoverDailyBudgetReservations')
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    let now = 400_000
+    const first = createGuardrails(repo, { now: () => now })
+    const restarted = createGuardrails(repo, { now: () => now })
+    try {
+      await Promise.all(['r1', 'r2', 'r3'].map((id) => first.reserveBudget(id, 10, day)))
+      expect(scan).toHaveBeenCalledTimes(1)
+      expect(warning).toHaveBeenCalledWith('[ai/budget] recovered uncertain reservations', 1)
+      await first.reserveBudget('r4', 10, day)
+      expect(scan).toHaveBeenCalledTimes(1)
+      now += 60_000
+      await first.reserveBudget('r5', 10, day)
+      expect(scan).toHaveBeenCalledTimes(2)
+      await restarted.reserveBudget('r6', 10, day)
+      expect(scan).toHaveBeenCalledTimes(3)
+    } finally {
+      first.dispose()
+      restarted.dispose()
+      scan.mockRestore()
+      warning.mockRestore()
+    }
+  })
+
+  it('fails closed on recovery errors and retries the scan on the next request', async () => {
+    const repo = createRepository(createDb(':memory:'))
+    const failure = vi
+      .spyOn(repo, 'recoverDailyBudgetReservations')
+      .mockRejectedValueOnce(new Error('database failed'))
+    const g = createGuardrails(repo)
+    try {
+      await expect(g.reserveBudget('blocked', 10)).rejects.toThrow('database failed')
+      await expect(g.reserveBudget('retry', 10)).resolves.toBeUndefined()
+      expect(failure).toHaveBeenCalledTimes(2)
+    } finally {
+      g.dispose()
+      failure.mockRestore()
+    }
+  })
+
   it('assertTurn 达 MAX_TURNS 后抛 code=turns 的温和拒答', () => {
     const g = fresh()
     for (let i = 0; i < maxTurns(); i++) {

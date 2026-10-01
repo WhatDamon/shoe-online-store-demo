@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm'
+import { and, asc, eq, lt, sql } from 'drizzle-orm'
 import {
   aiBudgetDays,
   aiBudgetReservations,
@@ -11,6 +11,11 @@ import type { PgAppDb } from '@/db/client'
 import { type ProductRecord, withoutId } from '@/db/product-row'
 import { parseVector } from './vector'
 import type { EmbeddingRow } from './embedding-row'
+import type {
+  BudgetReservationInput,
+  BudgetSettlementInput,
+  BudgetUsage,
+} from '@/server/guardrails/budget-contract'
 
 // Lock an ID even before its reservation row exists; retries share this transaction lock.
 const lockBudgetRequest = (tx: Pick<PgAppDb, 'execute'>, requestId: string) =>
@@ -18,16 +23,74 @@ const lockBudgetRequest = (tx: Pick<PgAppDb, 'execute'>, requestId: string) =>
 
 /** Postgres 实现：方法形状与 sqlite 版完全一致 → 可当 Repository 用。 */
 export function createPostgresRepository(db: PgAppDb) {
+  async function abandonDailyBudget(requestId: string, before?: number): Promise<boolean> {
+    await ensurePgTables(db)
+    return db.transaction(async (tx) => {
+      await lockBudgetRequest(tx, requestId)
+      const [reservation] = await tx
+        .select()
+        .from(aiBudgetReservations)
+        .where(eq(aiBudgetReservations.requestId, requestId))
+        .limit(1)
+      if (!reservation) return false
+      if (reservation.status === 'abandoned') return before === undefined
+      if (
+        reservation.status !== 'pending' ||
+        (before !== undefined && reservation.createdAt >= before)
+      )
+        return false
+      const [updated] = await tx
+        .update(aiBudgetDays)
+        .set({
+          reservedTokens: sql`${aiBudgetDays.reservedTokens} - ${reservation.reservedTokens}`,
+          usedTokens: sql`${aiBudgetDays.usedTokens} + ${reservation.reservedTokens}`,
+        })
+        .where(eq(aiBudgetDays.day, reservation.day))
+        .returning()
+      if (!updated) throw new Error('AI budget reservation day is missing')
+      await tx
+        .update(aiBudgetReservations)
+        .set({
+          status: 'abandoned',
+          actualTokens: reservation.reservedTokens,
+        })
+        .where(eq(aiBudgetReservations.requestId, requestId))
+      return true
+    })
+  }
+
   return {
-    async reserveDailyBudget(input: {
-      requestId: string
-      day: string
-      tokens: number
-      cap: number
-    }): Promise<boolean> {
+    abandonDailyBudget,
+    async recoverDailyBudgetReservations(before: number, limit = 100): Promise<number> {
+      if (!Number.isFinite(before) || before <= 0 || !Number.isFinite(limit) || limit <= 0) return 0
+      await ensurePgTables(db)
+      const rows = await db
+        .select({ requestId: aiBudgetReservations.requestId })
+        .from(aiBudgetReservations)
+        .where(
+          and(
+            eq(aiBudgetReservations.status, 'pending'),
+            lt(aiBudgetReservations.createdAt, before),
+          ),
+        )
+        .orderBy(asc(aiBudgetReservations.createdAt), asc(aiBudgetReservations.requestId))
+        .limit(Math.min(100, Math.floor(limit)))
+      let recovered = 0
+      for (const row of rows) if (await abandonDailyBudget(row.requestId, before)) recovered++
+      return recovered
+    },
+    async reserveDailyBudget(input: BudgetReservationInput): Promise<boolean> {
       const tokens = Math.max(0, Math.floor(input.tokens))
       const cap = Math.max(0, Math.floor(input.cap))
-      if (!input.requestId || !input.day || tokens <= 0 || cap <= 0) return false
+      if (
+        !input.requestId ||
+        !input.day ||
+        !Number.isSafeInteger(tokens) ||
+        !Number.isSafeInteger(cap) ||
+        tokens <= 0 ||
+        cap <= 0
+      )
+        return false
       await ensurePgTables(db)
       return db.transaction(async (tx) => {
         await lockBudgetRequest(tx, input.requestId)
@@ -74,21 +137,15 @@ export function createPostgresRepository(db: PgAppDb) {
         return true
       })
     },
-    async settleDailyBudget(input: {
-      requestId: string
-      usage: {
-        day: string
-        model: string
-        promptTokens: number
-        completionTokens: number
-        sessionKey: string
-      }
-      cap?: number
-    }): Promise<boolean> {
-      const actualTokens = Math.max(
-        0,
-        Math.floor(input.usage.promptTokens) + Math.floor(input.usage.completionTokens),
+    async settleDailyBudget(input: BudgetSettlementInput): Promise<boolean> {
+      if (
+        ![input.usage.promptTokens, input.usage.completionTokens].every(
+          (tokens) => Number.isSafeInteger(tokens) && tokens >= 0,
+        )
       )
+        return false
+      const actualTokens = input.usage.promptTokens + input.usage.completionTokens
+      if (!Number.isSafeInteger(actualTokens)) return false
       await ensurePgTables(db)
       return db.transaction(async (tx) => {
         await lockBudgetRequest(tx, input.requestId)
@@ -98,7 +155,7 @@ export function createPostgresRepository(db: PgAppDb) {
           .where(eq(aiBudgetReservations.requestId, input.requestId))
           .limit(1)
         if (!reservation || reservation.day !== input.usage.day) return false
-        if (reservation.status === 'settled') return true
+        if (reservation.status === 'settled') return reservation.actualTokens === actualTokens
         if (reservation.status !== 'pending') return false
         const [claimed] = await tx
           .update(aiBudgetReservations)
@@ -111,29 +168,16 @@ export function createPostgresRepository(db: PgAppDb) {
           )
           .returning()
         if (!claimed) return false
-        const extra = Math.max(0, actualTokens - claimed.reservedTokens)
-        if (extra > 0) {
-          const cap =
-            input.cap == null ? Number.MAX_SAFE_INTEGER : Math.max(0, Math.floor(input.cap))
-          const [toppedUp] = await tx
-            .update(aiBudgetDays)
-            .set({ reservedTokens: sql`${aiBudgetDays.reservedTokens} + ${extra}` })
-            .where(
-              and(
-                eq(aiBudgetDays.day, claimed.day),
-                sql`${aiBudgetDays.reservedTokens} + ${aiBudgetDays.usedTokens} + ${extra} <= ${cap}`,
-              ),
-            )
-            .returning({ day: aiBudgetDays.day })
-          if (!toppedUp) throw new Error('AI budget reservation day is missing')
-        }
-        await tx
+        // Admission enforces the cap; already incurred usage must still be accounted for.
+        const [updated] = await tx
           .update(aiBudgetDays)
           .set({
-            reservedTokens: sql`${aiBudgetDays.reservedTokens} - ${claimed.reservedTokens + extra}`,
+            reservedTokens: sql`${aiBudgetDays.reservedTokens} - ${claimed.reservedTokens}`,
             usedTokens: sql`${aiBudgetDays.usedTokens} + ${actualTokens}`,
           })
           .where(eq(aiBudgetDays.day, claimed.day))
+          .returning()
+        if (!updated) throw new Error('AI budget reservation day is missing')
         await tx.insert(aiUsage).values({ ...input.usage, createdAt: Date.now() })
         await tx
           .update(aiBudgetReservations)
@@ -222,13 +266,7 @@ export function createPostgresRepository(db: PgAppDb) {
         vector: parseVector(r.vector),
       }))
     },
-    async insertUsage(u: {
-      day: string
-      model: string
-      promptTokens: number
-      completionTokens: number
-      sessionKey: string
-    }): Promise<void> {
+    async insertUsage(u: BudgetUsage): Promise<void> {
       await ensurePgTables(db)
       await db.insert(aiUsage).values({ ...u, createdAt: Date.now() })
     },
@@ -236,7 +274,9 @@ export function createPostgresRepository(db: PgAppDb) {
       await ensurePgTables(db)
       const [row] = await db
         .select({
-          total: sql<number>`coalesce(sum(${aiUsage.promptTokens} + ${aiUsage.completionTokens}), 0)`,
+          total: sql<number>`coalesce(sum(${aiUsage.promptTokens} + ${aiUsage.completionTokens}), 0)
+            + (select coalesce(sum(actual_tokens), 0) from ai_budget_reservations
+               where day = ${day} and status = 'abandoned')`,
         })
         .from(aiUsage)
         .where(eq(aiUsage.day, day))

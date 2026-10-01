@@ -1,4 +1,4 @@
-import { bigint, doublePrecision, integer, pgTable, serial, text } from 'drizzle-orm/pg-core'
+import { bigint, doublePrecision, index, integer, pgTable, serial, text } from 'drizzle-orm/pg-core'
 
 // Postgres 方言 schema：列语义与 sqlite 版对齐，
 // 由 schema-parity 契约测试防漂移。createdAt 用 bigint（毫秒值超出 int32）。
@@ -23,14 +23,20 @@ export const aiBudgetDays = pgTable('ai_budget_days', {
   reservedTokens: integer('reserved_tokens').notNull().default(0),
   usedTokens: integer('used_tokens').notNull().default(0),
 })
-export const aiBudgetReservations = pgTable('ai_budget_reservations', {
-  requestId: text('request_id').primaryKey(),
-  day: text('day').notNull(),
-  reservedTokens: integer('reserved_tokens').notNull(),
-  actualTokens: integer('actual_tokens').notNull().default(0),
-  status: text('status').notNull(),
-  createdAt: bigint('created_at', { mode: 'number' }).notNull(),
-})
+export const aiBudgetReservations = pgTable(
+  'ai_budget_reservations',
+  {
+    requestId: text('request_id').primaryKey(),
+    day: text('day').notNull(),
+    reservedTokens: integer('reserved_tokens').notNull(),
+    actualTokens: integer('actual_tokens').notNull().default(0),
+    status: text('status').notNull(),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+  },
+  (table) => [
+    index('idx_ai_budget_reservations_recovery').on(table.status, table.createdAt, table.requestId),
+  ],
+)
 
 export const products = pgTable('products', {
   id: text('id').primaryKey(),

@@ -61,23 +61,52 @@ export async function POST(req: NextRequest) {
   const footMm =
     typeof body.footMm === 'number' && Number.isFinite(body.footMm) ? body.footMm : null
 
+  const cancellation = new AbortController()
+  const signal = AbortSignal.any([req.signal, cancellation.signal])
+  const iterator = chat({ sessionKey: session.id, ip, mode, text, product, footMm }, { signal })
+  const enc = new TextEncoder()
+  let finished = false
   const stream = new ReadableStream({
-    async start(controller) {
-      const enc = new TextEncoder()
-      const send = (ev: ChatEvent) => controller.enqueue(enc.encode(encodeEvent(ev)))
+    async pull(controller) {
+      if (finished) return
       try {
-        for await (const ev of chat({ sessionKey: session.id, ip, mode, text, product, footMm })) {
-          send(ev)
-          if (ev.type === 'done' || ev.type === 'error') break
+        const next = await iterator.next()
+        if (finished) return
+        if (next.done) {
+          finished = true
+          controller.close()
+          return
+        }
+        controller.enqueue(enc.encode(encodeEvent(next.value)))
+        if (next.value.type === 'done' || next.value.type === 'error') {
+          finished = true
+          controller.close()
+          try {
+            await iterator.return(undefined)
+          } catch {
+            console.error('[ai/chat] stream cleanup failed')
+          }
         }
       } catch {
-        send({
+        if (finished) return
+        finished = true
+        const event: ChatEvent = {
           type: 'error',
           code: 'provider',
           message: FALLBACK_ERROR_TEXT,
-        })
+        }
+        controller.enqueue(enc.encode(encodeEvent(event)))
+        controller.close()
       }
-      controller.close()
+    },
+    async cancel() {
+      finished = true
+      cancellation.abort()
+      try {
+        await iterator.return(undefined)
+      } catch {
+        console.error('[ai/chat] cancellation cleanup failed')
+      }
     },
   })
   const response = new NextResponse(stream, {

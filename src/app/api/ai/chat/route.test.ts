@@ -41,6 +41,100 @@ function request(headers: Record<string, string> = {}) {
 }
 
 describe('AI chat route session boundary', () => {
+  it('bounds producer reads and finalizes the generator when the reader cancels', async () => {
+    let produced = 0
+    let finalized = false
+    let signal: AbortSignal
+    chat.mockImplementation((_request, options) => {
+      signal = options.signal
+      return (async function* () {
+        try {
+          for (let i = 0; i < 100; i++) {
+            produced++
+            yield { type: 'delta', text: 'reply' }
+          }
+        } finally {
+          finalized = true
+        }
+      })()
+    })
+    const response = await POST(request())
+    const reader = response.body!.getReader()
+    expect((await reader.read()).done).toBe(false)
+    await Promise.resolve()
+    expect(produced).toBeLessThanOrEqual(2)
+    await reader.cancel()
+    expect(signal!.aborted).toBe(true)
+    expect(finalized).toBe(true)
+  })
+
+  it('aborts a pending provider read on cancellation without writing to a closed stream', async () => {
+    let finalized = false
+    let markWaiting: () => void
+    const waiting = new Promise<void>((resolve) => {
+      markWaiting = resolve
+    })
+    chat.mockImplementation((_request, { signal }) =>
+      (async function* () {
+        try {
+          yield { type: 'delta', text: 'partial' }
+          markWaiting()
+          await new Promise<void>((_resolve, reject) => {
+            signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+          })
+        } finally {
+          finalized = true
+        }
+      })(),
+    )
+    const response = await POST(request())
+    const reader = response.body!.getReader()
+    await reader.read()
+    const pending = reader.read()
+    await waiting
+    await reader.cancel()
+    expect(await pending).toEqual({ done: true, value: undefined })
+    expect(finalized).toBe(true)
+  })
+
+  it('links the inbound request abort signal and safely reports iterator failures', async () => {
+    const cancellation = new AbortController()
+    let finalized = false
+    chat.mockImplementation((_request, { signal }) =>
+      (async function* () {
+        try {
+          yield { type: 'delta', text: 'partial' }
+          await new Promise<void>((_resolve, reject) => {
+            if (signal.aborted) reject(new Error('private-provider-message'))
+            else
+              signal.addEventListener(
+                'abort',
+                () => reject(new Error('private-provider-message')),
+                { once: true },
+              )
+          })
+        } finally {
+          finalized = true
+        }
+      })(),
+    )
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/ai/chat', {
+        method: 'POST',
+        body: JSON.stringify({ text: 'hello' }),
+        signal: cancellation.signal,
+      }),
+    )
+    const reader = response.body!.getReader()
+    await reader.read()
+    cancellation.abort()
+    const errorFrame = new TextDecoder().decode((await reader.read()).value)
+    expect(errorFrame).toContain('fallback')
+    expect(errorFrame).not.toContain('private-provider-message')
+    expect((await reader.read()).done).toBe(true)
+    expect(finalized).toBe(true)
+  })
+
   it('ignores a legacy body sessionKey and issues a secure session cookie', async () => {
     chat.mockReturnValueOnce(responseEvents())
     const req = new NextRequest('http://localhost:3000/api/ai/chat', {
@@ -54,6 +148,7 @@ describe('AI chat route session boundary', () => {
       expect.objectContaining({
         sessionKey: expect.not.stringMatching(/^attacker-key$/),
       }),
+      expect.objectContaining({ signal: expect.anything() }),
     )
     const cookie = response.headers.get('set-cookie') ?? ''
     expect(cookie).toMatch(/evoloop_ai_session=[^;]+/i)
@@ -74,7 +169,10 @@ describe('AI chat route session boundary', () => {
     })
 
     const response = await POST(req)
-    expect(chat).not.toHaveBeenCalledWith(expect.objectContaining({ sessionKey: id }))
+    expect(chat).not.toHaveBeenCalledWith(
+      expect.objectContaining({ sessionKey: id }),
+      expect.anything(),
+    )
     expect(response.headers.get('set-cookie')).not.toContain(`evoloop_ai_session=${id}`)
   })
 
@@ -84,7 +182,10 @@ describe('AI chat route session boundary', () => {
     const id = chat.mock.calls[0][0].sessionKey
     vi.setSystemTime(now.getTime() + 5 * 60_000)
     const second = await POST(request({ cookie: `${AI_SESSION_COOKIE}=${cookie}` }))
-    expect(chat).toHaveBeenLastCalledWith(expect.objectContaining({ sessionKey: id }))
+    expect(chat).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sessionKey: id }),
+      expect.anything(),
+    )
     expect(second.cookies.get(AI_SESSION_COOKIE)!.value).toBe(cookie)
     expect(second.headers.get('set-cookie')).toContain('Max-Age=1500')
   })

@@ -19,6 +19,7 @@ export interface ChatOptions {
   guardrails?: Guardrails
   /** 测试注入：固定 provider；默认按 env 工厂选 Mock/真实。 */
   provider?: AiProvider
+  signal?: AbortSignal
 }
 
 /** 流内异常的统一文案；`/api/ai/chat` 的兜底 catch 也用它（单一来源）。 */
@@ -52,6 +53,7 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
 
   let history: SessionMessage[]
   try {
+    opts.signal?.throwIfAborted()
     guardrails.assertRate(req.ip, req.sessionKey)
     // Fast-fail an already exhausted day. The authoritative decision is the
     // atomic reservation immediately before provider work below.
@@ -64,6 +66,7 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
 
   const requestId = crypto.randomUUID()
   let activeReservation = false
+  let providerStarted = false
 
   const reserveFor = async (system: string, messages: AiContext['messages']) => {
     const prompt = [system, ...messages.map((message) => message.content)]
@@ -75,6 +78,7 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
 
   // 护栏全过，回合已领取（claim 在 provider 调用前；失败/中止的请求同样计入一次尝试——注释见 guardrails）。
   const record: TurnContext['record'] = async (system, userText, assistantText) => {
+    opts.signal?.throwIfAborted()
     const prompt = [system, ...history.map((m) => m.content), userText].filter(Boolean).join('\n')
     if (!activeReservation) {
       await guardrails.reserveBudget(
@@ -103,16 +107,22 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
     system: string,
     messages: AiContext['messages'],
   ): AsyncGenerator<{ type: 'delta'; text: string }, string> {
+    opts.signal?.throwIfAborted()
     await reserveFor(system, messages)
+    opts.signal?.throwIfAborted()
     let assistant = ''
+    providerStarted = true
     for await (const delta of provider.stream({
       system,
       maxTokens: maxOutputTokens(),
       messages,
+      signal: opts.signal,
     })) {
+      opts.signal?.throwIfAborted()
       assistant += delta
       yield { type: 'delta', text: delta }
     }
+    opts.signal?.throwIfAborted()
     return assistant
   }
 
@@ -124,9 +134,10 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
   } finally {
     if (activeReservation) {
       try {
-        await guardrails.releaseBudget(requestId)
+        if (providerStarted) await guardrails.abandonBudget(requestId)
+        else await guardrails.releaseBudget(requestId)
       } catch {
-        console.error('[chat] budget release failed')
+        console.error('[ai/budget] finalization failed')
       }
     }
   }

@@ -1,11 +1,91 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
+import { sql } from 'drizzle-orm'
 import { createDb } from '@/db/client'
-import { aiUsage } from '@/db/schema'
+import { aiBudgetDays, aiBudgetReservations, aiUsage } from '@/db/schema'
 import { createRepository } from '@/server/search/repository'
-import { dailyTokenCap, today, underDailyBudget } from './budget'
+import { dailyTokenCap, reservationStaleMs, today, underDailyBudget } from './budget'
 
 describe('budget', () => {
+  it('accounts for completed usage above the cap and rejects conflicting settlement retries', async () => {
+    const database = createDb(':memory:')
+    const repo = createRepository(database)
+    const day = '2026-10-01'
+    await repo.reserveDailyBudget({ requestId: 'overrun', day, tokens: 80, cap: 100 })
+    const input = {
+      requestId: 'overrun',
+      cap: 100,
+      usage: { day, model: 'mock', promptTokens: 20, completionTokens: 100, sessionKey: 'test' },
+    }
+    expect(await repo.settleDailyBudget(input)).toBe(true)
+    expect(await repo.settleDailyBudget(input)).toBe(true)
+    expect(
+      await repo.settleDailyBudget({ ...input, usage: { ...input.usage, completionTokens: 1 } }),
+    ).toBe(false)
+    expect(await repo.reserveDailyBudget({ requestId: 'next', day, tokens: 1, cap: 100 })).toBe(
+      false,
+    )
+    expect(database.select().from(aiBudgetDays).all()[0]).toMatchObject({
+      reservedTokens: 0,
+      usedTokens: 120,
+    })
+    expect(await repo.dayTokenUsage(day)).toBe(120)
+    expect(database.select().from(aiUsage).all()).toHaveLength(1)
+  })
+
+  it('recovers old pending work in bounded batches without refunding uncertain costs', async () => {
+    const database = createDb(':memory:')
+    const repo = createRepository(database)
+    const day = '2026-10-01'
+    for (let i = 0; i < 5; i++)
+      await repo.reserveDailyBudget({ requestId: `old-${i}`, day, tokens: 10, cap: 100 })
+    database.update(aiBudgetReservations).set({ createdAt: 0 }).run()
+    await repo.reserveDailyBudget({ requestId: 'live', day, tokens: 10, cap: 100 })
+    expect(await repo.recoverDailyBudgetReservations(1, 2)).toBe(2)
+    expect(database.select().from(aiBudgetDays).all()[0]).toMatchObject({
+      reservedTokens: 40,
+      usedTokens: 20,
+    })
+    expect(await repo.recoverDailyBudgetReservations(1, 100)).toBe(3)
+    expect(await repo.recoverDailyBudgetReservations(1, 100)).toBe(0)
+    expect(await repo.abandonDailyBudget('old-0')).toBe(true)
+    expect(await repo.releaseDailyBudget('old-0')).toBe(false)
+    expect(await repo.reserveDailyBudget({ requestId: 'old-0', day, tokens: 10, cap: 100 })).toBe(
+      false,
+    )
+    expect(database.select().from(aiBudgetDays).all()[0]).toMatchObject({
+      reservedTokens: 10,
+      usedTokens: 50,
+    })
+    expect(await repo.dayTokenUsage(day)).toBe(50)
+    expect(database.select().from(aiUsage).all()).toHaveLength(0)
+  })
+
+  it('rolls back counters when recovery status persistence fails', async () => {
+    const database = createDb(':memory:')
+    const repo = createRepository(database)
+    await repo.reserveDailyBudget({
+      requestId: 'rollback',
+      day: '2026-10-01',
+      tokens: 80,
+      cap: 100,
+    })
+    database.run(sql`CREATE TRIGGER reject_recovery BEFORE UPDATE OF status ON ai_budget_reservations
+      WHEN NEW.status = 'abandoned' BEGIN SELECT RAISE(ABORT, 'test_recovery_failure'); END`)
+    await expect(repo.abandonDailyBudget('rollback')).rejects.toThrow()
+    expect(database.select().from(aiBudgetDays).all()[0]).toMatchObject({
+      reservedTokens: 80,
+      usedTokens: 0,
+    })
+    expect(database.select().from(aiBudgetReservations).all()[0].status).toBe('pending')
+    database.run(sql`DROP TRIGGER reject_recovery`)
+    expect(await repo.abandonDailyBudget('rollback')).toBe(true)
+  })
+
+  it('leaves at least five minutes and several provider deadlines before recovery', () => {
+    expect(reservationStaleMs()).toBeGreaterThanOrEqual(300_000)
+  })
+
   it('rejects changed retry inputs and cross-day settlement without altering the reservation', async () => {
     const repo = createRepository(createDb(':memory:'))
     const input = { requestId: 'identity', day: '2026-10-01', tokens: 80, cap: 100 }
