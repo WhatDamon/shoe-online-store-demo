@@ -15,11 +15,14 @@ function allowed(path: string, method: string): boolean {
 }
 
 async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
+  // Ignore public request IDs; the proxy owns cross-service correlation.
+  const requestId = crypto.randomUUID()
+  const responseHeaders = { 'Cache-Control': 'no-store', 'X-Request-ID': requestId }
   const path = (await ctx.params).path.join('/')
   if (!allowed(path, req.method))
     return NextResponse.json(
-      { detail: 'not_found' },
-      { status: 404, headers: { 'Cache-Control': 'no-store' } },
+      { code: 'not_found', detail: 'not_found' },
+      { status: 404, headers: responseHeaders },
     )
   const origin = req.headers.get('origin')
   // Next may normalize nextUrl to localhost internally. Use the actual request
@@ -30,8 +33,8 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }
     ((origin && origin !== requestOrigin) || req.headers.get('sec-fetch-site') === 'cross-site')
   ) {
     return NextResponse.json(
-      { detail: 'invalid_origin' },
-      { status: 403, headers: { 'Cache-Control': 'no-store' } },
+      { code: 'invalid_origin', detail: 'invalid_origin' },
+      { status: 403, headers: responseHeaders },
     )
   }
   const existing = req.cookies.get(cookieName)?.value
@@ -39,6 +42,7 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'X-Session-ID': session,
+    'X-Request-ID': requestId,
   }
   const key = req.headers.get('idempotency-key')
   if (key) headers['Idempotency-Key'] = key
@@ -60,18 +64,18 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }
       await upstream.body?.cancel()
       response = NextResponse.json(
         { code: 'backend_unavailable', detail: 'backend_unavailable' },
-        { status: upstream.status, headers: { 'Cache-Control': 'no-store' } },
+        { status: upstream.status, headers: responseHeaders },
       )
     } else {
       response = new NextResponse(await upstream.text(), {
         status: upstream.status,
-        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+        headers: { 'Content-Type': 'application/json', ...responseHeaders },
       })
     }
   } catch {
     response = NextResponse.json(
-      { detail: 'backend_unavailable' },
-      { status: 503, headers: { 'Cache-Control': 'no-store' } },
+      { code: 'backend_unavailable', detail: 'backend_unavailable' },
+      { status: 503, headers: responseHeaders },
     )
   }
   if (existing !== session)

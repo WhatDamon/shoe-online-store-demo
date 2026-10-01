@@ -1,5 +1,10 @@
 # Python commerce MVP
 
+> 2026-10-01: errors now use a safe `{code, detail}` contract with `X-Request-ID`
+> correlation. PostgreSQL integration has an opt-in isolated-schema runner and a CI
+> job; the real PostgreSQL job has not yet been executed in this local environment.
+> See [the reliability report](../docs/reliability-2026-10-01.md).
+
 > 2026-09-30: restored into the main local workspace with strict success response
 > contracts, SQLite backup fixtures and framework-independent commerce errors. See
 > [the integration report](../docs/unified-baseline-2026-09-30.md) for current verification.
@@ -26,7 +31,7 @@ Copy-Item backend/.env.example backend/.env
 cd backend
 .venv/Scripts/python.exe -m alembic upgrade head
 .venv/Scripts/python.exe -m app.seed
-.venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+.venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-access-log
 ```
 
 If using `uv` (the environment used during implementation):
@@ -92,6 +97,44 @@ cookie (Secure over HTTPS); callers cannot override it with a browser header.
 The Next proxy checks same-origin writes, uses a route allowlist, does not cache
 commerce responses and has a 20-second upstream timeout. Bind Python to loopback
 for the local MVP. No CORS middleware is needed.
+
+Business, validation, HTTP routing and unexpected application failures return
+`{code, detail}`. Validation failures use `invalid_request` without echoing input;
+unexpected failures use `internal_error` without exception text. Every response
+has `Cache-Control: no-store` and `X-Request-ID`. Next generates the ID, Python
+accepts a well-formed internal UUIDv4, and structured application logs correlate
+the same ID with method, route template, status, code and elapsed time. IDs are
+diagnostic data, never authentication or idempotency credentials.
+
+Use `--no-access-log` with Uvicorn so the ordinary access logger does not duplicate
+raw URLs/query strings. Configure any external proxy logs with the same privacy
+policy. Successful streaming/background work after response start is outside
+this JSON error boundary; commerce currently uses ordinary JSON responses.
+
+## PostgreSQL integration tests
+
+By default pytest runs SQLite and explicitly skips the PostgreSQL migration test.
+To additionally run commerce, ownership, idempotency, concurrent inventory and
+failure/response-validation rollback tests on PostgreSQL, provision a dedicated
+empty database with a name ending in `_test`, then from `backend/` run:
+
+```powershell
+$env:COMMERCE_TEST_POSTGRES_URL = 'postgresql+psycopg://postgres:postgres@127.0.0.1:5432/commerce_test'
+.venv/Scripts/python.exe -B -m pytest -q
+Remove-Item Env:COMMERCE_TEST_POSTGRES_URL
+```
+
+The example credentials are for a disposable local test service only. Tests reject
+non-PostgreSQL URLs, database names without `_test`, and user-supplied search-path
+options. Each test creates a unique `commerce_test_<UUID>` schema, applies Alembic
+and seeds it, then drops only that owned schema. The database/role is never dropped.
+The role needs schema creation privileges; URLs can retain `sslmode=verify-full`
+and trusted CA settings. Normal completion/failure runs cleanup; a killed process
+may leave a test schema for later inspection. Never point this runner at production.
+
+`.github/workflows/verify.yml` adds a PostgreSQL 16 service job using this runner.
+Its disposable service does not validate production TLS, AI budget transactions
+or real payment. A missing local server remains an explicit validation gap, not a pass.
 
 Session ownership is enforced for cart items, orders and payment requests. Quantity
 must be an integer from 1 to 99. Prices, stock and statuses sent by a client are

@@ -1,6 +1,6 @@
 # Evoloop — 3D-Printed Casual Shoes
 
-> **Current local integration (2026-09-30):** Read [HANDOVER.md](./HANDOVER.md) and the [integration report](./docs/unified-baseline-2026-09-30.md). This checkout now includes the Python commerce implementation, response contracts and the previously separate security patches. Local verification is distinct from deployment and production acceptance.
+> **Current local integration (2026-10-01):** The integrated commerce/security baseline is committed as `4177ec5`. Read [HANDOVER.md](./HANDOVER.md), the [integration report](./docs/unified-baseline-2026-09-30.md), and the [reliability update](./docs/reliability-2026-10-01.md). Safe error contracts and request tracing are implemented; PostgreSQL integration has a CI entry point but still needs an actual run. Local verification is distinct from deployment and production acceptance.
 
 **Evoloop** began as a student hackathon project and has grown into an **independent footwear
 project**. This repository is its consumer-facing storefront front-end — landing page, `/shop`

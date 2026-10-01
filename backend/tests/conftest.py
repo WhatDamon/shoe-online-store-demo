@@ -1,3 +1,4 @@
+import os
 import sqlite3
 from contextlib import closing
 from pathlib import Path
@@ -14,6 +15,7 @@ from app.dependencies import database
 from app.infrastructure.database import make_engine
 from app.main import app
 from app.seed import seed
+from tests.postgres_support import postgres_database
 
 
 @pytest.fixture(scope="session")
@@ -43,24 +45,42 @@ def snapshot_database():
     return snapshot
 
 
-@pytest.fixture
-def commerce(template, tmp_path, monkeypatch, snapshot_database):
-    # API tests use isolated DBs; worker lifecycle has dedicated tests with its own DB.
-    monkeypatch.setattr(settings, "reservation_sweeper_enabled", False)
+@pytest.fixture(
+    params=["sqlite", "postgres"] if os.getenv("COMMERCE_TEST_POSTGRES_URL") else ["sqlite"]
+)
+def commerce_engine(request, template, tmp_path, snapshot_database):
+    if request.param == "postgres":
+        with postgres_database(os.environ["COMMERCE_TEST_POSTGRES_URL"]) as engine:
+            with Session(engine) as db, db.begin():
+                seed(db)
+            yield engine
+        return
     path = tmp_path / "commerce.db"
     snapshot_database(template, path)
     engine = make_engine(f"sqlite:///{path.as_posix()}")
+    try:
+        yield engine
+    finally:
+        engine.dispose()
+
+
+@pytest.fixture
+def commerce(commerce_engine, monkeypatch):
+    # API tests use isolated DBs; worker lifecycle has dedicated tests with its own DB.
+    monkeypatch.setattr(settings, "reservation_sweeper_enabled", False)
+    engine = commerce_engine
 
     def session():
         with Session(engine) as db, db.begin():
             yield db
 
     app.dependency_overrides[database] = session
-    with TestClient(app) as client:
-        client.headers["X-Session-ID"] = str(uuid4())
-        yield client, engine
-    app.dependency_overrides.clear()
-    engine.dispose()
+    try:
+        with TestClient(app) as client:
+            client.headers["X-Session-ID"] = str(uuid4())
+            yield client, engine
+    finally:
+        app.dependency_overrides.clear()
 
 
 @pytest.fixture

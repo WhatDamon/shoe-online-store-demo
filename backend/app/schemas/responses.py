@@ -14,6 +14,11 @@ class ResponseModel(BaseModel):
     model_config = ConfigDict(strict=True, extra="ignore")
 
 
+class ErrorResponse(ResponseModel):
+    code: Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{0,63}$")]
+    detail: str
+
+
 class HealthResponse(ResponseModel):
     status: Literal["ok"]
     payment_enabled: Literal[False]

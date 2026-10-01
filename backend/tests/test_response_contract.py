@@ -1,5 +1,4 @@
 import pytest
-from fastapi.exceptions import ResponseValidationError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -63,8 +62,9 @@ def test_catalog_rejects_invalid_variant_output(commerce, monkeypatch, field, in
         return result
 
     monkeypatch.setattr(routes, "product_view", invalid_product)
-    with pytest.raises(ResponseValidationError):
-        client.get("/api/v1/catalog/products/dc-1001")
+    response = client.get("/api/v1/catalog/products/dc-1001")
+    assert response.status_code == 500
+    assert response.json()["code"] == "internal_error"
 
 
 def test_internal_catalog_fields_are_not_exposed(commerce, monkeypatch):
@@ -111,10 +111,11 @@ def test_invalid_order_response_rolls_back_checkout(commerce, variant, monkeypat
         return result
 
     monkeypatch.setattr(service, "order_view", invalid_order)
-    with pytest.raises(ResponseValidationError):
-        client.post(
-            "/api/v1/checkout/create-order", headers={"Idempotency-Key": "response-contract"}
-        )
+    response = client.post(
+        "/api/v1/checkout/create-order", headers={"Idempotency-Key": "response-contract"}
+    )
+    assert response.status_code == 500
+    assert response.json()["code"] == "internal_error"
     with Session(engine) as db:
         for model, count in before.items():
             assert db.scalar(select(func.count()).select_from(model)) == count
@@ -141,8 +142,9 @@ def test_invalid_payment_response_rolls_back_writes(commerce, variant, monkeypat
         return result
 
     monkeypatch.setattr(service.MockPaymentProvider, "create_session", invalid_payment)
-    with pytest.raises(ResponseValidationError):
-        client.post("/api/v1/payments/session", json={"order_id": order["id"]})
+    response = client.post("/api/v1/payments/session", json={"order_id": order["id"]})
+    assert response.status_code == 500
+    assert response.json()["code"] == "internal_error"
     with Session(engine) as db:
         for model in (Payment, PaymentEvent):
             assert db.scalar(select(func.count()).select_from(model)) == 0

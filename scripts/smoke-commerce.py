@@ -1,7 +1,7 @@
 """Run against the two locally started services; creates then cancels a demo order."""
 
 import argparse
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import httpx
 
@@ -15,6 +15,8 @@ def main() -> None:
         def request(method: str, path: str, **kwargs) -> dict:
             response = client.request(method, f"/api/commerce/{path}", **kwargs)
             response.raise_for_status()
+            assert UUID(response.headers["X-Request-ID"]).version == 4
+            assert response.headers["Cache-Control"] == "no-store"
             return response.json()
 
         for path in ["/", "/shop?q=Urban", "/product/dc-1001", "/cart", "/checkout"]:
@@ -55,6 +57,19 @@ def main() -> None:
                 },
             )
             assert denied_origin.status_code == 403
+            assert denied_origin.json()["code"] == "invalid_origin"
+            invalid = client.post(
+                "/api/commerce/cart/items",
+                headers={**origin, "X-Request-ID": "public-header-must-not-be-trusted"},
+                json={"variant_id": "private-invalid-input", "quantity": 0},
+            )
+            assert invalid.status_code == 422
+            assert invalid.json() == {
+                "code": "invalid_request",
+                "detail": "Request validation failed",
+            }
+            assert UUID(invalid.headers["X-Request-ID"]).version == 4
+            assert "private-invalid-input" not in invalid.text
             payment = request(
                 "POST",
                 "payments/session",
