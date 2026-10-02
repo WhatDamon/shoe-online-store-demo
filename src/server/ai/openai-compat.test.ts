@@ -78,6 +78,43 @@ describe('real SDK against an isolated loopback gateway', () => {
     }
   })
 
+  it('records provider-reported usage from the final streaming chunk', async () => {
+    const database = createDb(':memory:')
+    const guardrails = createGuardrails(createRepository(database))
+    const server = await gateway((response) => {
+      response.writeHead(200, { 'content-type': 'text/event-stream' })
+      response.end(
+        [
+          `data: ${JSON.stringify({ choices: [{ delta: { content: 'measured reply' } }] })}`,
+          `data: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 12, completion_tokens: 3, total_tokens: 15 } })}`,
+          'data: [DONE]',
+        ].join('\n\n') + '\n\n',
+      )
+    })
+    try {
+      const events = []
+      for await (const event of chat(
+        {
+          sessionKey: 'measured-usage',
+          ip: '127.0.0.1',
+          mode: 'support',
+          text: 'store policy',
+          product: null,
+        },
+        { guardrails, provider: new OpenAICompatProvider() },
+      )) {
+        events.push(event)
+      }
+      expect(events).toMatchObject([{ type: 'delta', text: 'measured reply' }, { type: 'done' }])
+      expect(database.select().from(aiUsage).all()).toMatchObject([
+        { promptTokens: 12, completionTokens: 3 },
+      ])
+    } finally {
+      guardrails.dispose()
+      await server.close()
+    }
+  })
+
   it.each(['caller cancellation', 'deadline'] as const)(
     'rejects %s after partial output and closes the transport',
     async (reason) => {

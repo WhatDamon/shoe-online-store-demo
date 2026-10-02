@@ -147,6 +147,7 @@ See [`.env.example`](.env.example) for the annotated template. Summary:
 | `AI_API_KEY` | *(empty)* | **Empty → Mock mode** (zero cost, demoable). Set to enable the real OpenAI-compatible provider. |
 | `AI_BASE_URL` | *(empty)* | OpenAI-compatible endpoint base URL (empty = official OpenAI) |
 | `AI_MODEL` | `gpt-5.6-luna` | Chat model for the real provider (2026-09: GPT-5.6 budget tier; quality-upgrade: `gpt-5.6-terra`) |
+| `AI_INCLUDE_USAGE` | `1` | Requests final streaming usage for exact settlement; set `0` only for gateways that reject `stream_options` (estimate fallback). |
 | `AI_EMBEDDING_MODEL` | `text-embedding-3-small` | Embedding model for semantic search (cached locally) |
 | `AI_MAX_TURNS` | `20` | Per-session turn cap (soft message when exceeded) |
 | `AI_MAX_OUTPUT_TOKENS` | `500` | Max output tokens per provider response |
@@ -176,9 +177,12 @@ See [`.env.example`](.env.example) for the annotated template. Summary:
 
 Each provider attempt owns one budget reservation. SDK automatic retries are disabled,
 and upstream SDK logs are suppressed so private response content cannot bypass the
-application's safe error logging. Completed usage is still a character-based estimate,
-not an exact token count or billing cap. Completed usage above the admission estimate
-is recorded even if it exceeds the configured cap; subsequent reservations are rejected.
+application's safe error logging. When the provider returns a valid final usage chunk,
+prompt and completion tokens are settled from that response. Missing or invalid usage
+falls back to the character estimate; `AI_INCLUDE_USAGE=0` selects that fallback explicitly
+for incompatible gateways. This is an accounting input, not a provider billing guarantee.
+Completed usage above the admission estimate is recorded even if it exceeds the configured cap;
+subsequent reservations are rejected. See the [usage accuracy report](./docs/ai-usage-accuracy-2026-10-02.md).
 
 Once provider work starts, failure, timeout or cancellation marks its reservation
 `abandoned` and consumes the full reserved estimate. This can overcount unbilled failures,

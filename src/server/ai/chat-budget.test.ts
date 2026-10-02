@@ -117,6 +117,36 @@ describe('chat with atomic budgets and bounded session state', () => {
     }
   })
 
+  it('falls back to character estimates when provider usage is invalid', async () => {
+    const run = async (provider: AiProvider) => {
+      const database = createDb(':memory:')
+      const guardrails = createGuardrails(createRepository(database))
+      try {
+        for await (const event of chat(request, { guardrails, provider })) {
+          expect(['delta', 'done']).toContain(event.type)
+        }
+        return database.select().from(aiUsage).all()[0]
+      } finally {
+        guardrails.dispose()
+      }
+    }
+    const estimated = await run({
+      async *stream() {
+        yield 'estimated reply'
+      },
+    })
+    const malformed = await run({
+      async *stream() {
+        yield 'estimated reply'
+        yield { type: 'usage', usage: { promptTokens: -1, completionTokens: 3 } }
+      },
+    })
+    expect(malformed).toMatchObject({
+      promptTokens: estimated.promptTokens,
+      completionTokens: estimated.completionTokens,
+    })
+  })
+
   it('releases an unsuccessful deterministic reply that never invoked a provider', async () => {
     const database = createDb(':memory:')
     const guardrails = createGuardrails(createRepository(database))

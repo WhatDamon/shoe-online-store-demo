@@ -7,10 +7,10 @@ import { estTokens, maxOutputTokens, truncateMessage } from '@/server/guardrails
 import { today } from '@/server/guardrails/budget'
 import { createDefaultRepository } from '@/server/search/repository'
 import type { ChatEvent } from '@/domain/chat-events'
-import type { AiContext, AiProvider } from './provider'
+import type { AiContext, AiProvider, AiUsage } from './provider'
 import { aiModel, aiProvider } from './factory'
 import { modeHandlers } from './handlers'
-import type { ChatRequest, TurnContext } from './turn'
+import type { ChatRequest, ProviderReply, TurnContext } from './turn'
 
 export type { ChatRequest } from './turn'
 
@@ -24,6 +24,15 @@ export interface ChatOptions {
 
 /** 流内异常的统一文案；`/api/ai/chat` 的兜底 catch 也用它（单一来源）。 */
 export const FALLBACK_ERROR_TEXT = 'Something went wrong — please try again.'
+
+const validUsage = (usage: AiUsage | undefined): AiUsage | undefined =>
+  usage &&
+  Number.isSafeInteger(usage.promptTokens) &&
+  usage.promptTokens >= 0 &&
+  Number.isSafeInteger(usage.completionTokens) &&
+  usage.completionTokens >= 0
+    ? usage
+    : undefined
 
 let shared: Guardrails | null = null
 const sharedGuardrails = (): Guardrails => (shared ??= createGuardrails(createDefaultRepository()))
@@ -77,7 +86,7 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
   }
 
   // 护栏全过，回合已领取（claim 在 provider 调用前；失败/中止的请求同样计入一次尝试——注释见 guardrails）。
-  const record: TurnContext['record'] = async (system, userText, assistantText) => {
+  const record: TurnContext['record'] = async (system, userText, assistantText, usage) => {
     opts.signal?.throwIfAborted()
     const prompt = [system, ...history.map((m) => m.content), userText].filter(Boolean).join('\n')
     if (!activeReservation) {
@@ -88,11 +97,12 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
       )
       activeReservation = true
     }
+    const measured = validUsage(usage)
     await guardrails.settleBudget(requestId, {
       day: budgetDay,
       model,
-      promptTokens: estTokens(prompt),
-      completionTokens: estTokens(assistantText),
+      promptTokens: measured?.promptTokens ?? estTokens(prompt),
+      completionTokens: measured?.completionTokens ?? estTokens(assistantText),
       sessionKey: req.sessionKey,
     })
     activeReservation = false
@@ -106,24 +116,30 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
   async function* stream(
     system: string,
     messages: AiContext['messages'],
-  ): AsyncGenerator<{ type: 'delta'; text: string }, string> {
+  ): AsyncGenerator<{ type: 'delta'; text: string }, ProviderReply> {
     opts.signal?.throwIfAborted()
     await reserveFor(system, messages)
     opts.signal?.throwIfAborted()
     let assistant = ''
+    let usage: AiUsage | undefined
     providerStarted = true
-    for await (const delta of provider.stream({
+    for await (const chunk of provider.stream({
       system,
       maxTokens: maxOutputTokens(),
       messages,
       signal: opts.signal,
     })) {
       opts.signal?.throwIfAborted()
-      assistant += delta
-      yield { type: 'delta', text: delta }
+      if (typeof chunk === 'string') {
+        assistant += chunk
+        yield { type: 'delta', text: chunk }
+      } else if (chunk.type === 'usage') {
+        const measured = validUsage(chunk.usage)
+        if (measured) usage = measured
+      }
     }
     opts.signal?.throwIfAborted()
-    return assistant
+    return { text: assistant, usage }
   }
 
   try {

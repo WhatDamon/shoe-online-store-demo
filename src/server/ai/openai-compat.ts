@@ -1,8 +1,8 @@
 // 真实流式客户端（AI_API_KEY + AI_BASE_URL/AI_MODEL 可配；OpenAI 兼容网关）。
 // OpenAI client 每次调用惰性构造：既避免无 key 模块加载即抛错，也让 env 变更（测试 stub/部署重启）生效。
 import OpenAI from 'openai'
-import { envInt, envStr } from '@/config'
-import type { AiContext, AiProvider } from './provider'
+import { envFlag, envInt, envStr } from '@/config'
+import type { AiContext, AiProvider, AiUsage } from './provider'
 
 // 单一事实源：真实 provider 的缺省模型（chat 记账与流式调用共用，见 factory.ts aiModel()）。
 // 2026-09 调研后更新：gpt-4o-mini 已属旧档（ChatGPT 端 2026-02 退役，API 侧亦在官方迁移清单）。
@@ -15,7 +15,9 @@ export const DEFAULT_AI_MODEL = 'gpt-5.6-luna'
 export const aiModelName = (): string => envStr('AI_MODEL', DEFAULT_AI_MODEL)
 
 export class OpenAICompatProvider implements AiProvider {
-  async *stream(ctx: AiContext & { system: string; maxTokens: number }): AsyncGenerator<string> {
+  async *stream(
+    ctx: AiContext & { system: string; maxTokens: number },
+  ): AsyncGenerator<string | { type: 'usage'; usage: AiUsage }> {
     const client = new OpenAI({
       apiKey: envStr('AI_API_KEY'),
       baseURL: envStr('AI_BASE_URL') || undefined,
@@ -33,15 +35,30 @@ export class OpenAICompatProvider implements AiProvider {
         max_tokens: ctx.maxTokens,
         messages: [{ role: 'system', content: ctx.system }, ...ctx.messages],
         stream: true,
+        ...(envFlag('AI_INCLUDE_USAGE', true) ? { stream_options: { include_usage: true } } : {}),
       },
       { signal },
     )
+    let usage: AiUsage | undefined
     for await (const chunk of stream) {
       signal.throwIfAborted()
+      if (chunk.usage) {
+        const promptTokens = chunk.usage.prompt_tokens
+        const completionTokens = chunk.usage.completion_tokens
+        if (
+          Number.isSafeInteger(promptTokens) &&
+          promptTokens >= 0 &&
+          Number.isSafeInteger(completionTokens) &&
+          completionTokens >= 0
+        ) {
+          usage = { promptTokens, completionTokens }
+        }
+      }
       const delta = chunk.choices[0]?.delta?.content ?? ''
       if (delta) yield delta
     }
     // The SDK can finish its iterator silently after transport cancellation.
     signal.throwIfAborted()
+    if (usage) yield { type: 'usage', usage }
   }
 }

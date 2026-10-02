@@ -45,7 +45,7 @@ function makeTurn(over: Partial<ChatRequest> = {}, reply = 'ok'): Turn {
       systems.push(system)
       sent.push(messages)
       yield { type: 'delta', text: reply }
-      return reply
+      return { text: reply }
     },
     async record(system, userText, assistantText) {
       recorded.push({ system, userText, assistantText })
