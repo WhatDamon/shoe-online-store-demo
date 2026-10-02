@@ -119,9 +119,14 @@ jobs:
           docker exec "$TEST_POSTGRES_CONTAINER" psql -U postgres -d commerce_test -c "ALTER SYSTEM SET ssl_cert_file = '/tmp/server.crt'"
           docker exec "$TEST_POSTGRES_CONTAINER" psql -U postgres -d commerce_test -c "ALTER SYSTEM SET ssl_key_file = '/tmp/server.key'"
           docker exec "$TEST_POSTGRES_CONTAINER" psql -U postgres -d commerce_test -c "ALTER SYSTEM SET ssl = 'on'"
-          docker exec "$TEST_POSTGRES_CONTAINER" psql -U postgres -d commerce_test -c "SELECT pg_reload_conf()"
+          # ssl_cert_file and ssl_key_file are read at server start. A reload
+          # alone can leave the service using its original certificate.
+          docker exec --user postgres "$TEST_POSTGRES_CONTAINER" pg_ctl -D /var/lib/postgresql/data restart -m fast
           for attempt in {1..20}; do
-            if [ "$(docker exec "$TEST_POSTGRES_CONTAINER" psql -U postgres -d commerce_test -Atc 'SHOW ssl')" = on ]; then
+            if [ "$(docker exec "$TEST_POSTGRES_CONTAINER" pg_isready -U postgres -d commerce_test >/dev/null 2>&1; echo $?)" = 0 ] && \
+              [ "$(docker exec "$TEST_POSTGRES_CONTAINER" psql -U postgres -d commerce_test -Atc 'SHOW ssl' | tr -d '\r')" = on ] && \
+              [ "$(docker exec "$TEST_POSTGRES_CONTAINER" psql -U postgres -d commerce_test -Atc 'SHOW ssl_cert_file' | tr -d '\r')" = /tmp/server.crt ] && \
+              [ "$(docker exec "$TEST_POSTGRES_CONTAINER" psql -U postgres -d commerce_test -Atc 'SHOW ssl_key_file' | tr -d '\r')" = /tmp/server.key ]; then
               exit 0
             fi
             sleep 0.2

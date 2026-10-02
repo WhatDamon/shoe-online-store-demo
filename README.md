@@ -1,5 +1,7 @@
 # Evoloop — 3D-Printed Casual Shoes
 
+> **目录与 CI 更新（2026-10-02）：** 新增只读 `check:catalog` 门禁，比较 TypeScript 展示快照与 Python commerce 导入快照的稳定商品/变体键、价格、颜色、尺码和无尺码款；不会写入交易数据库。PostgreSQL TLS CI 在切换临时证书后执行完整服务重启，并确认 `ssl_cert_file`、`ssl_key_file` 已生效。当前结果与限制见 [目录漂移报告](./docs/catalog-drift-2026-10-02.md)。
+
 > **Current local integration (2026-10-01):** Commerce/security baseline `4177ec5`, error contracts/tracing `847e32e`, and actual PostgreSQL/TLS acceptance `128a762` are committed locally. AI now conservatively accounts for interrupted provider calls, recovers stale reservations and propagates stream cancellation. Read [HANDOVER.md](./HANDOVER.md), the [integration report](./docs/unified-baseline-2026-09-30.md), the [reliability update](./docs/reliability-2026-10-01.md), the [PostgreSQL acceptance report](./docs/postgres-acceptance-2026-10-01.md) and the [budget recovery report](./docs/ai-budget-recovery-2026-10-01.md). Local results do not establish deployment or remote CI success.
 
 **Evoloop** began as a student hackathon project and has grown into an **independent footwear
@@ -109,13 +111,14 @@ tests); the reserved Shopify adapter takes priority only with `SHOPIFY_ENABLED=t
 | `npm run start` | Serve the production build (Node runtime). |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run check:boundary` | Guards that `'use client'` modules carry no runtime `@/server/**` import. |
-| `npm run check:coupling` | Checks runtime import cycles, domain independence and guardrails' budget port. |
+| `npm run check:coupling` | Checks runtime import cycles, transitive client/domain boundaries and guardrails' budget port. |
+| `npm run check:catalog` | Read-only comparison of display/commerce snapshots and stable variant keys; set `CATALOG_DRIFT_DATABASE` for an optional local runtime DB check. |
 | `npm run lint` | ESLint over the repo |
 | `npm run test` | Vitest unit and integration tests on Node; see the dated integration report for actual counts. |
-| `npm run verify` | One-shot acceptance gate: `format:check` + `typecheck` + `check:boundary` + `lint` + `test`. |
+| `npm run verify` | One-shot acceptance gate: formatting, typecheck, boundaries, coupling, catalog drift, lint and tests. |
 | `npm run test:watch` | Vitest watch mode |
 
-The acceptance gate is **format:check + typecheck + check:boundary + check:coupling + lint + test** (`npm run verify`),
+The acceptance gate is **format:check + typecheck + check:boundary + check:coupling + check:catalog + lint + test** (`npm run verify`),
 with **`npm run build`** run separately. CI is configured for Node 22 / 24 and Python 3.12;
 local results do not establish the current remote CI or deployment state.
 

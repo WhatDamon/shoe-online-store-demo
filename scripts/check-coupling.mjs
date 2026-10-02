@@ -73,6 +73,54 @@ function visit(file, stack = []) {
 }
 for (const file of graph.keys()) visit(file)
 
+// Direct import checks catch accidental boundaries at the point of change,
+// while this reachability check protects entry points when an intermediate
+// module later starts importing a server-only implementation.
+function findReachableViolations(rootFile, forbidden, label) {
+  const seen = new Set()
+  const violationsForRoot = []
+  function walk(file, stack) {
+    if (seen.has(file)) return
+    seen.add(file)
+    if (stack.length > 1 && forbidden.test(file)) {
+      violationsForRoot.push(`${label}: ${stack.join(' -> ')}`)
+      return
+    }
+    for (const target of graph.get(file) || []) walk(target, [...stack, target])
+  }
+  walk(rootFile, [rootFile])
+  return violationsForRoot
+}
+
+for (const file of graph.keys()) {
+  const source = ts.createSourceFile(
+    file,
+    readFileSync(path.join(root, file), 'utf8'),
+    ts.ScriptTarget.Latest,
+    true,
+  )
+  const first = source.statements[0]
+  if (
+    first &&
+    ts.isExpressionStatement(first) &&
+    ts.isStringLiteral(first.expression) &&
+    first.expression.text === 'use client'
+  ) {
+    violations.push(
+      ...findReachableViolations(file, /^src\/(server|db)\//, 'Client boundary violation'),
+    )
+  }
+  if (file.startsWith('src/domain/')) {
+    violations.push(
+      ...findReachableViolations(
+        file,
+        /^src\/(server|db|app|components)\//,
+        'Domain boundary violation',
+      ),
+    )
+  }
+}
+
 if (violations.length) {
   for (const violation of violations) console.error(violation)
   process.exit(1)

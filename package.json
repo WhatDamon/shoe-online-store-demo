@@ -13,12 +13,13 @@
     "typecheck": "tsc --noEmit",
     "check:boundary": "node scripts/check-server-boundary.mjs",
     "check:coupling": "node scripts/check-coupling.mjs",
+    "check:catalog": "node scripts/check-catalog-drift.mjs",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "verify": "npm run format:check && npm run typecheck && npm run check:boundary && npm run check:coupling && npm run lint && npm run test"
+    "verify": "npm run format:check && npm run typecheck && npm run check:boundary && npm run check:coupling && npm run check:catalog && npm run lint && npm run test"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
