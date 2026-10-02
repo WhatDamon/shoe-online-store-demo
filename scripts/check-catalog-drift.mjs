@@ -45,6 +45,35 @@ const differences = []
 const displayById = new Map(seedProducts.map((product) => [product.id, product]))
 const commerceById = new Map(commerceProducts.map((product) => [product.id, product]))
 
+function snapshotOf(products) {
+  return {
+    products: products
+      .map((product) => ({
+        id: product.id,
+        handle: product.handle,
+        title: product.title,
+        price: product.price,
+        sizes: product.sizes ?? [],
+        colors: product.colors ?? [],
+      }))
+      .sort((a, b) => a.id.localeCompare(b.id)),
+    variants: [...variants(products).entries()].sort(([a], [b]) => a.localeCompare(b)),
+  }
+}
+
+function snapshotVersion(products) {
+  return createHash('sha256')
+    .update(JSON.stringify(snapshotOf(products)))
+    .digest('hex')
+    .slice(0, 16)
+}
+
+const displayVersion = snapshotVersion(seedProducts)
+const commerceVersion = snapshotVersion(commerceProducts)
+if (displayVersion !== commerceVersion) {
+  differences.push(`catalog snapshot version: ${displayVersion} != ${commerceVersion}`)
+}
+
 for (const id of displayById.keys()) {
   if (!commerceById.has(id)) differences.push(`missing commerce product: ${id}`)
 }
@@ -182,6 +211,8 @@ if (process.env.CATALOG_DRIFT_DATABASE) {
 console.log(
   `Catalog drift check: ${seedProducts.length} display / ${commerceProducts.length} commerce products`,
 )
+console.log(`Display snapshot version: ${displayVersion}`)
+console.log(`Commerce snapshot version: ${commerceVersion}`)
 console.log(`Stable variant mapping: ${displayVariants.size} keys (UUIDv5)`)
 if (unsellable.length) {
   console.log(`No sellable size variants: ${unsellable.map((product) => product.id).join(', ')}`)
