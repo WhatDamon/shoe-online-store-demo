@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { once } from 'node:events'
-import { createServer, type ServerResponse } from 'node:http'
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { AddressInfo, Socket } from 'node:net'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { OpenAICompatProvider } from './openai-compat'
@@ -16,12 +16,12 @@ beforeEach(() => {
 })
 afterEach(() => vi.unstubAllEnvs())
 
-async function gateway(handler: (response: ServerResponse) => void) {
+async function gateway(handler: (response: ServerResponse, request: IncomingMessage) => void) {
   let requests = 0
   const sockets = new Set<Socket>()
-  const server = createServer((_request, response) => {
+  const server = createServer((request, response) => {
     requests++
-    handler(response)
+    handler(response, request)
   })
   server.on('connection', (socket) => {
     sockets.add(socket)
@@ -111,6 +111,34 @@ describe('real SDK against an isolated loopback gateway', () => {
       ])
     } finally {
       guardrails.dispose()
+      await server.close()
+    }
+  })
+
+  it('can omit the usage extension for incompatible gateways', async () => {
+    vi.stubEnv('AI_INCLUDE_USAGE', '0')
+    let requestBody: Record<string, unknown> | undefined
+    const server = await gateway((response, request) => {
+      const chunks: Buffer[] = []
+      request.on('data', (chunk: Buffer) => chunks.push(chunk))
+      request.on('end', () => {
+        requestBody = JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>
+        response.writeHead(200, { 'content-type': 'text/event-stream' })
+        response.end(
+          `data: ${JSON.stringify({ choices: [{ delta: { content: 'fallback' } }] })}\n\ndata: [DONE]\n\n`,
+        )
+      })
+    })
+    try {
+      const stream = new OpenAICompatProvider().stream({
+        messages: [],
+        system: 'test',
+        maxTokens: 10,
+      })
+      expect((await stream.next()).value).toBe('fallback')
+      await stream.return(undefined)
+      expect(requestBody?.stream_options).toBeUndefined()
+    } finally {
       await server.close()
     }
   })
