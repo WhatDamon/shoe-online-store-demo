@@ -1,5 +1,7 @@
 # 新 Agent 工作交接 — Evoloop
 
+> **远端 CI 提交链核对：2026-10-02。** GitHub Actions 最新远端 SHA `cf40bc2`（其父提交 `14f0f75`）仍基于 `dd76ad8`，两个 Node 矩阵均在 TypeScript 阶段找不到 `@/components/shop/commerce-panel`；后续本地 `4177ec5` 已补齐组件，当前 HEAD 的 `npm run verify` 与 `npm run build` 已通过。此次本地合并保留远端 cleanup 删除的构建产物和数据库文件，不 push、不部署。远端失败不是 Node 22/24 测试行为差异，而是 CI checkout 的提交没有包含后续源码提交。
+
 > **AI 用量精度与 embedding 预算更新：2026-10-02。** 真实 OpenAI-compatible 流默认请求最终 usage chunk，并在结算前校验非负安全整数；缺失/非法 usage 或 `AI_INCLUDE_USAGE=0` 时回退字符估算，不自动重试。检索的能力探测、查询和商品批量 embedding 现在各自通过原子预算 reservation，成功按输入字符估算结算；普通网络/网关失败保守记账后降级关键词，预算拒绝会阻断 provider 调用。新增回归覆盖精确写入、估算回退和 embedding reservation，详见 [AI 用量精度报告](./docs/ai-usage-accuracy-2026-10-02.md) 与 [embedding 预算边界报告](./docs/ai-embedding-budget-2026-10-02.md)。多实例共享护栏和正式网关兼容性仍需独立验收。
 
 > **目录漂移与 CI 更新：2026-10-02。** 新增只读 `npm run check:catalog`，比较 TypeScript 展示快照与 Python commerce 导入快照的稳定商品/变体键、价格、颜色、尺码和无尺码款；本次 29 款、968 个变体键一致，规范化展示/交易快照版本均为 `109c32e3464f7e96`，`evo-05` 明确无可售尺码。检查不读取或修改运行时库存、预占和订单。PostgreSQL TLS CI 在写入测试证书后完整重启服务，并验证证书路径和 `ssl=on`，不再只依赖 reload。证据见 [目录漂移报告](./docs/catalog-drift-2026-10-02.md)。
