@@ -175,7 +175,7 @@ See [`.env.example`](.env.example) for the annotated template. Summary:
 3. Restart. Guardrails (rate limit, turn cap, daily budget) apply to real and Mock alike.
    `AI_DISABLE_REAL=1` is the one-switch rollback to Mock.
 
-Each provider attempt owns one budget reservation. SDK automatic retries are disabled,
+Each provider attempt and each embedding network call owns a separate budget reservation. SDK automatic retries are disabled,
 and upstream SDK logs are suppressed so private response content cannot bypass the
 application's safe error logging. When the provider returns a valid final usage chunk,
 prompt and completion tokens are settled from that response. Missing or invalid usage
