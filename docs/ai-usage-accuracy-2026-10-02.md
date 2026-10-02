@@ -15,4 +15,4 @@
 
 ## 限制
 
-精确 usage 依赖网关实现 OpenAI streaming usage 扩展；不兼容网关应设置 `AI_INCLUDE_USAGE=0`，并接受估算账本。embedding 调用仍不纳入聊天预算，护栏和 Session 仍是单实例有界状态。`ai_usage` 是成本估算/核对记录，不是第三方账单证明。
+精确 usage 依赖网关实现 OpenAI streaming usage 扩展；不兼容网关应设置 `AI_INCLUDE_USAGE=0`，并接受估算账本。embedding 调用现在通过独立 reservation 纳入日预算，但仍使用输入字符估算；护栏和 Session 仍是单实例有界状态。`ai_usage` 是成本估算/核对记录，不是第三方账单证明。详见 [embedding 预算边界报告](./ai-embedding-budget-2026-10-02.md)。

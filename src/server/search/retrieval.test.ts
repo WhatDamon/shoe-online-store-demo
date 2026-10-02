@@ -72,6 +72,13 @@ describe('retrieve', () => {
     expect(await retrieve('zzzqwertyplokmnb', depsOf(makeRepo()))).toEqual([])
   })
 
+  it('预算拒绝不会被吞掉为关键词降级', async () => {
+    mockEmbeddingsAvailable.mockResolvedValue(true)
+    mockEmbed.mockRejectedValue(Object.assign(new Error('daily cap'), { code: 'budget' }))
+
+    await expect(retrieve('sneaker', depsOf(makeRepo()))).rejects.toMatchObject({ code: 'budget' })
+  })
+
   it('语义可用时懒嵌入缺失商品并缓存，余弦排序首位为查询对齐商品', async () => {
     mockEmbeddingsAvailable.mockResolvedValue(true)
     mockSemanticEmbed()

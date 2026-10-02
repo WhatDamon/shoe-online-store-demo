@@ -5,11 +5,16 @@ import { createGuardrails, GuardrailError, type Guardrails } from '@/server/guar
 import type { SessionMessage } from '@/server/guardrails/session-state'
 import { estTokens, maxOutputTokens, truncateMessage } from '@/server/guardrails/text'
 import { today } from '@/server/guardrails/budget'
+import { envStr } from '@/config'
 import { createDefaultRepository } from '@/server/search/repository'
 import type { ChatEvent } from '@/domain/chat-events'
 import type { AiContext, AiProvider, AiUsage } from './provider'
 import { aiModel, aiProvider } from './factory'
 import { modeHandlers } from './handlers'
+import {
+  retrieveProducts as retrieveCatalogProducts,
+  type EmbeddingRunner,
+} from './retrieval-gateway'
 import type { ChatRequest, ProviderReply, TurnContext } from './turn'
 
 export type { ChatRequest } from './turn'
@@ -77,6 +82,46 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
   let activeReservation = false
   let providerStarted = false
 
+  /**
+   * Retrieval can make more than one embedding request (probe, query, and a
+   * missing-product batch). Each network call gets its own reservation so it
+   * cannot spend the chat provider's reservation or bypass the daily cap.
+   */
+  const runEmbedding: EmbeddingRunner = async (texts, operation) => {
+    const tokens = Math.max(
+      1,
+      texts.reduce((total, value) => total + estTokens(value), 0),
+    )
+    const embeddingRequestId = crypto.randomUUID()
+    const embeddingModel = envStr('AI_EMBEDDING_MODEL', 'embedding')
+    await guardrails.reserveBudget(embeddingRequestId, tokens, budgetDay)
+    try {
+      const result = await operation()
+      if (result instanceof Response && !result.ok) {
+        await guardrails.abandonBudget(embeddingRequestId)
+      } else {
+        await guardrails.settleBudget(embeddingRequestId, {
+          day: budgetDay,
+          model: embeddingModel,
+          promptTokens: tokens,
+          completionTokens: 0,
+          sessionKey: req.sessionKey,
+        })
+      }
+      return result
+    } catch (error) {
+      try {
+        await guardrails.abandonBudget(embeddingRequestId)
+      } catch {
+        console.error('[ai/budget] embedding finalization failed')
+      }
+      throw error
+    }
+  }
+
+  const retrieveForChat = (query: string, limit?: number) =>
+    retrieveCatalogProducts(query, limit, { runEmbedding })
+
   const reserveFor = async (system: string, messages: AiContext['messages']) => {
     const prompt = [system, ...messages.map((message) => message.content)]
       .filter(Boolean)
@@ -143,7 +188,14 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
   }
 
   try {
-    yield* modeHandlers[req.mode]({ req, text, history, stream, record })
+    yield* modeHandlers[req.mode]({
+      req,
+      text,
+      history,
+      retrieveProducts: retrieveForChat,
+      stream,
+      record,
+    })
   } catch (e) {
     // provider 运行期失败 → 显式 error + UI 重试（P3：绝不静默降级到 Mock）
     yield toErrorEvent(e)

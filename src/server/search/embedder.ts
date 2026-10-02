@@ -5,9 +5,13 @@ let probe: boolean | null = null
 // 整个进程生命周期静默禁用语义检索）。401/400/404 等确定性错误才置 false。
 const retryable = (r: Response) => r.status === 429 || r.status >= 500
 
+export type EmbeddingProbeRunner = (operation: () => Promise<Response>) => Promise<Response>
+
 // 网关地址与模型名一律**调用时**读取（不做模块级快照）：模块加载时快照会让测试
 // vi.stubEnv 失效，也让部署改配置后必须重启进程才生效。
-export async function embeddingsAvailable(): Promise<boolean> {
+export async function embeddingsAvailable(
+  options: { run?: EmbeddingProbeRunner } = {},
+): Promise<boolean> {
   if (probe !== null) return probe
   const base = envStr('AI_BASE_URL')
   const model = envStr('AI_EMBEDDING_MODEL')
@@ -16,20 +20,31 @@ export async function embeddingsAvailable(): Promise<boolean> {
     return false
   }
   try {
-    const r = await fetch(`${base}/embeddings`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${envStr('AI_API_KEY')}`,
-      },
-      // encoding_format 显式声明 float：OpenAI 官方可省略（默认 float），但 ModelScope
-      // api-inference 网关强制要求该字段，缺省即 400；带上它对 OpenAI 官方无害。
-      body: JSON.stringify({ model, input: 'ping', encoding_format: 'float' }),
-      signal: AbortSignal.timeout(3_000),
-    })
+    const request = () =>
+      fetch(`${base}/embeddings`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${envStr('AI_API_KEY')}`,
+        },
+        // encoding_format 显式声明 float：OpenAI 官方可省略（默认 float），但 ModelScope
+        // api-inference 网关强制要求该字段，缺省即 400；带上它对 OpenAI 官方无害。
+        body: JSON.stringify({ model, input: 'ping', encoding_format: 'float' }),
+        signal: AbortSignal.timeout(3_000),
+      })
+    const r = await (options.run ? options.run(request) : request())
     if (r.ok) probe = true
     else if (!retryable(r)) probe = false
-  } catch {
+  } catch (error) {
+    // A budget wrapper may reject before the probe reaches the network. Do
+    // not turn that application decision into a keyword fallback.
+    if (
+      error !== null &&
+      typeof error === 'object' &&
+      'code' in error &&
+      (error as { code?: unknown }).code === 'budget'
+    )
+      throw error
     // 网络/超时：同样不固化，下次再探
   }
   return probe === true

@@ -2,6 +2,7 @@
 // 独立成模块是为了打断 chat ↔ handlers 的循环：两侧都只依赖这里，这里不依赖任何一侧。
 import type { SessionMessage } from '@/server/guardrails/session-state'
 import type { ChatEvent, Mode } from '@/domain/chat-events'
+import type { Product } from '@/domain/product'
 import type { AiContext, AiUsage } from './provider'
 
 export interface ChatRequest {
@@ -40,6 +41,7 @@ export interface TurnContext {
   /** 已裁剪的入参文本（truncateMessage 结果），handler 不再重复裁剪。 */
   text: string
   history: SessionMessage[]
+  retrieveProducts: (query: string, limit?: number) => Promise<Product[]>
   stream: StreamReplies
   record: RecordTurn
 }

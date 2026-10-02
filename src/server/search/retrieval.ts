@@ -74,6 +74,17 @@ export async function retrieve(query: string, deps: RetrievalDeps): Promise<Retr
     try {
       return await semanticRetrieve(query, deps)
     } catch (e) {
+      // The application budget wrapper uses the stable GuardrailError code
+      // without making this search layer depend on the guardrails module.
+      // Budget denial must reach chat and stop provider work; only provider
+      // or transport failures are eligible for keyword fallback.
+      if (
+        e !== null &&
+        typeof e === 'object' &&
+        'code' in e &&
+        (e as { code?: unknown }).code === 'budget'
+      )
+        throw e
       // 语义侧故障（限流/过载/瞬时）不拖垮导购：本次请求降级关键词。
       console.warn(
         '[retrieval] embeddings failed (%s) — keyword fallback for this request',

@@ -7,7 +7,6 @@ import { getProductForMarket } from '@/server/catalog/service'
 import type { AiContext } from './provider'
 import { digestLines, productContextOf, toCard } from './context'
 import { systemFor } from './prompts'
-import { retrieveProducts } from './retrieval-gateway'
 import { adviceFor } from './size-input'
 import type { ModeHandler, TurnContext } from './turn'
 
@@ -80,7 +79,7 @@ const handleSupport: ModeHandler = async function* (ctx) {
  * 拆成两个近乎相同的函数只会得到一层透传，故共用并按 req.mode 分叉。 */
 const handleCatalogModes: ModeHandler = async function* (ctx) {
   const { req, text } = ctx
-  const products = await retrieveProducts(text)
+  const products = await ctx.retrieveProducts(text)
   const digest = digestLines(products)
   // PDP 锚定（设计：FAB 打开带上当前鞋，shopping 自由提问也能针对该鞋回答）：
   // handle 可查 → 注入该鞋真实事实块（同 size-fit/outfit）；无效/未知 → 静默回退纯 digest

@@ -6,6 +6,10 @@ import { createGuardrails } from '@/server/guardrails'
 import { createRepository } from '@/server/search/repository'
 import { chat, type ChatRequest } from './chat'
 import type { AiProvider } from './provider'
+import type { EmbeddingRunner, RetrievalOptions } from './retrieval-gateway'
+
+const { mockRetrieveProducts } = vi.hoisted(() => ({ mockRetrieveProducts: vi.fn() }))
+vi.mock('./retrieval-gateway', () => ({ retrieveProducts: mockRetrieveProducts }))
 
 const request: ChatRequest = {
   sessionKey: 'budget-session',
@@ -20,6 +24,7 @@ beforeEach(() => {
   vi.stubEnv('AI_DISABLE_REAL', '1')
   vi.stubEnv('AI_DAILY_TOKEN_CAP', '1000000')
   vi.spyOn(console, 'error').mockImplementation(() => {})
+  mockRetrieveProducts.mockReset()
 })
 afterEach(() => {
   vi.unstubAllEnvs()
@@ -145,6 +150,105 @@ describe('chat with atomic budgets and bounded session state', () => {
       promptTokens: estimated.promptTokens,
       completionTokens: estimated.completionTokens,
     })
+  })
+
+  it('accounts for query and catalog embedding calls in separate budget reservations', async () => {
+    const database = createDb(':memory:')
+    const guardrails = createGuardrails(createRepository(database))
+    mockRetrieveProducts.mockImplementation(
+      async (_query: string, _limit: number | undefined, options: RetrievalOptions) => {
+        const runEmbedding = options.runEmbedding as EmbeddingRunner
+        await runEmbedding(['query text'], async () => [[1]])
+        await runEmbedding(['catalog text'], async () => [[1]])
+        return []
+      },
+    )
+    try {
+      const events = []
+      for await (const event of chat({ ...request, mode: 'shopping' }, { guardrails })) {
+        events.push(event)
+      }
+      expect(events).toEqual([
+        {
+          type: 'delta',
+          text: "I couldn't find a style that matches that yet — try different words or browse the shop.",
+        },
+        { type: 'done' },
+      ])
+      const usage = database.select().from(aiUsage).all()
+      expect(usage.filter((row) => row.model === 'embedding')).toHaveLength(2)
+      expect(usage.filter((row) => row.model === 'embedding')).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            promptTokens: 3,
+            completionTokens: 0,
+            sessionKey: request.sessionKey,
+          }),
+        ]),
+      )
+      expect(database.select().from(aiBudgetReservations).all()).toHaveLength(3)
+      expect(database.select().from(aiBudgetDays).all()[0].reservedTokens).toBe(0)
+    } finally {
+      guardrails.dispose()
+    }
+  })
+
+  it('keeps an embedding failure as abandoned cost before keyword fallback', async () => {
+    const database = createDb(':memory:')
+    const guardrails = createGuardrails(createRepository(database))
+    mockRetrieveProducts.mockImplementation(
+      async (_query: string, _limit: number | undefined, options: RetrievalOptions) => {
+        const runEmbedding = options.runEmbedding as EmbeddingRunner
+        await expect(
+          runEmbedding(['query text'], async () => {
+            throw new Error('embedding timeout')
+          }),
+        ).rejects.toThrow('embedding timeout')
+        return []
+      },
+    )
+    try {
+      for await (const event of chat({ ...request, mode: 'shopping' }, { guardrails })) {
+        expect(['delta', 'done']).toContain(event.type)
+      }
+      const reservations = database.select().from(aiBudgetReservations).all()
+      expect(reservations.some((row) => row.status === 'abandoned')).toBe(true)
+      expect(reservations.some((row) => row.status === 'settled')).toBe(true)
+      expect(
+        database
+          .select()
+          .from(aiUsage)
+          .all()
+          .some((row) => row.model === 'embedding'),
+      ).toBe(false)
+    } finally {
+      guardrails.dispose()
+    }
+  })
+
+  it('returns budget refusal when embedding admission is exhausted before provider work', async () => {
+    vi.stubEnv('AI_DAILY_TOKEN_CAP', '1')
+    const database = createDb(':memory:')
+    const guardrails = createGuardrails(createRepository(database))
+    const provider: AiProvider = { stream: vi.fn() }
+    mockRetrieveProducts.mockImplementation(
+      async (_query: string, _limit: number | undefined, options: RetrievalOptions) => {
+        const runEmbedding = options.runEmbedding as EmbeddingRunner
+        await runEmbedding(['query text'], async () => [[1]])
+        return []
+      },
+    )
+    try {
+      const events = []
+      for await (const event of chat({ ...request, mode: 'shopping' }, { guardrails, provider })) {
+        events.push(event)
+      }
+      expect(events).toHaveLength(1)
+      expect(events[0]).toMatchObject({ type: 'error', code: 'budget' })
+      expect(provider.stream).not.toHaveBeenCalled()
+    } finally {
+      guardrails.dispose()
+    }
   })
 
   it('releases an unsuccessful deterministic reply that never invoked a provider', async () => {
