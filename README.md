@@ -189,8 +189,10 @@ See [`.env.example`](.env.example) for the annotated template. Summary:
 | `SHOPIFY_DOMAIN`, `SHOPIFY_STOREFRONT_TOKEN` | *(empty)* | Reserved catalog stub; selected only with both credentials and `SHOPIFY_ENABLED=true`. It is not a working sync integration. |
 | `SHOPIFY_BUY_DOMAIN`, `SHOPIFY_BUY_TOKEN` | *(empty)* | Compatibility Buy Button credentials, independent of catalog credentials. Requires both plus `SHOPIFY_ENABLED=true`; disabled by default so PDPs use Python variants and cart. The external store was not tested in this integration. |
 
-Before a production build is started, run `npm run preflight -- -Environment production`.
-It checks the deployment boundary without printing secrets: PostgreSQL is selected,
+Before a production build is started, set `APP_ENV=production` and run
+`npm run preflight -- -Environment production`. The explicit environment value is
+required so a production build cannot silently inherit the local development mode.
+The preflight checks the deployment boundary without printing secrets: PostgreSQL is selected,
 TLS verification is enabled, the AI session secret is long enough, Python is not
 exposed as a loopback production URL, the Next → Python proxy secret is long enough,
 and the unsupported Shopify purchase path is disabled. Development defaults remain

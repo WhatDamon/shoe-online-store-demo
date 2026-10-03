@@ -2,7 +2,7 @@
 
 > **目录停售传播：2026-10-03，F:/shoe-online-store-demo，基于 `54c6fa7`。** 阶段 C 新增商品/变体 `is_active` 与 Alembic 迁移 `c73a28f06b19`；显式 `app.sync_catalog` 默认只读预览，应用必须匹配计划版本，缺失身份停用但不删除，恢复必须显式 `--restore-present`。加购、数量修改和创建订单从 Python 重读可售状态；已有购物车显示停售并允许移除，历史订单、幂等重试、取消和到期释放保持可用。同步不导入价格、不调整库存、不改订单。前端 verify/build、双数据库回归、CLI 与迁移保护证据见 [停售传播报告](./docs/catalog-availability-2026-10-03.md)。新增商品、改名迁移、自动持续同步和正式部署仍按后续独立步骤处理。
 
-> **生产配置门禁：2026-10-03。** 新增 `npm run preflight -- -Environment production`，在构建/启动前检查 PostgreSQL + TLS 验证、32 字节 AI Session 签名材料、非回环 Python 内部地址和 Shopify 默认关闭；输出不包含连接串、密钥或证书内容。Pester 回归覆盖拒绝不安全组合与接受已验证配置。该脚本是配置门禁，不证明真实证书、代理、域名或部署已上线。
+> **生产配置门禁：2026-10-03。** 新增 `npm run preflight -- -Environment production`，要求显式 `APP_ENV=production`，并在构建/启动前检查 PostgreSQL + TLS 验证、32 字节 AI Session 签名材料、非回环 Python 内部地址和 Shopify 默认关闭；输出不包含连接串、密钥或证书内容。Pester 回归覆盖缺失/错误/正确 `APP_ENV` 及其他不安全组合。该脚本是配置门禁，不证明真实证书、代理、域名或部署已上线。
 
 > **TypeScript 数据库迁移：2026-10-03。** 展示/AI 五张表已从 `src/db/client.ts` 内联 DDL 收敛为 `drizzle/sqlite` 与 `drizzle/postgres` 双方言版本化迁移。运行时仍自动应用空库迁移，初始 SQL 使用 `IF NOT EXISTS` 接管旧 DDL 创建的表并保留数据；`next.config.ts` 已把迁移 SQL 加入生产文件追踪。Python commerce 仍只使用 Alembic。实现与边界见 [ADR 0007](./docs/adr/0007-versioned-typescript-migrations.md) 和 [迁移报告](./docs/typescript-migrations-2026-10-03.md)。
 

@@ -29,6 +29,10 @@ function Is-LoopbackUrl([string] $Value) {
 }
 
 if ($Environment -eq 'production') {
+  if ($env:APP_ENV -cne 'production') {
+    Add-Failure 'APP_ENV must be explicitly set to production in production.'
+  }
+
   if ([string]::IsNullOrWhiteSpace($env:AI_SESSION_SECRET) -or
       [Text.Encoding]::UTF8.GetByteCount($env:AI_SESSION_SECRET) -lt 32) {
     Add-Failure 'AI_SESSION_SECRET must contain at least 32 bytes in production.'
