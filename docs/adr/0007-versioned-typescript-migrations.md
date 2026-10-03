@@ -15,12 +15,18 @@ TypeScript 展示/AI 数据库原先在 `src/db/client.ts` 中维护 SQLite 和 
 
 - `drizzle/sqlite`：`better-sqlite3` 运行时迁移；
 - `drizzle/postgres`：`postgres.js` 运行时迁移；
-- `src/db/client.ts`：`createDb()` 和 `ensurePgTables()` 分别调用对应 migrator；
+- `src/db/client.ts`：`createDb()` 使用 SQLite migrator；`ensurePgTables()` 使用
+  PostgreSQL 单事务 runner，并在同一连接上取得 advisory transaction lock；
 - `drizzle` 元数据表记录已应用迁移，重复打开不会重复执行。
 
 初始迁移的表、索引和唯一索引使用 `IF NOT EXISTS`，因此旧版内联 DDL 已创建的表和
 数据可以被新版本接管。基线迁移不包含删除或重建数据的语句。后续 schema 变化必须
 同时更新双方言、生成双方言迁移，并补充迁移升级/兼容测试。
+
+PostgreSQL migrator 不直接使用 Drizzle 默认实现，因为该实现会在事务外读取最后
+一个 marker；多实例同时启动时可能重复执行同一迁移。自定义 runner 在
+`pg_advisory_xact_lock` 后于同一事务内读取 marker、执行文件和写入 marker，失败时由
+数据库回滚并释放锁。真实 PostgreSQL 并发测试仍需专用 `_test` 数据库。
 
 Next.js 的 `outputFileTracingIncludes` 显式包含两个 SQL 目录，确保 standalone 或
 托管部署的服务器运行时能读取迁移文件。运行时仍自动初始化空库，开发环境不需要
@@ -36,4 +42,5 @@ Next.js 的 `outputFileTracingIncludes` 显式包含两个 SQL 目录，确保 s
 ## 证据
 
 `src/db/migrations.test.ts` 覆盖空库五表初始化、重复打开的单次应用、旧内联 DDL
-数据保留和索引接管；`npm run build` 还需检查生产 trace 是否包含两个 SQL 目录。
+数据保留和索引接管；`src/db/postgres-migrations.test.ts` 覆盖 advisory lock 顺序和
+marker 写入；`npm run build` 还需检查生产 trace 是否包含两个 SQL 目录。
