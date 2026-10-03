@@ -6,7 +6,7 @@
  * Vercel 控制台常注入空串/纯空白值（新增变量未填、复制时带空格）。裸
  * `Number(process.env.AI_DAILY_TOKEN_CAP)` 会把封顶打成 0（`Number('') === 0`），
  * 结果是每次请求都被护栏拒绝、且不留日志；`process.env.DB_DRIVER || 'sqlite'` 同款坑。
- * 因此三个 helper 一律把「缺失 / 空串 / 纯空白」视为未设置并回退默认。
+ * 因此这些 helper 一律把「缺失 / 空串 / 纯空白」视为未设置并回退默认。
  */
 
 /** 字符串 env：缺失/空串/纯空白 → fallback；命中则返回已 trim 的值。 */
@@ -24,6 +24,13 @@ export const envInt = (name: string, fallback: number): number => {
   const n = Number(raw.trim())
   return Number.isInteger(n) && n > 0 ? n : fallback
 }
+
+/** 正整数 env 的有界版本：误配置过大时回落到明确的资源上限。 */
+export const envIntMax = (name: string, fallback: number, maximum: number): number =>
+  Math.min(envInt(name, fallback), maximum)
+
+/** Provider timeout in milliseconds, bounded before it reaches AbortSignal. */
+export const aiRequestTimeoutMs = () => envIntMax('AI_REQUEST_TIMEOUT_MS', 20_000, 120_000)
 
 /** 布尔 env：'1' / 'true'（忽略大小写与首尾空白）为真；缺失/空/其它值 → fallback。 */
 export const envFlag = (name: string, fallback = false): boolean => {

@@ -1,7 +1,7 @@
 // 真实流式客户端（AI_API_KEY + AI_BASE_URL/AI_MODEL 可配；OpenAI 兼容网关）。
 // OpenAI client 每次调用惰性构造：既避免无 key 模块加载即抛错，也让 env 变更（测试 stub/部署重启）生效。
 import OpenAI from 'openai'
-import { envFlag, envInt, envStr } from '@/config'
+import { aiRequestTimeoutMs, envFlag, envStr } from '@/config'
 import type { AiContext, AiProvider, AiUsage } from './provider'
 
 // 单一事实源：真实 provider 的缺省模型（chat 记账与流式调用共用，见 factory.ts aiModel()）。
@@ -26,7 +26,7 @@ export class OpenAICompatProvider implements AiProvider {
       logLevel: 'off',
     })
     const signal = AbortSignal.any([
-      AbortSignal.timeout(envInt('AI_REQUEST_TIMEOUT_MS', 20_000)),
+      AbortSignal.timeout(aiRequestTimeoutMs()),
       ...(ctx.signal ? [ctx.signal] : []),
     ])
     const stream = await client.chat.completions.create(

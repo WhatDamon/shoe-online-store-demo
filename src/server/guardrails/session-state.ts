@@ -1,4 +1,4 @@
-import { envInt } from '@/config'
+import { envIntMax } from '@/config'
 import { createBoundedStore, validGuardrailKey } from './bounded-store'
 
 export interface SessionMessage {
@@ -7,7 +7,7 @@ export interface SessionMessage {
 }
 
 /** 每会话最大回合数（调用时读 env，见 config）。 */
-export const maxTurns = () => envInt('AI_MAX_TURNS', 20)
+export const maxTurns = () => envIntMax('AI_MAX_TURNS', 20, 100)
 export const HISTORY_TURNS = 6
 export const SESSION_TTL_MS = 30 * 60_000
 export const MAX_SESSIONS = 1_000

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { envFlag, envInt, envStr } from '@/config'
+import { envFlag, envInt, envIntMax, envStr } from '@/config'
 
 afterEach(() => vi.unstubAllEnvs())
 
@@ -32,6 +32,13 @@ describe('envStr', () => {
 describe('envInt', () => {
   it('未设置 → 回退默认', () => {
     expect(envInt('EVOLOOP_TEST_INT_UNSET', 99)).toBe(99)
+  })
+
+  it('超出明确上限时截断，避免误配置放大资源消耗', () => {
+    vi.stubEnv('EVOLOOP_TEST_INT', '999999')
+    expect(envIntMax('EVOLOOP_TEST_INT', 42, 100)).toBe(100)
+    vi.stubEnv('EVOLOOP_TEST_INT', '20')
+    expect(envIntMax('EVOLOOP_TEST_INT', 42, 100)).toBe(20)
   })
 
   it('空串/空白/非整数/非正数一律回退默认（Vercel 空串注入防线）', () => {

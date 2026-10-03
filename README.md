@@ -154,11 +154,11 @@ See [`.env.example`](.env.example) for the annotated template. Summary:
 | `AI_MODEL` | `gpt-5.6-luna` | Chat model for the real provider (2026-09: GPT-5.6 budget tier; quality-upgrade: `gpt-5.6-terra`) |
 | `AI_INCLUDE_USAGE` | `1` | Requests final streaming usage for exact settlement; set `0` only for gateways that reject `stream_options` (estimate fallback). |
 | `AI_EMBEDDING_MODEL` | `text-embedding-3-small` | Embedding model for semantic search (cached locally) |
-| `AI_MAX_TURNS` | `20` | Per-session turn cap (soft message when exceeded) |
-| `AI_MAX_OUTPUT_TOKENS` | `500` | Max output tokens per provider response |
-| `AI_REQUEST_TIMEOUT_MS` | `20000` | Provider request timeout |
-| `AI_MAX_MESSAGE_CHARS` | `800` | Max characters per incoming user message |
-| `AI_DAILY_TOKEN_CAP` | `1000000` | UTC estimated-token budget; atomic admission, completed usage settlement and conservative accounting for uncertain calls |
+| `AI_MAX_TURNS` | `20` (max `100`) | Per-session turn cap (soft message when exceeded) |
+| `AI_MAX_OUTPUT_TOKENS` | `500` (max `2000`) | Max output tokens per provider response |
+| `AI_REQUEST_TIMEOUT_MS` | `20000` (max `120000`) | Provider request timeout |
+| `AI_MAX_MESSAGE_CHARS` | `800` (max `4000`) | Max characters per incoming user message |
+| `AI_DAILY_TOKEN_CAP` | `1000000` (max `10000000`) | UTC estimated-token budget; atomic admission, completed usage settlement and conservative accounting for uncertain calls |
 | `AI_SESSION_SECRET` | *(required in production)* | Private signing secret, at least 32 bytes; missing/short configuration fails closed |
 | `TRUSTED_PROXY_IPS` | *(empty)* | Exact trusted immediate peer IPs; XFF is ignored without a verified peer |
 | `AI_DISABLE_REAL` | `0` | `1` forces Mock mode even with a key (abuse kill switch) |
