@@ -6,7 +6,7 @@
 
 ```powershell
 cd F:\\shoe-online-store-demo
-aider --no-auto-commits --read AGENTS.md --read README.md --read HANDOVER.md --read HANDOVER-CLI-PROMPT.md
+aider --no-auto-commits --read AGENTS.md --read README.md --read HANDOVER.md --message-file HANDOVER-CLI-PROMPT.md
 ```
 
 在 Aider 会话中只用 `/add` 加入本次小步需要编辑的文件；不要加入或删除用户的教学文档。使用 `/run` 或 Aider 的 PowerShell 执行能力运行验证命令，但把 Git 暂存和提交留到验证通过之后手动完成。
