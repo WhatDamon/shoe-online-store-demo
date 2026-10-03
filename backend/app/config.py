@@ -27,6 +27,9 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_proxy_secret(self) -> "Settings":
+        node_env = os.getenv("NODE_ENV", "").strip().lower()
+        if node_env == "production" and self.app_env != "production":
+            raise ValueError("APP_ENV must be production when NODE_ENV=production")
         if self.app_env == "production" and len(self.commerce_proxy_secret.encode("utf-8")) < 32:
             raise ValueError("COMMERCE_PROXY_SECRET must contain at least 32 bytes in production")
         return self

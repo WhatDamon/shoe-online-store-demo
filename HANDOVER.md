@@ -8,7 +8,7 @@
 
 > **AI 请求边界与追踪：2026-10-03。** `/api/ai/chat` 现在在创建 Session 前限制请求体 16 KiB，严格校验 mode/text/product/footMm，拒绝 malformed JSON、未知字段、超长输入和超范围脚长；无效请求返回 422，不调用 chat、不消耗预算。每个响应使用服务端 UUIDv4 `X-Request-ID`，AI 拒绝、provider 失败、预算结算和流清理日志使用安全 JSON 字段与耗时，不记录 Session、正文、Cookie、Token 或内部异常。证据见 [AI 请求边界报告](./docs/ai-request-boundary-2026-10-03.md)。
 
-> **Python 交易库 TLS 边界：2026-10-03。** `backend` 新增 `APP_ENV`；生产进程创建 SQLAlchemy 引擎前必须使用带显式主机名的 PostgreSQL URL 且明确 `sslmode=verify-full`，SQLite、无主机、缺失验证、重复模式、`require` 和 `verify-ca` 均 fail closed。开发/测试仍可使用本地 SQLite 或专用 `_test` PostgreSQL；部署必须显式设置 `APP_ENV=production`。证据见 [Python PostgreSQL TLS 边界报告](./docs/python-postgres-tls-2026-10-03.md)。
+> **Python 交易库 TLS 边界：2026-10-03。** `backend` 新增 `APP_ENV`；生产进程创建 SQLAlchemy 引擎前必须使用带显式主机名的 PostgreSQL URL 且明确 `sslmode=verify-full`，SQLite、无主机、缺失验证、重复模式、`require` 和 `verify-ca` 均 fail closed。`NODE_ENV=production` 时，`.env` 不能把 `APP_ENV` 降级为 development；开发/测试仍可使用本地 SQLite 或专用 `_test` PostgreSQL。部署必须显式设置 `APP_ENV=production`。证据见 [Python PostgreSQL TLS 边界报告](./docs/python-postgres-tls-2026-10-03.md)。
 
 > **内部代理认证：2026-10-03。** Next → Python 的服务端代理新增 `COMMERCE_PROXY_SECRET` 与 `X-Internal-Proxy-Secret`；生产要求至少 32 字节，Python `/api/v1/*` 对缺失/错误凭证在数据库操作前拒绝，客户端伪造 Header 不会被转发。开发空密钥保持本地兼容；证据见 [内部代理认证报告](./docs/commerce-proxy-auth-2026-10-03.md)。
 

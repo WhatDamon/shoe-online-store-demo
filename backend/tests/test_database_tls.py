@@ -59,3 +59,13 @@ def test_node_production_environment_defaults_to_production(monkeypatch):
         ).app_env
         == "production"
     )
+
+
+def test_node_production_cannot_be_overridden_by_development_app_env(monkeypatch):
+    monkeypatch.setenv("NODE_ENV", "production")
+    with pytest.raises(ValueError, match="APP_ENV must be production"):
+        Settings(
+            app_env="development",
+            commerce_proxy_secret="local-development-secret",
+            _env_file=None,
+        )
