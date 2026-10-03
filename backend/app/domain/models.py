@@ -11,6 +11,7 @@ from sqlalchemy import (
     Numeric,
     String,
     UniqueConstraint,
+    true,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -29,6 +30,7 @@ class Product(Base):
     handle: Mapped[str] = mapped_column(String(100), unique=True)
     title: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(String(4000))
+    is_active: Mapped[bool] = mapped_column(default=True, server_default=true())
 
 
 class Variant(Base):
@@ -45,6 +47,7 @@ class Variant(Base):
     size: Mapped[int]
     price: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     currency: Mapped[str] = mapped_column(String(3), default="USD")
+    is_active: Mapped[bool] = mapped_column(default=True, server_default=true())
 
 
 class Media(Base):

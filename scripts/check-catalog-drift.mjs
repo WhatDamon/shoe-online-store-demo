@@ -129,6 +129,7 @@ const duplicateVariantIds = [...displayVariants.entries()]
   )
   .map(([key, id]) => `${key} -> ${id}`)
 const runtimeUnavailable = []
+const runtimeRetired = []
 
 function checkRuntimeDatabase(databasePath) {
   const Database = require('better-sqlite3')
@@ -139,14 +140,16 @@ function checkRuntimeDatabase(databasePath) {
   try {
     database.pragma('query_only = ON')
     const runtimeProducts = database
-      .prepare('SELECT id, handle, title FROM products ORDER BY id')
+      .prepare('SELECT id, handle, title, is_active FROM products ORDER BY id')
       .all()
     const runtimeById = new Map(runtimeProducts.map((product) => [product.id, product]))
     for (const id of displayById.keys()) {
       if (!runtimeById.has(id)) differences.push(`missing runtime product: ${id}`)
     }
     for (const id of runtimeById.keys()) {
-      if (!displayById.has(id)) differences.push(`extra runtime product: ${id}`)
+      if (!displayById.has(id) && runtimeById.get(id).is_active)
+        differences.push(`extra active runtime product: ${id}`)
+      if (!runtimeById.get(id).is_active) runtimeRetired.push(`product ${id}`)
     }
     for (const [id, display] of displayById) {
       const runtime = runtimeById.get(id)
@@ -162,6 +165,7 @@ function checkRuntimeDatabase(databasePath) {
     const runtimeVariants = database
       .prepare(
         `SELECT p.id AS product_id, p.handle, v.id, v.color, v.size, v.price, v.currency,
+                p.is_active AS product_active, v.is_active AS variant_active,
                 i.variant_id AS inventory_variant_id, i.available
            FROM product_variants v
            JOIN products p ON p.id = v.product_id
@@ -174,8 +178,10 @@ function checkRuntimeDatabase(databasePath) {
       const key = `${variant.product_id}|${variant.handle}|${variant.color.trim().toLowerCase()}|${variant.size}`
       runtimeByKey.set(key, variant)
       const expectedId = displayVariants.get(key)
+      const retired = !variant.product_active || !variant.variant_active
+      if (retired) runtimeRetired.push(`variant ${variant.id}`)
       if (!expectedId) {
-        differences.push(`extra runtime variant: ${key}`)
+        if (!retired) differences.push(`extra active runtime variant: ${key}`)
         continue
       }
       if (variant.id !== expectedId) {
@@ -219,6 +225,9 @@ if (unsellable.length) {
 }
 if (runtimeUnavailable.length) {
   console.log(`Runtime variants with zero available stock: ${runtimeUnavailable.join(', ')}`)
+}
+if (runtimeRetired.length) {
+  console.log(`Runtime retired entries retained for history: ${runtimeRetired.length}`)
 }
 if (duplicateVariantIds.length) {
   differences.push(`duplicate stable variant IDs: ${duplicateVariantIds.slice(0, 3).join('; ')}`)

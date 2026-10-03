@@ -98,6 +98,7 @@ export function CommercePanel({
   }
 
   const view = order ?? cart
+  const hasUnavailableItems = cart?.items.some((item) => item.sellable === false) ?? false
   return (
     <section className="mx-auto max-w-3xl space-y-6 px-4 py-10">
       <h1 className="font-heading text-3xl font-semibold">
@@ -160,6 +161,11 @@ export function CommercePanel({
               {item.color} · EU {item.size}
             </p>
             <p className="text-xs text-neutral-500">{item.sku}</p>
+            {!order && item.sellable === false && (
+              <p className="text-sm text-red-700">
+                No longer available. Remove this item to continue.
+              </p>
+            )}
             <p>
               {view.currency} {item.unit_price} / pair
             </p>
@@ -172,7 +178,7 @@ export function CommercePanel({
                   aria-label={`${item.title} quantity`}
                   className="ml-2 rounded border p-2"
                   value={item.quantity}
-                  disabled={busy}
+                  disabled={busy || item.sellable === false}
                   onChange={(event) => change(item.id, Number(event.target.value))}
                 >
                   {Array.from({ length: 99 }, (_, i) => (
@@ -197,7 +203,7 @@ export function CommercePanel({
         </p>
       )}
       {view?.items.length === 0 && <p>Your cart is empty.</p>}
-      {mode === 'cart' && Boolean(cart?.items.length) && (
+      {mode === 'cart' && Boolean(cart?.items.length) && !hasUnavailableItems && (
         <Link href="/checkout" className="inline-block rounded-full bg-ink px-6 py-3 text-white">
           Review checkout
         </Link>
@@ -208,7 +214,10 @@ export function CommercePanel({
             Your total is recalculated when you place the order. This local demo does not add
             shipping or tax. Payments are not available yet.
           </p>
-          <Button disabled={busy || (!cart?.items.length && !retryPending)} onClick={createOrder}>
+          <Button
+            disabled={busy || ((!cart?.items.length || hasUnavailableItems) && !retryPending)}
+            onClick={createOrder}
+          >
             {busy ? 'Creating...' : retryPending ? 'Retry order request' : 'Create pending order'}
           </Button>
         </div>

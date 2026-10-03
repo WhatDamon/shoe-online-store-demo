@@ -3,11 +3,11 @@
 import json
 from decimal import Decimal
 from pathlib import Path
-from uuid import NAMESPACE_URL, uuid5
 
 from sqlalchemy.orm import Session
 
-from app.application.commerce import audit
+from app.application.audit import audit
+from app.domain.catalog_identity import stable_variant_id
 from app.domain.models import Inventory, Media, Product, Variant
 from app.infrastructure.database import SessionLocal
 
@@ -25,8 +25,7 @@ def seed(db: Session) -> None:
         for color in colors:
             for size in p["sizes"]:
                 # Stable import keys, never color array positions.
-                identity = f"evoloop/{p['handle']}/{color['name'].casefold()}/{size}"
-                variant_id = str(uuid5(NAMESPACE_URL, identity))
+                variant_id = stable_variant_id(p["handle"], color["name"], size)
                 db.add(
                     Variant(
                         id=variant_id,

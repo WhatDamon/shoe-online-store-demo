@@ -1,5 +1,7 @@
 # 新 Agent 工作交接 — Evoloop
 
+> **目录停售传播：2026-10-03，F:/shoe-online-store-demo，基于 `54c6fa7`。** 阶段 C 新增商品/变体 `is_active` 与 Alembic 迁移 `c73a28f06b19`；显式 `app.sync_catalog` 默认只读预览，应用必须匹配计划版本，缺失身份停用但不删除，恢复必须显式 `--restore-present`。加购、数量修改和创建订单从 Python 重读可售状态；已有购物车显示停售并允许移除，历史订单、幂等重试、取消和到期释放保持可用。同步不导入价格、不调整库存、不改订单。前端 verify/build、双数据库回归、CLI 与迁移保护证据见 [停售传播报告](./docs/catalog-availability-2026-10-03.md)。新增商品、改名迁移、自动持续同步和正式部署仍按后续独立步骤处理。
+
 > **远端 CI 提交链核对：2026-10-02。** GitHub Actions 最新远端 SHA `cf40bc2`（其父提交 `14f0f75`）仍基于 `dd76ad8`，两个 Node 矩阵均在 TypeScript 阶段找不到 `@/components/shop/commerce-panel`；后续本地 `4177ec5` 已补齐组件，当前 HEAD 的 `npm run verify` 与 `npm run build` 已通过。此次本地合并保留远端 cleanup 删除的构建产物和数据库文件，不 push、不部署。远端失败不是 Node 22/24 测试行为差异，而是 CI checkout 的提交没有包含后续源码提交。
 
 > **AI 用量精度与 embedding 预算更新：2026-10-02。** 真实 OpenAI-compatible 流默认请求最终 usage chunk，并在结算前校验非负安全整数；缺失/非法 usage 或 `AI_INCLUDE_USAGE=0` 时回退字符估算，不自动重试。检索的能力探测、查询和商品批量 embedding 现在各自通过原子预算 reservation，成功按输入字符估算结算；普通网络/网关失败保守记账后降级关键词，预算拒绝会阻断 provider 调用。新增回归覆盖精确写入、估算回退和 embedding reservation，详见 [AI 用量精度报告](./docs/ai-usage-accuracy-2026-10-02.md) 与 [embedding 预算边界报告](./docs/ai-embedding-budget-2026-10-02.md)。多实例共享护栏和正式网关兼容性仍需独立验收。

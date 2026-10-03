@@ -55,6 +55,7 @@ export function parseCommerceProduct(value: unknown): CommerceProduct {
 
 function parseLine(value: unknown): CartLine {
   const line = record(value)
+  if (line.sellable !== undefined && typeof line.sellable !== 'boolean') invalid()
   return {
     id: text(line.id),
     variant_id: text(line.variant_id),
@@ -65,6 +66,7 @@ function parseLine(value: unknown): CartLine {
     quantity: integer(line.quantity, 1, 99),
     unit_price: money(line.unit_price),
     ...(line.available === undefined ? {} : { available: integer(line.available, 0) }),
+    ...(line.sellable === undefined ? {} : { sellable: line.sellable as boolean }),
   }
 }
 

@@ -63,6 +63,7 @@ class OrderItemResponse(ResponseModel):
 class CartItemResponse(OrderItemResponse):
     subtotal: Money
     available: Stock
+    sellable: bool
 
 
 class CartResponse(ResponseModel):

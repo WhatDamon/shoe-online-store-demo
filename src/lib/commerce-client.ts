@@ -1,4 +1,5 @@
 const messages: Record<string, string> = {
+  variant_unavailable: 'This item is no longer available. Remove it from your cart to continue.',
   insufficient_stock: 'Not enough stock. Update the quantity in your cart.',
   empty_cart: 'Your cart is empty. Choose a product first.',
   order_not_found: "We couldn't find this order for the current session.",

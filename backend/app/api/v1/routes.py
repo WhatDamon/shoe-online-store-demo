@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Header, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.application.catalog import require_sellable
 from app.application.commerce import (
     MockPaymentProvider,
     cancel_order,
@@ -18,7 +19,6 @@ from app.application.errors import (
     CartItemNotFound,
     ProductNotFound,
     QuantityLimitExceeded,
-    VariantNotFound,
 )
 from app.dependencies import anonymous_session, database
 from app.domain.models import CartItem, Inventory, Media, Product, Variant
@@ -34,7 +34,7 @@ def product_view(db: Session, product: Product) -> dict:
     variants = db.execute(
         select(Variant, Inventory)
         .join(Inventory)
-        .where(Variant.product_id == product.id)
+        .where(Variant.product_id == product.id, Variant.is_active.is_(True))
         .order_by(Variant.color, Variant.size)
     ).all()
     media = db.scalars(select(Media).where(Media.product_id == product.id).order_by(Media.position))
@@ -62,12 +62,17 @@ def product_view(db: Session, product: Product) -> dict:
 
 @router.get("/catalog/products", response_model=list[ProductResponse])
 def products(db: DB) -> list[dict]:
-    return [product_view(db, p) for p in db.scalars(select(Product).order_by(Product.handle))]
+    return [
+        product_view(db, p)
+        for p in db.scalars(
+            select(Product).where(Product.is_active.is_(True)).order_by(Product.handle)
+        )
+    ]
 
 
 @router.get("/catalog/products/{handle}", response_model=ProductResponse)
 def product(handle: str, db: DB) -> dict:
-    p = db.scalar(select(Product).where(Product.handle == handle))
+    p = db.scalar(select(Product).where(Product.handle == handle, Product.is_active.is_(True)))
     if p is None:
         raise ProductNotFound()
     return product_view(db, p)
@@ -82,8 +87,7 @@ def cart(db: DB, sid: SessionID) -> dict:
 def add_item(body: AddItem, db: DB, sid: SessionID) -> dict:
     lock_cart(db, sid)
     variant_id = str(body.variant_id)
-    if db.get(Variant, variant_id) is None:
-        raise VariantNotFound()
+    require_sellable(db, variant_id)
     item = db.scalar(
         select(CartItem).where(CartItem.cart_id == sid, CartItem.variant_id == variant_id)
     )
@@ -108,7 +112,9 @@ def owned_item(db: Session, sid: str, item_id: str) -> CartItem:
 @router.patch("/cart/items/{item_id}", response_model=CartResponse)
 def patch_item(item_id: str, body: Quantity, db: DB, sid: SessionID) -> dict:
     lock_cart(db, sid)
-    owned_item(db, sid, item_id).quantity = body.quantity
+    item = owned_item(db, sid, item_id)
+    require_sellable(db, item.variant_id)
+    item.quantity = body.quantity
     db.flush()
     return cart_view(db, sid)
 

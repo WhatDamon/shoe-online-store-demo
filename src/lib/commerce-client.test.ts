@@ -62,6 +62,17 @@ it('accepts null legacy deadlines and explicitly cancelled orders', () => {
   expect(parseCommerceProduct({ variants: [variant] })).toEqual({ variants: [variant] })
 })
 
+it.each([true, false])('preserves explicit sellable=%s in cart and order responses', (sellable) => {
+  const items = [{ ...line, sellable }]
+  expect(parseCartView({ ...cart, items })).toEqual({ ...cart, items })
+  expect(parseOrderView({ ...order, items })).toEqual({ ...order, items })
+})
+
+it('accepts legacy cart and order lines without inventing a sellable field', () => {
+  expect(parseCartView(cart).items[0]).not.toHaveProperty('sellable')
+  expect(parseOrderView(order).items[0]).not.toHaveProperty('sellable')
+})
+
 const invalidCases: [string, (value: unknown) => unknown, unknown][] = [
   ['null cart', parseCartView, null],
   ['non-array items', parseCartView, { ...cart, items: {} }],
@@ -74,6 +85,11 @@ const invalidCases: [string, (value: unknown) => unknown, unknown][] = [
   ['string quantity', parseCartView, { ...cart, items: [{ ...line, quantity: '1' }] }],
   ['excess quantity', parseCartView, { ...cart, items: [{ ...line, quantity: 100 }] }],
   ['null line', parseCartView, { ...cart, items: [null] }],
+  ['string sellable', parseCartView, { ...cart, items: [{ ...line, sellable: 'false' }] }],
+  ['numeric sellable', parseCartView, { ...cart, items: [{ ...line, sellable: 0 }] }],
+  ['null sellable', parseCartView, { ...cart, items: [{ ...line, sellable: null }] }],
+  ['array sellable', parseCartView, { ...cart, items: [{ ...line, sellable: [] }] }],
+  ['object sellable', parseOrderView, { ...order, items: [{ ...line, sellable: {} }] }],
   ['invalid stock', parseCommerceProduct, { variants: [{ ...variant, available: -1 }] }],
   ['numeric price', parseCommerceProduct, { variants: [{ ...variant, price: 59 }] }],
   ['paid order', parseOrderView, { ...order, status: 'paid' }],
@@ -116,6 +132,16 @@ it.each([{ detail: 'insufficient_stock' }, { code: 'insufficient_stock', message
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, json: async () => data }))
     await expect(commerceRequest('cart', parseCartView)).rejects.toThrow(
       'Not enough stock. Update the quantity in your cart.',
+    )
+  },
+)
+
+it.each([{ detail: 'variant_unavailable' }, { code: 'variant_unavailable', message: 'secret' }])(
+  'shows a safe removal message for unavailable variants: %j',
+  async (data) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, json: async () => data }))
+    await expect(commerceRequest('checkout/preview', parseCartView)).rejects.toThrow(
+      'This item is no longer available. Remove it from your cart to continue.',
     )
   },
 )

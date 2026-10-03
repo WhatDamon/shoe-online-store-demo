@@ -1,20 +1,21 @@
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Any
 
 from sqlalchemy import delete, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
+from app.application.audit import audit
+from app.application.catalog import lock_products
 from app.application.errors import (
     EmptyCart,
     InsufficientStock,
     OrderNotFound,
+    VariantUnavailable,
 )
 from app.config import settings
 from app.domain.models import (
-    AuditLog,
     Cart,
     CartItem,
     Inventory,
@@ -26,10 +27,6 @@ from app.domain.models import (
     Reservation,
     Variant,
 )
-
-
-def audit(db: Session, entity: str, action: str, **details: Any) -> None:
-    db.add(AuditLog(entity_id=entity, action=action, details=details))
 
 
 def lock_cart(db: Session, session_id: str) -> Cart:
@@ -49,10 +46,14 @@ def cart_view(db: Session, session_id: str, *, check_stock: bool = False) -> dic
         .join(Inventory, Inventory.variant_id == Variant.id)
         .where(CartItem.cart_id == session_id)
         .order_by(Variant.id)
+        .execution_options(populate_existing=True)
     ).all()
     items = []
     total = Decimal("0.00")
     for item, variant, product, stock in rows:
+        sellable = product.is_active and variant.is_active
+        if check_stock and not sellable:
+            raise VariantUnavailable()
         if check_stock and item.quantity > stock.available:
             raise InsufficientStock()
         subtotal = variant.price * item.quantity
@@ -69,6 +70,7 @@ def cart_view(db: Session, session_id: str, *, check_stock: bool = False) -> dic
                 unit_price=str(variant.price),
                 subtotal=str(subtotal),
                 available=stock.available,
+                sellable=sellable,
             )
         )
     return dict(items=items, total=str(total), currency="USD")
@@ -116,6 +118,14 @@ def create_order(db: Session, session_id: str, key: str) -> dict:
     if existing:
         expire_if_due(db, existing)
         return order_view(db, existing)
+    lock_products(
+        db,
+        db.scalars(
+            select(Variant.product_id)
+            .join(CartItem, CartItem.variant_id == Variant.id)
+            .where(CartItem.cart_id == session_id)
+        ),
+    )
     cart = cart_view(db, session_id, check_stock=True)
     if not cart["items"]:
         raise EmptyCart()

@@ -32,6 +32,13 @@ class OrderNotFound(CommerceError):
         super().__init__("order_not_found", 404, "Order not found")
 
 
+class VariantUnavailable(CommerceError):
+    def __init__(self) -> None:
+        super().__init__(
+            "variant_unavailable", 409, "This item is no longer available for purchase"
+        )
+
+
 class EmptyCart(CommerceError):
     def __init__(self) -> None:
         super().__init__("empty_cart", 409, "Cart is empty")

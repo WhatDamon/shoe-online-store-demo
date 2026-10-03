@@ -19,6 +19,7 @@ export interface CartLine {
   quantity: number
   unit_price: string
   available?: number
+  sellable?: boolean
 }
 export interface CartView {
   items: CartLine[]

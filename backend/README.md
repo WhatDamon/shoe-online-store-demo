@@ -1,5 +1,11 @@
 # Python commerce MVP
 
+> 2026-10-03: product/variant availability now has an explicit, audited reconciliation
+> command. Cart and checkout re-read Python sale state while historical orders remain
+> readable and cancellable. SQLite/PostgreSQL tests and migration verification are
+> recorded in [the availability report](../docs/catalog-availability-2026-10-03.md).
+> Earlier statements below about local PostgreSQL execution describe their dated baseline.
+
 > 2026-10-01: errors now use a safe `{code, detail}` contract with `X-Request-ID`
 > correlation. PostgreSQL integration has an opt-in isolated-schema runner and a CI
 > job; the real PostgreSQL job has not yet been executed in this local environment.
@@ -71,6 +77,55 @@ Repeated seeding skips existing products and never resets prices or inventory.
 The snapshot was generated using `node scripts/export-commerce-catalog.mjs` at
 repository root. Regenerate intentionally; this is not automatic catalog sync.
 Supplier assets/data retain the repository's LICENSE-ASSETS restrictions.
+
+## Reviewed availability reconciliation
+
+Apply `alembic upgrade head` before starting this version: revision `c73a28f06b19`
+adds non-null `is_active` flags with a true default to products and variants. Existing
+identities, prices, inventory and order snapshots are retained.
+
+`app.sync_catalog` accepts a reviewed **full** catalog export, up to 2 MB. A partial
+export would retire omitted identities. New product/variant identities or changed
+handles are rejected; import or migrate identities explicitly before reconciliation.
+From `backend/`, preview first:
+
+```powershell
+.venv/Scripts/python.exe -m app.sync_catalog --catalog data/catalog.json
+```
+
+The command returns `source_version`, `plan_version` and all proposed changes as
+JSON. SQLite preview uses a read-only connection; PostgreSQL preview uses a read-only
+transaction. Apply the same source only after reviewing its output:
+
+```powershell
+$reviewedPlan = 'copy-the-plan_version-from-the-preview'
+.venv/Scripts/python.exe -m app.sync_catalog --catalog data/catalog.json --apply --expect-plan $reviewedPlan
+```
+
+Application locks products in stable ID order, recalculates the plan and rejects a
+changed identity set, sale state or restore mode. Missing products/variants become inactive;
+rows stay present for carts and historical orders. Only availability flags and
+`catalog_availability_changed` audit records are written in one transaction. Prices,
+stock and reservations are never copied from the export or reset. A repeat of an
+already applied old plan is rejected; a fresh no-change preview can be applied safely.
+
+A later export containing a retired item does not revive it by default, and repeated
+seed also preserves retirement. To restore reviewed identities, preview with
+`--restore-present`, then apply with that same flag and the new plan version. This
+restores sale eligibility only; existing prices and stock still decide checkout.
+
+Public commerce catalog responses omit inactive products and variants. Old cart lines
+remain visible with `sellable=false`; remove them before checkout. Adding or changing
+inactive lines, previewing checkout and creating a new order return
+`409 variant_unavailable`. Retrying a completed order's idempotency key returns its
+original order even after retirement. Reads, Mock payment, cancel and expiry keep their
+ownership checks and inventory-release rules.
+
+For rollback, use a reviewed `--restore-present` plan if restoring sales is intended.
+Migration downgrade refuses any inactive entry to prevent accidental re-enabling.
+Do not run older purchase code while inactive entries exist: older code ignores these
+flags even if the additive columns remain. Prefer a forward fix retaining the gates.
+There is no scheduled sync, price sync, product rename migration or hard deletion.
 
 ## API
 
