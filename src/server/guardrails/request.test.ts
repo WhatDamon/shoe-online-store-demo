@@ -179,4 +179,16 @@ describe('requestIp', () => {
       'untrusted',
     )
   })
+
+  it('rejects an overlong forwarded token before it becomes a limiter key', () => {
+    expect(
+      requestIp(
+        {
+          ip: '192.0.2.10',
+          headers: new Headers({ 'x-forwarded-for': `${'a'.repeat(129)}, 192.0.2.10` }),
+        },
+        { TRUSTED_PROXY_IPS: '192.0.2.10' },
+      ),
+    ).toBe('192.0.2.10')
+  })
 })

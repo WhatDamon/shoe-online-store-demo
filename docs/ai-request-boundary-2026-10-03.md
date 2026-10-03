@@ -31,6 +31,11 @@ Validated fields are bounded before session creation:
 Invalid input creates no signed session cookie, does not call `chat()`, and therefore
 does not consume a turn, rate bucket, budget reservation or provider request.
 
+When a trusted immediate proxy supplies `X-Forwarded-For`, the first forwarded token is
+limited to 128 characters before it becomes a rate-limit key. Invalid or overlong values
+fall back to the already trusted immediate peer; when no peer is available, the bounded
+`untrusted` bucket remains the fallback.
+
 ## Correlation and logging
 
 The route creates a UUIDv4 and ignores any client-supplied request ID. It returns the
@@ -53,6 +58,9 @@ keeps retry accounting unchanged.
   cancellation cleanup and existing signed-session compatibility.
 - The installed Next.js 16.3.4 Route Handler guide was read; implementation uses standard Web
   `Request.arrayBuffer()` body access and retains `dynamic = 'force-dynamic'` plus Node runtime.
+- Follow-up forwarded-token bound: `npm test -- --run src/server/guardrails/request.test.ts
+  src/server/guardrails/bounded-store.test.ts` passed 44 tests; `npm run verify` passed 581
+  tests and `npm run build` completed successfully.
 
 This is a process-local input and observability boundary. It does not provide shared
 multi-instance rate/session state, replace production proxy controls, or prove an

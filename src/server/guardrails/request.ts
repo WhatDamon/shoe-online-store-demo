@@ -6,6 +6,7 @@ export const AI_SESSION_MAX_AGE_SECONDS = 30 * 60
 
 const uuidV4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const ipToken = /^[0-9a-f:.]+$/i
+const MAX_IP_TOKEN_CHARS = 128
 const signedCookie = /^v1[.]([0-9a-f-]{36})[.]([1-9][0-9]{0,10})[.]([0-9a-f]{64})$/
 let developmentSecret: string | undefined
 
@@ -89,9 +90,15 @@ function configuredProxyIps(env: Record<string, string | undefined>): Set<string
     (env.TRUSTED_PROXY_IPS ?? '')
       .split(',')
       .map((value) => value.trim().toLowerCase())
-      .filter((value) => value !== '' && ipToken.test(value)),
+      .filter((value) => value !== '' && value.length <= MAX_IP_TOKEN_CHARS && ipToken.test(value)),
   )
 }
+
+const isIpToken = (value: string | undefined): value is string =>
+  value !== undefined &&
+  value.length > 0 &&
+  value.length <= MAX_IP_TOKEN_CHARS &&
+  ipToken.test(value)
 
 /**
  * Resolve a request IP without trusting a browser-supplied forwarding header.
@@ -108,9 +115,9 @@ export function requestIp(
   if (peer && trustedPeers.has(peer)) {
     const forwarded = request.headers.get('x-forwarded-for')
     const first = forwarded?.split(',')[0]?.trim().toLowerCase()
-    if (first && ipToken.test(first)) return first
+    if (isIpToken(first)) return first
   }
   // A direct peer is a useful limiter key. If the runtime hides it, use one
   // bounded anonymous bucket rather than accepting an attacker-controlled key.
-  return peer && ipToken.test(peer) ? peer : 'untrusted'
+  return isIpToken(peer) ? peer : 'untrusted'
 }

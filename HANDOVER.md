@@ -6,7 +6,7 @@
 
 > **TypeScript 数据库迁移：2026-10-03。** 展示/AI 五张表已从 `src/db/client.ts` 内联 DDL 收敛为 `drizzle/sqlite` 与 `drizzle/postgres` 双方言版本化迁移。运行时仍自动应用空库迁移，初始 SQL 使用 `IF NOT EXISTS` 接管旧 DDL 创建的表并保留数据；`next.config.ts` 已把迁移 SQL 加入生产文件追踪。Python commerce 仍只使用 Alembic。实现与边界见 [ADR 0007](./docs/adr/0007-versioned-typescript-migrations.md) 和 [迁移报告](./docs/typescript-migrations-2026-10-03.md)。
 
-> **AI 请求边界与追踪：2026-10-03。** `/api/ai/chat` 现在在创建 Session 前限制请求体 16 KiB，严格校验 mode/text/product/footMm，拒绝 malformed JSON、未知字段、超长输入和超范围脚长；无效请求返回 422，不调用 chat、不消耗预算。每个响应使用服务端 UUIDv4 `X-Request-ID`，AI 拒绝、provider 失败、预算结算和流清理日志使用安全 JSON 字段与耗时，不记录 Session、正文、Cookie、Token 或内部异常。证据见 [AI 请求边界报告](./docs/ai-request-boundary-2026-10-03.md)。
+> **AI 请求边界与追踪：2026-10-03。** `/api/ai/chat` 现在在创建 Session 前限制请求体 16 KiB，严格校验 mode/text/product/footMm，拒绝 malformed JSON、未知字段、超长输入和超范围脚长；无效请求返回 422，不调用 chat、不消耗预算。每个响应使用服务端 UUIDv4 `X-Request-ID`，可信代理转发 IP 进入限流前限制为 128 字符，非法或超长值回退到可信直接 peer；没有可用 peer 时使用有界 `untrusted` 桶。AI 拒绝、provider 失败、预算结算和流清理日志使用安全 JSON 字段与耗时，不记录 Session、正文、Cookie、Token 或内部异常。证据见 [AI 请求边界报告](./docs/ai-request-boundary-2026-10-03.md)。
 
 > **Python 交易库 TLS 边界：2026-10-03。** `backend` 新增 `APP_ENV`；生产进程创建 SQLAlchemy 引擎前必须使用带显式主机名的 PostgreSQL URL 且明确 `sslmode=verify-full`，SQLite、无主机、缺失验证、重复模式、`require` 和 `verify-ca` 均 fail closed。`NODE_ENV=production` 时，`.env` 不能把 `APP_ENV` 降级为 development；开发/测试仍可使用本地 SQLite 或专用 `_test` PostgreSQL。部署必须显式设置 `APP_ENV=production`。证据见 [Python PostgreSQL TLS 边界报告](./docs/python-postgres-tls-2026-10-03.md)。
 
@@ -462,10 +462,10 @@ backend/.venv/Scripts/python.exe scripts/smoke-commerce.py
 
 ### 7.4 历史测试结果与本轮证据分开
 
-| 项目 | 旧交接/报告记载 | 本轮文档任务 |
+| 项目 | 旧交接/报告记载 | 本轮证据 |
 | --- | --- | --- |
-| Python pytest | 阶段 C 最近基线：103 passed、1 skipped | 本轮未重跑；本次没有修改 Python commerce |
-| TS verify | 阶段 C 旧基线：67 文件 / 427 项 | 本轮通过：78 文件、580 passed、15 skipped |
+| Python pytest | 阶段 C 最近基线：104 passed、1 skipped | 上一小步已重跑；本轮只改 TypeScript 限流输入边界 |
+| TS verify | 阶段 C 旧基线：67 文件 / 427 项 | 本轮通过：78 文件、581 passed、15 skipped |
 | 生产 build | 阶段 C 旧基线：成功、44 个静态页面 | 本轮通过：Next 16.3.4，45 个静态页面生成；trace 含双方言迁移文件 |
 | Ruff/format/mypy/compileall、SQLite 迁移 | 旧交接记载通过；TS 迁移单元测试本轮通过 | 后端门禁未在本轮重跑；TS PostgreSQL 迁移需独立测试库 |
 | 双服务 smoke 与浏览器 | 早期 MVP 报告有成功闭环及库存恢复记录 | 未执行；没有启动服务或下单 |
