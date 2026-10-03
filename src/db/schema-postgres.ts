@@ -9,15 +9,19 @@ export const productEmbeddings = pgTable('product_embeddings', {
   vector: text('vector').notNull(), // JSON number[]
 })
 
-export const aiUsage = pgTable('ai_usage', {
-  id: serial('id').primaryKey(),
-  day: text('day').notNull(),
-  model: text('model').notNull(),
-  promptTokens: integer('prompt_tokens').notNull(),
-  completionTokens: integer('completion_tokens').notNull(),
-  sessionKey: text('session_key').notNull(),
-  createdAt: bigint('created_at', { mode: 'number' }).notNull(), // sqlite INTEGER(64) 等价
-})
+export const aiUsage = pgTable(
+  'ai_usage',
+  {
+    id: serial('id').primaryKey(),
+    day: text('day').notNull(),
+    model: text('model').notNull(),
+    promptTokens: integer('prompt_tokens').notNull(),
+    completionTokens: integer('completion_tokens').notNull(),
+    sessionKey: text('session_key').notNull(),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull(), // sqlite INTEGER(64) 等价
+  },
+  (table) => [index('idx_ai_usage_day').on(table.day)],
+)
 export const aiBudgetDays = pgTable('ai_budget_days', {
   day: text('day').primaryKey(),
   reservedTokens: integer('reserved_tokens').notNull().default(0),
@@ -34,6 +38,7 @@ export const aiBudgetReservations = pgTable(
     createdAt: bigint('created_at', { mode: 'number' }).notNull(),
   },
   (table) => [
+    index('idx_ai_budget_reservations_day').on(table.day),
     index('idx_ai_budget_reservations_recovery').on(table.status, table.createdAt, table.requestId),
   ],
 )

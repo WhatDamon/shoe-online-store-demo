@@ -58,10 +58,25 @@ npm run dev               # http://localhost:3000
 > both drivers run on Node, Vercel-ready.
 
 The TypeScript display/AI database has five tables: `products`, `product_embeddings`,
-`ai_usage`, `ai_budget_days` and `ai_budget_reservations`. Its existing idempotent DDL
-initializes them on either driver. The first daily reservation accounts for usage already
-in the legacy ledger. Python commerce uses a **separate database and explicit Alembic
-migrations**; application startup never creates its tables.
+`ai_usage`, `ai_budget_days` and `ai_budget_reservations`. Versioned Drizzle migrations
+under `drizzle/sqlite` and `drizzle/postgres` initialize them on either driver; the
+runtime still applies the migration automatically so local startup remains zero-setup.
+The baseline is idempotent for databases created by the former inline DDL and records
+applied versions in Drizzle's metadata table. The first daily reservation accounts for
+usage already in the legacy ledger. Python commerce uses a **separate database and
+explicit Alembic migrations**; application startup never creates its tables.
+
+To generate a new TypeScript migration after changing a schema, update both dialect
+schemas and run:
+
+```powershell
+npm run db:generate:sqlite
+npm run db:generate:postgres
+```
+
+Do not mix these files with the Python commerce migrations. Production traces include
+the SQL directories through `next.config.ts`; no separate migration command is required
+for the local runtime bootstrap.
 
 ### Start the local commerce service
 

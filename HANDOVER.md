@@ -4,6 +4,8 @@
 
 > **生产配置门禁：2026-10-03。** 新增 `npm run preflight -- -Environment production`，在构建/启动前检查 PostgreSQL + TLS 验证、32 字节 AI Session 签名材料、非回环 Python 内部地址和 Shopify 默认关闭；输出不包含连接串、密钥或证书内容。Pester 回归覆盖拒绝不安全组合与接受已验证配置。该脚本是配置门禁，不证明真实证书、代理、域名或部署已上线。
 
+> **TypeScript 数据库迁移：2026-10-03。** 展示/AI 五张表已从 `src/db/client.ts` 内联 DDL 收敛为 `drizzle/sqlite` 与 `drizzle/postgres` 双方言版本化迁移。运行时仍自动应用空库迁移，初始 SQL 使用 `IF NOT EXISTS` 接管旧 DDL 创建的表并保留数据；`next.config.ts` 已把迁移 SQL 加入生产文件追踪。Python commerce 仍只使用 Alembic。实现与边界见 [ADR 0007](./docs/adr/0007-versioned-typescript-migrations.md) 和 [迁移报告](./docs/typescript-migrations-2026-10-03.md)。
+
 > **AI 请求边界与追踪：2026-10-03。** `/api/ai/chat` 现在在创建 Session 前限制请求体 16 KiB，严格校验 mode/text/product/footMm，拒绝 malformed JSON、未知字段、超长输入和超范围脚长；无效请求返回 422，不调用 chat、不消耗预算。每个响应使用服务端 UUIDv4 `X-Request-ID`，AI 拒绝、provider 失败、预算结算和流清理日志使用安全 JSON 字段与耗时，不记录 Session、正文、Cookie、Token 或内部异常。证据见 [AI 请求边界报告](./docs/ai-request-boundary-2026-10-03.md)。
 
 > **Python 交易库 TLS 边界：2026-10-03。** `backend` 新增 `APP_ENV`；生产进程创建 SQLAlchemy 引擎前必须使用带显式主机名的 PostgreSQL URL 且明确 `sslmode=verify-full`，SQLite、无主机、缺失验证、重复模式、`require` 和 `verify-ca` 均 fail closed。开发/测试仍可使用本地 SQLite 或专用 `_test` PostgreSQL；部署必须显式设置 `APP_ENV=production`。证据见 [Python PostgreSQL TLS 边界报告](./docs/python-postgres-tls-2026-10-03.md)。
@@ -248,7 +250,7 @@ AI Session 与购物会话是两条边界。购物 Cookie 已存在，不代表 
 a682dde201b4_reservation_expiry
 ```
 
-第二项增加到期/取消信息及索引。响应模型和前端 parser 补丁没有新增迁移。Python 正式 schema 通过 Alembic；TS 展示库仍保留运行时幂等建表，两者现状不同。新增字段应同步 ORM、迁移、响应模型、种子（如适用）和测试。
+第二项增加到期/取消信息及索引。响应模型和前端 parser 补丁没有新增迁移。Python 正式 schema 通过 Alembic；TS 展示库现在通过 Drizzle 双方言版本化迁移，两者仍是独立数据库和独立边界。新增字段应同步 ORM、迁移、响应模型、种子（如适用）和测试。
 
 ## 4. 阅读代码时的最短路径
 
@@ -462,10 +464,10 @@ backend/.venv/Scripts/python.exe scripts/smoke-commerce.py
 
 | 项目 | 旧交接/报告记载 | 本轮文档任务 |
 | --- | --- | --- |
-| Python pytest | 2026-09-30：50 passed | 未执行；只核对测试与实现文件 |
-| TS verify | 67 文件 / 427 项，含格式/类型/边界/lint | 未执行；文档任务不宣称应用门禁通过 |
-| 生产 build | 成功，44 个静态页面 | 未执行；没有改业务代码 |
-| Ruff/format/mypy/compileall、SQLite 迁移 | 旧交接记载通过 | 未执行；未创建/修改业务或验收数据库 |
+| Python pytest | 阶段 C 最近基线：103 passed、1 skipped | 本轮未重跑；本次没有修改 Python commerce |
+| TS verify | 阶段 C 旧基线：67 文件 / 427 项 | 本轮通过：78 文件、580 passed、15 skipped |
+| 生产 build | 阶段 C 旧基线：成功、44 个静态页面 | 本轮通过：Next 16.3.4，45 个静态页面生成；trace 含双方言迁移文件 |
+| Ruff/format/mypy/compileall、SQLite 迁移 | 旧交接记载通过；TS 迁移单元测试本轮通过 | 后端门禁未在本轮重跑；TS PostgreSQL 迁移需独立测试库 |
 | 双服务 smoke 与浏览器 | 早期 MVP 报告有成功闭环及库存恢复记录 | 未执行；没有启动服务或下单 |
 | GitHub CI/PR、线上 SEO GET | 旧交接有日期与结果 | 未重新查询，不沿用为当前状态 |
 | PostgreSQL/TLS、负载、移动端指标 | 缺少当前组合版本完整验收证据 | 未执行；本轮没有相应验证环境 |
@@ -473,14 +475,22 @@ backend/.venv/Scripts/python.exe scripts/smoke-commerce.py
 
 旧报告提到 TestClient/httpx/anyio 弃用警告与 Windows 测试临时目录权限问题；遇到时记录实际输出，区分依赖警告、权限失败和业务失败。
 
-### 7.5 本轮文档验证记录
+### 7.5 历史文档验证记录
 
 - `node node_modules/prettier/bin/prettier.cjs --check HANDOVER.md`：通过。
 - 本地链接存在性检查：21 个链接，0 个失效；README 的 HANDOVER 导航存在。绝对路径仅证明本机存在，不保证跨机器可用。
 - PowerShell Parser 静态检查：8 个命令块，0 个语法错误；这些是语法检查，没有执行安装、迁移、启动或应用测试命令。
 - Markdown 代码围栏：15 对，闭合完整。
 - `git -c safe.directory=F:/shoe-online-store-demo diff --check`：通过；该命令不包含未跟踪的新文件，HANDOVER 另由格式/内容检查覆盖。
-- 本轮修改仅为新建 HANDOVER 和 README 导航；原有未跟踪教学文件保留。未提交，未修改业务库或部署状态。
+- 本轮包含 TypeScript 双方言迁移、运行时接入、迁移测试、Next 文件追踪和文档更新；原有未跟踪教学文件保留。未部署，未修改 Python commerce 业务库。
+
+### 7.6 本次 TypeScript 迁移验证
+
+- `npm run verify`：通过；格式、类型、边界、耦合、目录漂移、lint 和全量测试均通过。
+- `npm test -- --run src/db/migrations.test.ts src/db/db.test.ts src/db/schema-parity.test.ts`：3 文件、15 项通过。
+- `npm run build`：通过；Next 16.3.4 生成 45 个静态页面。
+- Next route trace 已包含 `drizzle/sqlite`、`drizzle/postgres` 的 SQL 与 metadata 文件。
+- `git diff --check`：通过。PostgreSQL 迁移路径和后端全量门禁未在本轮重跑，需独立 PostgreSQL 测试库复核。
 
 ## 8. 发布、回滚与观察边界
 
@@ -492,7 +502,7 @@ backend/.venv/Scripts/python.exe scripts/smoke-commerce.py
 - 观察：关注 5xx/P95、库存冲突、长期 reserved/过期积压、预算预占释放、AI provider 失败、内存容量；request ID/安全日志等未整合部分不要当作现有完整监控。
 - SEO：先事实和交易门禁，再上线复测 canonical、分享图、robots、sitemap、私有页 noindex、失效 URL 与缓存。历史 404/localhost 是复测线索，不是本轮线上发现。
 
-本轮交接本身不引入数据库迁移或配置变化。需要撤回本轮文档时，只撤回 HANDOVER 和 README 的新增入口，保留原有教学文档与其他工作区成果；不要用 reset/clean 回滚整个工作区。
+本轮交接记录了 TypeScript 迁移小步和验证边界。需要回滚时，保留旧迁移目录和数据，按 ADR 0007 的向前修复策略处理；不要用 reset/clean 回滚整个工作区。
 
 ## 9. 证据与阅读索引
 

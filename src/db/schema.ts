@@ -5,15 +5,19 @@ export const productEmbeddings = sqliteTable('product_embeddings', {
   model: text('model').notNull(),
   vector: text('vector').notNull(), // JSON number[]
 })
-export const aiUsage = sqliteTable('ai_usage', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  day: text('day').notNull(),
-  model: text('model').notNull(),
-  promptTokens: integer('prompt_tokens').notNull(),
-  completionTokens: integer('completion_tokens').notNull(),
-  sessionKey: text('session_key').notNull(),
-  createdAt: integer('created_at').notNull(),
-})
+export const aiUsage = sqliteTable(
+  'ai_usage',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    day: text('day').notNull(),
+    model: text('model').notNull(),
+    promptTokens: integer('prompt_tokens').notNull(),
+    completionTokens: integer('completion_tokens').notNull(),
+    sessionKey: text('session_key').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (table) => [index('idx_ai_usage_day').on(table.day)],
+)
 export const aiBudgetDays = sqliteTable('ai_budget_days', {
   day: text('day').primaryKey(),
   reservedTokens: integer('reserved_tokens').notNull().default(0),
@@ -30,6 +34,7 @@ export const aiBudgetReservations = sqliteTable(
     createdAt: integer('created_at').notNull(),
   },
   (table) => [
+    index('idx_ai_budget_reservations_day').on(table.day),
     index('idx_ai_budget_reservations_recovery').on(table.status, table.createdAt, table.requestId),
   ],
 )
