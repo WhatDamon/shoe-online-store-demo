@@ -96,6 +96,37 @@ it('owns request correlation and forwards it without trusting a browser header',
   expect(fetcher.mock.calls[0][1].headers['X-Request-ID']).toBe(traceId)
 })
 
+it('forwards the server-only proxy secret and ignores a browser-supplied value', async () => {
+  vi.stubEnv('COMMERCE_PROXY_SECRET', 'abcdefghijklmnopqrstuvwxyz123456')
+  const fetcher = vi.fn().mockResolvedValue(new Response('{"items":[]}'))
+  vi.stubGlobal('fetch', fetcher)
+  await GET(
+    new NextRequest('http://localhost:3000/api/commerce/cart', {
+      headers: { 'X-Internal-Proxy-Secret': 'browser-spoof' },
+    }),
+    { params: Promise.resolve({ path: ['cart'] }) },
+  )
+  expect(fetcher.mock.calls[0][1].headers['X-Internal-Proxy-Secret']).toBe(
+    'abcdefghijklmnopqrstuvwxyz123456',
+  )
+})
+
+it('fails closed in production when the proxy secret is missing', async () => {
+  vi.stubEnv('NODE_ENV', 'production')
+  vi.stubEnv('COMMERCE_PROXY_SECRET', 'short')
+  const fetcher = vi.fn()
+  vi.stubGlobal('fetch', fetcher)
+  const response = await GET(new NextRequest('http://localhost:3000/api/commerce/cart'), {
+    params: Promise.resolve({ path: ['cart'] }),
+  })
+  expect(response.status).toBe(503)
+  expect(await response.json()).toEqual({
+    code: 'backend_unavailable',
+    detail: 'backend_unavailable',
+  })
+  expect(fetcher).not.toHaveBeenCalled()
+})
+
 it('includes safe codes and correlation even when rejecting before an upstream call', async () => {
   const fetcher = vi.fn()
   vi.stubGlobal('fetch', fetcher)

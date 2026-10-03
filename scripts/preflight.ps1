@@ -34,6 +34,11 @@ if ($Environment -eq 'production') {
     Add-Failure 'AI_SESSION_SECRET must contain at least 32 bytes in production.'
   }
 
+  if ([string]::IsNullOrWhiteSpace($env:COMMERCE_PROXY_SECRET) -or
+      [Text.Encoding]::UTF8.GetByteCount($env:COMMERCE_PROXY_SECRET) -lt 32) {
+    Add-Failure 'COMMERCE_PROXY_SECRET must contain at least 32 bytes in production.'
+  }
+
   if ($env:DB_DRIVER -ne 'postgres') {
     Add-Failure 'DB_DRIVER must be postgres in production.'
   }

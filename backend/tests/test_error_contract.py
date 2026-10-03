@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.application import commerce as service
+from app.config import settings
 from app.domain.models import AuditLog, Inventory, Order, OrderItem, Reservation
 
 
@@ -57,6 +58,23 @@ def test_unknown_route_and_method_use_stable_contract(commerce):
     assert method.json()["code"] == "method_not_allowed"
     assert "GET" in method.headers["allow"]
     assert method.headers["cache-control"] == "no-store"
+
+
+def test_production_api_requires_internal_proxy_secret(commerce, monkeypatch):
+    client, _ = commerce
+    monkeypatch.setattr(settings, "app_env", "production")
+    monkeypatch.setattr(settings, "commerce_proxy_secret", "abcdefghijklmnopqrstuvwxyz123456")
+    missing = client.get("/api/v1/catalog/products")
+    wrong = client.get(
+        "/api/v1/catalog/products", headers={"X-Internal-Proxy-Secret": "wrong-secret"}
+    )
+    correct = client.get(
+        "/api/v1/catalog/products",
+        headers={"X-Internal-Proxy-Secret": "abcdefghijklmnopqrstuvwxyz123456"},
+    )
+    assert missing.status_code == 403
+    assert wrong.status_code == 403
+    assert correct.status_code == 200
 
 
 def test_unexpected_failure_is_safe_and_rolls_back_all_writes(

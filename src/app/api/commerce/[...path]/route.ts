@@ -37,6 +37,14 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }
       { status: 403, headers: responseHeaders },
     )
   }
+  const proxySecret = process.env.COMMERCE_PROXY_SECRET?.trim() ?? ''
+  const production = (process.env.NODE_ENV ?? '').trim().toLowerCase() === 'production'
+  if (production && new TextEncoder().encode(proxySecret).byteLength < 32) {
+    return NextResponse.json(
+      { code: 'backend_unavailable', detail: 'backend_unavailable' },
+      { status: 503, headers: responseHeaders },
+    )
+  }
   const existing = req.cookies.get(cookieName)?.value
   const session = existing && uuid.test(existing) ? existing : crypto.randomUUID()
   const headers: Record<string, string> = {
@@ -44,6 +52,7 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }
     'X-Session-ID': session,
     'X-Request-ID': requestId,
   }
+  if (proxySecret) headers['X-Internal-Proxy-Secret'] = proxySecret
   const key = req.headers.get('idempotency-key')
   if (key) headers['Idempotency-Key'] = key
   let response: NextResponse

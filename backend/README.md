@@ -152,6 +152,10 @@ There is no scheduled sync, price sync, product rename migration or hard deletio
 | POST | /api/v1/payments/session | `{ "order_id": "UUID" }`; always disabled |
 
 All non-public APIs require `X-Session-ID: <random UUID>` (a bearer credential).
+In production they also require the server-only `X-Internal-Proxy-Secret`, which
+must match `COMMERCE_PROXY_SECRET` and contain at least 32 random bytes. The Next
+proxy adds this header; browsers cannot supply or override it. Local development
+may leave the secret empty, but a configured secret is always checked.
 In the storefront, Next creates this credential in an HttpOnly, SameSite=Lax
 cookie (Secure over HTTPS); callers cannot override it with a browser header.
 The Next proxy checks same-origin writes, uses a route allowlist, does not cache

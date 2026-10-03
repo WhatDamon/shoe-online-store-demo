@@ -52,4 +52,10 @@ def test_unknown_environment_fails_closed():
 def test_node_production_environment_defaults_to_production(monkeypatch):
     monkeypatch.delenv("APP_ENV", raising=False)
     monkeypatch.setenv("NODE_ENV", " Production ")
-    assert Settings(_env_file=None).app_env == "production"
+    assert (
+        Settings(
+            commerce_proxy_secret="abcdefghijklmnopqrstuvwxyz123456",
+            _env_file=None,
+        ).app_env
+        == "production"
+    )

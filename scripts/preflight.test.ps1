@@ -35,6 +35,7 @@ Describe 'production preflight' {
     $env:PG_SSL = 'verify-full'
     $env:PYTHON_API_URL = 'http://commerce.internal:8000'
     $env:AI_SESSION_SECRET = '01234567890123456789012345678901'
+    $env:COMMERCE_PROXY_SECRET = 'abcdefghijklmnopqrstuvwxyz123456'
     $env:SHOPIFY_ENABLED = 'false'
 
     $output = (& pwsh -NoProfile -File $scriptPath -Environment production 2>&1 | Out-String)
@@ -44,7 +45,7 @@ Describe 'production preflight' {
   }
 
   AfterEach {
-    @('NODE_ENV', 'DB_DRIVER', 'DATABASE_URL', 'PG_SSL', 'PYTHON_API_URL', 'AI_SESSION_SECRET', 'SHOPIFY_ENABLED', 'PG_SSL_CA_FILE') |
+    @('NODE_ENV', 'DB_DRIVER', 'DATABASE_URL', 'PG_SSL', 'PYTHON_API_URL', 'AI_SESSION_SECRET', 'COMMERCE_PROXY_SECRET', 'SHOPIFY_ENABLED', 'PG_SSL_CA_FILE') |
       ForEach-Object { Remove-Item "Env:$_" -ErrorAction SilentlyContinue }
   }
 }

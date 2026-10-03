@@ -20,12 +20,12 @@ from app.application.errors import (
     ProductNotFound,
     QuantityLimitExceeded,
 )
-from app.dependencies import anonymous_session, database
+from app.dependencies import anonymous_session, database, internal_proxy
 from app.domain.models import CartItem, Inventory, Media, Product, Variant
 from app.schemas.commerce import AddItem, PaymentRequest, Quantity
 from app.schemas.responses import CartResponse, OrderResponse, PaymentResponse, ProductResponse
 
-router = APIRouter(prefix="/api/v1")
+router = APIRouter(prefix="/api/v1", dependencies=[Depends(internal_proxy)])
 DB = Annotated[Session, Depends(database, scope="function")]
 SessionID = Annotated[str, Depends(anonymous_session)]
 
