@@ -241,8 +241,43 @@ describe('AI chat route session boundary', () => {
       request({ origin: 'http://localhost:3000', 'sec-fetch-site': 'same-origin' }),
     )
     expect(response.status).toBe(200)
+    expect(response.headers.get('x-request-id')).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    )
     expect(chat).toHaveBeenCalledTimes(1)
     expect(await response.text()).toContain('data: {"type":"done"}')
+  })
+
+  it.each([
+    ['malformed JSON', '{"text":'],
+    ['oversized body', JSON.stringify({ text: 'x'.repeat(17_000) })],
+    ['oversized text field', JSON.stringify({ text: 'x'.repeat(801) })],
+    ['invalid mode', JSON.stringify({ mode: 'admin', text: 'hello' })],
+    ['unknown field', JSON.stringify({ text: 'hello', privateToken: 'secret' })],
+    [
+      'invalid product handle',
+      JSON.stringify({ product: { handle: 'bad/handle', title: 'Shoe' } }),
+    ],
+    ['invalid foot length', JSON.stringify({ footMm: 500 })],
+  ])('rejects %s before session and AI work', async (_label, body) => {
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/ai/chat', {
+        method: 'POST',
+        body,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
+    expect(response.status).toBe(422)
+    expect(await response.json()).toEqual({
+      code: 'invalid_request',
+      message: 'Request validation failed',
+    })
+    expect(response.headers.get('set-cookie')).toBeNull()
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(response.headers.get('x-request-id')).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    )
+    expect(chat).not.toHaveBeenCalled()
   })
 
   it.each(['http://127.0.0.1:3106', 'http://[::1]:3106'])(

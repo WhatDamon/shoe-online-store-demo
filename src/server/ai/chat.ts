@@ -25,6 +25,8 @@ export interface ChatOptions {
   /** 测试注入：固定 provider；默认按 env 工厂选 Mock/真实。 */
   provider?: AiProvider
   signal?: AbortSignal
+  /** Server-owned correlation ID; never derived from session or user input. */
+  requestId?: string
 }
 
 /** 流内异常的统一文案；`/api/ai/chat` 的兜底 catch 也用它（单一来源）。 */
@@ -43,21 +45,36 @@ let shared: Guardrails | null = null
 const sharedGuardrails = (): Guardrails => (shared ??= createGuardrails(createDefaultRepository()))
 
 /** GuardrailError → 对应 code + 温和文案（code 1:1 透传，含 'turns'）；其余 → provider 错误。 */
-const toErrorEvent = (e: unknown): ChatEvent => {
+const logAi = (
+  level: 'warn' | 'error',
+  event: string,
+  fields: Record<string, string | number>,
+): void => {
+  console[level](JSON.stringify({ event, ...fields }))
+}
+
+const toErrorEvent = (e: unknown, requestId: string, elapsedMs: number): ChatEvent => {
   if (e instanceof GuardrailError) {
     // 护栏拒绝（rate_limited/budget/turns）是设计内软拒绝：仅记录 code（不携带会话/内容/访客信息），
     // 便于 Vercel 端区分「配置误伤（如空 env 把预算打成 0）」与真实滥用；UI 仍只显示温和文案。
-    console.warn('[ai/chat] guardrail refusal', e.code)
+    logAi('warn', 'ai_guardrail_refusal', {
+      request_id: requestId,
+      code: e.code,
+      elapsed_ms: elapsedMs,
+    })
     return { type: 'error', code: e.code, message: e.message }
   }
   // Provider/database exceptions can include credentials, URLs or request bodies.
-  console.error('[ai/chat] provider failure')
+  logAi('error', 'ai_provider_failure', { request_id: requestId, elapsed_ms: elapsedMs })
   return { type: 'error', code: 'provider', message: FALLBACK_ERROR_TEXT }
 }
 
 /** 护栏顺序：rate → budget → turns；被 rate/budget 拒的请求不消耗回合（回合 claim 最后执行）。
  * 三者任一失败都只回一个 error 帧，故合并为一个 try —— 原先是三个逐字相同的 try/catch。 */
 export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGenerator<ChatEvent> {
+  const traceId = opts.requestId ?? crypto.randomUUID()
+  const startedAt = Date.now()
+  const elapsed = () => Math.max(0, Date.now() - startedAt)
   const guardrails = opts.guardrails ?? sharedGuardrails()
   const provider = opts.provider ?? aiProvider()
   const text = truncateMessage(req.text ?? '')
@@ -74,11 +91,11 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
     await guardrails.assertBudget(budgetDay)
     history = guardrails.assertTurn(req.sessionKey)
   } catch (e) {
-    yield toErrorEvent(e)
+    yield toErrorEvent(e, traceId, elapsed())
     return
   }
 
-  const requestId = crypto.randomUUID()
+  const budgetRequestId = crypto.randomUUID()
   let activeReservation = false
   let providerStarted = false
 
@@ -113,7 +130,11 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
       try {
         await guardrails.abandonBudget(embeddingRequestId)
       } catch {
-        console.error('[ai/budget] embedding finalization failed')
+        logAi('error', 'ai_budget_finalization_failed', {
+          request_id: traceId,
+          phase: 'embedding',
+          elapsed_ms: elapsed(),
+        })
       }
       throw error
     }
@@ -126,7 +147,11 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
     const prompt = [system, ...messages.map((message) => message.content)]
       .filter(Boolean)
       .join('\n')
-    await guardrails.reserveBudget(requestId, estTokens(prompt) + maxOutputTokens(), budgetDay)
+    await guardrails.reserveBudget(
+      budgetRequestId,
+      estTokens(prompt) + maxOutputTokens(),
+      budgetDay,
+    )
     activeReservation = true
   }
 
@@ -136,14 +161,14 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
     const prompt = [system, ...history.map((m) => m.content), userText].filter(Boolean).join('\n')
     if (!activeReservation) {
       await guardrails.reserveBudget(
-        requestId,
+        budgetRequestId,
         estTokens(prompt) + estTokens(assistantText),
         budgetDay,
       )
       activeReservation = true
     }
     const measured = validUsage(usage)
-    await guardrails.settleBudget(requestId, {
+    await guardrails.settleBudget(budgetRequestId, {
       day: budgetDay,
       model,
       promptTokens: measured?.promptTokens ?? estTokens(prompt),
@@ -198,14 +223,18 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
     })
   } catch (e) {
     // provider 运行期失败 → 显式 error + UI 重试（P3：绝不静默降级到 Mock）
-    yield toErrorEvent(e)
+    yield toErrorEvent(e, traceId, elapsed())
   } finally {
     if (activeReservation) {
       try {
-        if (providerStarted) await guardrails.abandonBudget(requestId)
-        else await guardrails.releaseBudget(requestId)
+        if (providerStarted) await guardrails.abandonBudget(budgetRequestId)
+        else await guardrails.releaseBudget(budgetRequestId)
       } catch {
-        console.error('[ai/budget] finalization failed')
+        logAi('error', 'ai_budget_finalization_failed', {
+          request_id: traceId,
+          phase: 'chat',
+          elapsed_ms: elapsed(),
+        })
       }
     }
   }

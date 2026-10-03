@@ -2,6 +2,10 @@
 
 > **目录停售传播：2026-10-03，F:/shoe-online-store-demo，基于 `54c6fa7`。** 阶段 C 新增商品/变体 `is_active` 与 Alembic 迁移 `c73a28f06b19`；显式 `app.sync_catalog` 默认只读预览，应用必须匹配计划版本，缺失身份停用但不删除，恢复必须显式 `--restore-present`。加购、数量修改和创建订单从 Python 重读可售状态；已有购物车显示停售并允许移除，历史订单、幂等重试、取消和到期释放保持可用。同步不导入价格、不调整库存、不改订单。前端 verify/build、双数据库回归、CLI 与迁移保护证据见 [停售传播报告](./docs/catalog-availability-2026-10-03.md)。新增商品、改名迁移、自动持续同步和正式部署仍按后续独立步骤处理。
 
+> **生产配置门禁：2026-10-03。** 新增 `npm run preflight -- -Environment production`，在构建/启动前检查 PostgreSQL + TLS 验证、32 字节 AI Session 签名材料、非回环 Python 内部地址和 Shopify 默认关闭；输出不包含连接串、密钥或证书内容。Pester 回归覆盖拒绝不安全组合与接受已验证配置。该脚本是配置门禁，不证明真实证书、代理、域名或部署已上线。
+
+> **AI 请求边界与追踪：2026-10-03。** `/api/ai/chat` 现在在创建 Session 前限制请求体 16 KiB，严格校验 mode/text/product/footMm，拒绝 malformed JSON、未知字段、超长输入和超范围脚长；无效请求返回 422，不调用 chat、不消耗预算。每个响应使用服务端 UUIDv4 `X-Request-ID`，AI 拒绝、provider 失败、预算结算和流清理日志使用安全 JSON 字段与耗时，不记录 Session、正文、Cookie、Token 或内部异常。证据见 [AI 请求边界报告](./docs/ai-request-boundary-2026-10-03.md)。
+
 > **远端 CI 提交链核对：2026-10-02。** GitHub Actions 最新远端 SHA `cf40bc2`（其父提交 `14f0f75`）仍基于 `dd76ad8`，两个 Node 矩阵均在 TypeScript 阶段找不到 `@/components/shop/commerce-panel`；后续本地 `4177ec5` 已补齐组件，当前 HEAD 的 `npm run verify` 与 `npm run build` 已通过。此次本地合并保留远端 cleanup 删除的构建产物和数据库文件，不 push、不部署。远端失败不是 Node 22/24 测试行为差异，而是 CI checkout 的提交没有包含后续源码提交。
 
 > **AI 用量精度与 embedding 预算更新：2026-10-02。** 真实 OpenAI-compatible 流默认请求最终 usage chunk，并在结算前校验非负安全整数；缺失/非法 usage 或 `AI_INCLUDE_USAGE=0` 时回退字符估算，不自动重试。检索的能力探测、查询和商品批量 embedding 现在各自通过原子预算 reservation，成功按输入字符估算结算；普通网络/网关失败保守记账后降级关键词，预算拒绝会阻断 provider 调用。新增回归覆盖精确写入、估算回退和 embedding reservation，详见 [AI 用量精度报告](./docs/ai-usage-accuracy-2026-10-02.md) 与 [embedding 预算边界报告](./docs/ai-embedding-budget-2026-10-02.md)。多实例共享护栏和正式网关兼容性仍需独立验收。
@@ -269,11 +273,11 @@ a682dde201b4_reservation_expiry
 | Python 交易源码、代理与交易页面 | 缺失；残留被跟踪的 `.pyc`、数据库 | 有 | 本地 MVP 已有实现，不要在 A 误判成“后端已搭好” |
 | 预占到期释放 | 无完整源码 | 有 | 历史测试通过，组合基线须复测 |
 | 成功响应模型、前端 parser | 无 | 有 | 2026-09-30 工作已进入 B；错误规范仍待整合 |
-| TLS 身份校验 | 仍有 `rejectUnauthorized:false` | 同样存在旧逻辑 | 独立修复存在，尚未进入这两份当前代码 |
+| TLS 身份校验 | 已整合验证：生产强制 `rejectUnauthorized:true`、CA/主机名校验与 fail-closed 配置 | 同样已整合；真实握手/数据库验收见 TLS 报告 | 当前代码不再提供生产明文或证书绕过路径 |
 | AI Map 有界、Session/IP、原子预算 | 旧路径 | 旧路径 | 独立修复存在，不能宣布已经整体解决 |
 | Shopify 显式关闭开关 | 无相同总开关 | 有 | 保留兼容入口，不等于删除账号/外部商店 |
 | robots/sitemap、SEO 方案 | 有草稿/文件 | 对应文件缺失 | A 文件存在不代表正确或上线 |
-| PostgreSQL 运行时及 TLS 联调 | 本轮未执行 | 旧报告亦未给出完整运行验收 | 离线 SQL/SQLite 通过不替代此项 |
+| PostgreSQL 运行时及 TLS 联调 | 已有独立本地 PostgreSQL/TLS 验收报告与集成测试 | 已有独立本地 PostgreSQL/TLS 验收报告与集成测试 | 仍不等同于远端 CI、证书轮换或正式部署验收 |
 | 真实支付、账号恢复、后台管理、自动目录同步 | 不作为已完成能力 | 未实现 | 明确范围，不能靠 UI 或表名推断 |
 
 历史回答中的粗略百分比不是验收指标。本项目尚无统一加权需求清单；报告应分别给出“实现、集成、测试、发布”的状态，不编造一个精确完成率。

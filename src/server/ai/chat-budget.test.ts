@@ -55,7 +55,12 @@ describe('chat with atomic budgets and bounded session state', () => {
           await stream.return(undefined)
         } else {
           expect((await stream.next()).value).toMatchObject({ type: 'error', code: 'provider' })
-          expect(console.error).toHaveBeenCalledWith('[ai/chat] provider failure')
+          expect(JSON.parse(vi.mocked(console.error).mock.calls[0][0] as string)).toMatchObject({
+            event: 'ai_provider_failure',
+            request_id: expect.stringMatching(
+              /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+            ),
+          })
           await stream.return(undefined) // Route handlers stop after the error frame.
         }
         const reservation = database.select().from(aiBudgetReservations).all()[0]

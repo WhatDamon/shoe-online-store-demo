@@ -142,7 +142,13 @@ export function pgConnectOptions(
 ): { rejectUnauthorized: true; ca?: string } | null {
   const mode = (env.PG_SSL ?? '').trim().toLowerCase()
   const caFile = (env.PG_SSL_CA_FILE ?? '').trim()
-  const production = env.NODE_ENV === 'production'
+  const production = (env.NODE_ENV ?? '').trim().toLowerCase() === 'production'
+  // Node's process-wide TLS escape hatch must never be present in a
+  // production process, even though the client below passes an explicit
+  // rejectUnauthorized=true option. Fail closed before creating a client.
+  if (production && (env.NODE_TLS_REJECT_UNAUTHORIZED ?? '').trim() === '0') {
+    throw new Error('NODE_TLS_REJECT_UNAUTHORIZED=0 is not allowed in production')
+  }
   if (!['', '0', 'false', '1', 'true', 'require', 'verify-full'].includes(mode)) {
     throw new Error('Invalid PG_SSL: use 1/verify-full, or 0 for local development')
   }

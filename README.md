@@ -162,10 +162,20 @@ See [`.env.example`](.env.example) for the annotated template. Summary:
 | `DATABASE_URL` | `./data/local.db` | sqlite: local file; postgres: `postgres://…` connection string |
 | `PG_SSL` | *(verified TLS in production)* | `1`/`verify-full` verifies certificates; plaintext `0` is development-only |
 | `PG_SSL_CA_FILE` | *(system roots)* | Optional readable PEM CA bundle, never committed |
+| `NODE_TLS_REJECT_UNAUTHORIZED` | *(unset)* | `0` is rejected in production before a PostgreSQL client is created; do not use it as a TLS workaround |
 | `PYTHON_API_URL` | `http://127.0.0.1:8000` | Server-only commerce endpoint; not exposed to browser JavaScript |
 | `SHOPIFY_ENABLED` | `false` | Explicit compatibility purchase switch; keep disabled for the local MVP |
 | `SHOPIFY_DOMAIN`, `SHOPIFY_STOREFRONT_TOKEN` | *(empty)* | Reserved catalog stub; selected only with both credentials and `SHOPIFY_ENABLED=true`. It is not a working sync integration. |
 | `SHOPIFY_BUY_DOMAIN`, `SHOPIFY_BUY_TOKEN` | *(empty)* | Compatibility Buy Button credentials, independent of catalog credentials. Requires both plus `SHOPIFY_ENABLED=true`; disabled by default so PDPs use Python variants and cart. The external store was not tested in this integration. |
+
+Before a production build is started, run `npm run preflight -- -Environment production`.
+It checks the deployment boundary without printing secrets: PostgreSQL is selected,
+TLS verification is enabled, the AI session secret is long enough, Python is not
+exposed as a loopback production URL, and the unsupported Shopify purchase path is
+disabled. Development defaults remain compatible with the local SQLite/Mock setup.
+The AI Route Handler also rejects bodies above 16 KiB and invalid fields before
+creating a session or reserving budget; its `X-Request-ID` is server-owned correlation
+data, not a session or idempotency credential. See the [AI request boundary report](./docs/ai-request-boundary-2026-10-03.md).
 
 ### Enabling real AI
 

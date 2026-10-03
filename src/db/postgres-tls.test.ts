@@ -36,6 +36,24 @@ describe('PostgreSQL TLS policy', () => {
     expect(pgConnectOptions({ NODE_ENV: 'development', PG_SSL })).toBeNull()
   })
 
+  it.each(['production', ' Production ', 'PRODUCTION'])(
+    'treats normalized production mode as TLS-required (%s)',
+    (NODE_ENV) => {
+      expect(() => pgConnectOptions({ NODE_ENV, PG_SSL: '0' })).toThrow(
+        'PostgreSQL TLS cannot be disabled',
+      )
+    },
+  )
+
+  it('fails closed when the process-wide TLS escape hatch is enabled', () => {
+    expect(() =>
+      pgConnectOptions({
+        NODE_ENV: ' production ',
+        NODE_TLS_REJECT_UNAUTHORIZED: '0',
+      }),
+    ).toThrow('NODE_TLS_REJECT_UNAUTHORIZED=0 is not allowed in production')
+  })
+
   it('rejects unsupported modes without echoing configuration', () => {
     expect(() => pgConnectOptions({ PG_SSL: 'secret-invalid-value' })).toThrow(
       'Invalid PG_SSL: use 1/verify-full, or 0 for local development',
@@ -78,7 +96,7 @@ describe('PostgreSQL TLS policy', () => {
       vi.stubEnv('PG_SSL', '')
       vi.stubEnv('PG_SSL_CA_FILE', '')
       vi.stubEnv('PGSSL', 'require')
-      vi.stubEnv('NODE_TLS_REJECT_UNAUTHORIZED', '0')
+      vi.stubEnv('NODE_TLS_REJECT_UNAUTHORIZED', '1')
       createPostgresDb(`postgres://user:secret@localhost/test?sslmode=${mode}`)
       // Inspect the real postgres.js parser's result, not just the arguments.
       const client = vi.mocked(postgres).mock.results.at(-1)!.value
