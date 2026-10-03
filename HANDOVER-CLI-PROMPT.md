@@ -28,8 +28,9 @@ Aider 工作方式：
 【当前工作区事实】
 - 工作目录：F:\\shoe-online-store-demo
 - 分支：sql-certificate-and-AI-stock
-- 当前基准 HEAD（生成本提示词时）：a8208e0；Aider 启动时必须以 `git log` 的实际 HEAD 为准。
+- 当前基准 HEAD（本轮集成测试小步开始前）：49e2900；Aider 启动时必须以 `git log` 的实际 HEAD 为准。
 - 最近相关提交：
+  - 49e2900 docs: pass Aider handover as initial message
   - a8208e0 fix: serialize PostgreSQL schema migrations
   - d22ab62 chore: require explicit production environment preflight
   - ab3ab33 fix: bound trusted proxy IP input
@@ -52,9 +53,10 @@ Aider 工作方式：
 【当前优先顺序】
 第一步：在实际可用的专用 PostgreSQL 测试库上验收 TypeScript 迁移锁。
 - 只使用独立、可删除、名称以 _test 结尾的数据库；不能使用业务数据库。
-- 设置 AI_TEST_POSTGRES_URL 后运行：
-  npm test -- --run src/server/search/repository-postgres.integration.test.ts
-- 需要补充或扩展真实并发用例时，至少验证两个独立 client 同时 ensurePgTables() 只完成一份迁移，失败事务能重试，锁会在提交/回滚后释放。
+- 设置 AI_TEST_POSTGRES_MIGRATIONS_URL 后运行：
+  npm test -- --run src/db/postgres-migrations.integration.test.ts
+- 测试使用两个 `max=1` 独立 client，同时调用 ensurePgTables()，并检查专用库只有一份 migration marker；CI 会先创建 `typescript_migrations_test` 数据库。
+- 需要扩展真实并发用例时，至少验证失败事务能重试，锁会在提交/回滚后释放。
 - 没有该环境时不要伪造通过：保留当前 fake-client 证据，并在报告中写“真实 PostgreSQL 并发未执行”。不要为了这一步临时引入 Redis 或替换迁移框架。
 
 第二步：根据实际测试结果修复迁移边界。保持 SQL 双方言、生产文件追踪和旧 inline DDL 数据接管；不要改 Python Alembic 交易迁移，不要把展示库当交易真值。

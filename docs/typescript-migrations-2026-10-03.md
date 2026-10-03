@@ -26,6 +26,8 @@ Drizzle 版本化迁移。Python commerce 的 Alembic 目录和交易 schema 没
 3. 旧 inline DDL 创建的五张表可被接管，既有商品行保留且缺失索引被补齐。
 
 `src/db/postgres-migrations.test.ts` 验证锁先于 DDL 且 marker 会写入；
-`src/server/search/repository-postgres.integration.test.ts` 仍需在配置测试数据库的环境
-执行真实 PostgreSQL 并发验收。本机未配置独立 PostgreSQL 测试库时，不能把 fake-client
-或 SQLite 结果当成 PostgreSQL 集成证据。
+`src/db/postgres-migrations.integration.test.ts` 使用两个独立 `max=1` client，验证
+同一专用数据库只写入一个 migration marker。CI 会先创建隔离的
+`typescript_migrations_test` 数据库再运行它。本机未配置
+`AI_TEST_POSTGRES_MIGRATIONS_URL` 时，不能把 fake-client 或 SQLite 结果当成 PostgreSQL
+集成证据。

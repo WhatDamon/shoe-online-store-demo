@@ -6,7 +6,7 @@
 
 > **TypeScript 数据库迁移：2026-10-03。** 展示/AI 五张表已从 `src/db/client.ts` 内联 DDL 收敛为 `drizzle/sqlite` 与 `drizzle/postgres` 双方言版本化迁移。运行时仍自动应用空库迁移，初始 SQL 使用 `IF NOT EXISTS` 接管旧 DDL 创建的表并保留数据；`next.config.ts` 已把迁移 SQL 加入生产文件追踪。Python commerce 仍只使用 Alembic。实现与边界见 [ADR 0007](./docs/adr/0007-versioned-typescript-migrations.md) 和 [迁移报告](./docs/typescript-migrations-2026-10-03.md)。
 
-> **PostgreSQL 迁移并发：2026-10-03。** `ensurePgTables()` 改为在同一 `postgres.js` 事务内取得 `pg_advisory_xact_lock`，再读取/执行/登记迁移，避免 Drizzle 默认实现把读取放在事务外造成多实例竞态；失败由事务回滚并允许下一次重试。定向 fake-client 测试通过，真实 PostgreSQL 并发验收仍需专用 `_test` 数据库，本机未配置该 URL。
+> **PostgreSQL 迁移并发：2026-10-03。** `ensurePgTables()` 改为在同一 `postgres.js` 事务内取得 `pg_advisory_xact_lock`，再读取/执行/登记迁移，避免 Drizzle 默认实现把读取放在事务外造成多实例竞态；失败由事务回滚并允许下一次重试。新增两个独立 `max=1` client 的真实集成测试，CI 会在隔离 `typescript_migrations_test` 数据库中运行；本机未配置 `AI_TEST_POSTGRES_MIGRATIONS_URL`，所以本地仅有 fake-client 证据。
 
 > **AI 请求边界与追踪：2026-10-03。** `/api/ai/chat` 现在在创建 Session 前限制请求体 16 KiB，严格校验 mode/text/product/footMm，拒绝 malformed JSON、未知字段、超长输入和超范围脚长；无效请求返回 422，不调用 chat、不消耗预算。每个响应使用服务端 UUIDv4 `X-Request-ID`，可信代理转发 IP 进入限流前限制为 128 字符，非法或超长值回退到可信直接 peer；没有可用 peer 时使用有界 `untrusted` 桶。AI 拒绝、provider 失败、预算结算和流清理日志使用安全 JSON 字段与耗时，不记录 Session、正文、Cookie、Token 或内部异常。证据见 [AI 请求边界报告](./docs/ai-request-boundary-2026-10-03.md)。
 

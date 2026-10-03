@@ -103,6 +103,15 @@ jobs:
           cache: npm
       - run: npm ci
         working-directory: .
+      - name: Create isolated TypeScript migration database
+        env:
+          TEST_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: docker exec "$TEST_POSTGRES_CONTAINER" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE typescript_migrations_test"
+      - name: Test TypeScript PostgreSQL migration locking
+        env:
+          AI_TEST_POSTGRES_MIGRATIONS_URL: postgresql://postgres:postgres@127.0.0.1:5432/typescript_migrations_test
+        run: npm test -- src/db/postgres-migrations.integration.test.ts
+        working-directory: .
       - run: npm test -- src/server/search/repository-postgres.integration.test.ts
         working-directory: .
       # Public, localhost-only fixture; never use these keys for a deployed server.
