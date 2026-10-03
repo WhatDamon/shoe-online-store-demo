@@ -150,6 +150,14 @@ database whose name ends in `_test`. Run
 and removes one random schema, warms independent connections and verifies competing
 reservations, duplicate retries and rollback. Without the variable it is explicitly skipped.
 
+For TypeScript schema migration startup locking, set
+`AI_TEST_POSTGRES_MIGRATIONS_URL` to a separate disposable loopback database whose name
+ends in `_test`, then run
+`npm test -- src/db/postgres-migrations.integration.test.ts`. The test opens two independent
+`max=1` clients, starts both migrations together, and verifies that exactly one migration
+marker is written. Without the variable it is explicitly skipped; never point it at a
+commerce or production database.
+
 For TLS, use a disposable server configured with the public localhost-only fixture in
 `src/test/fixtures/postgres-tls.json`, set `AI_TEST_POSTGRES_TLS_URL` with hostname `localhost`,
 then run `npm test -- src/db/postgres-tls.integration.test.ts`. It executes a real encrypted
