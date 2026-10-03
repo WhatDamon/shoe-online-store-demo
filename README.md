@@ -78,6 +78,11 @@ Set-Location backend
 .venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
+The Python service defaults to `APP_ENV=development` for local SQLite. Production
+must set `APP_ENV=production` and use a PostgreSQL URL with
+`sslmode=verify-full`; the service rejects SQLite and weaker PostgreSQL modes before
+creating an engine. See [the Python PostgreSQL TLS boundary report](./docs/python-postgres-tls-2026-10-03.md).
+
 In a second terminal at the repository root, keep `SHOPIFY_ENABLED=false`, set
 `PYTHON_API_URL=http://127.0.0.1:8000` and `AI_DISABLE_REAL=1`, then run `npm run dev`.
 Open `/product/dc-1001`, choose a color/size, add to `/cart`, change quantity, create an

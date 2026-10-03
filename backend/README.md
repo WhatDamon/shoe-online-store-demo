@@ -54,9 +54,14 @@ from `backend/`.
 
 Run from `backend/`: default database is `backend/commerce.db`. Backend `.env`
 is resolved independently of the Next.js environment. Set `DATABASE_URL` to
-`postgresql+psycopg://user:password@localhost:5432/evoloop` for PostgreSQL, then run
-the same Alembic and seed commands. Do not point Python at the old TypeScript
-SQLite file: these are separate schemas during migration.
+`postgresql+psycopg://user:password@localhost:5432/evoloop` for local PostgreSQL, then run
+the same Alembic and seed commands. For a production process, set `APP_ENV=production`
+and include a real database hostname plus `?sslmode=verify-full` in the URL; startup
+and Alembic engine creation fail closed for SQLite, hostless URLs, missing TLS
+verification, or weaker PostgreSQL modes. Add
+`sslrootcert=/path/to/trusted-ca.pem` when the server certificate is not in the system
+trust store. Do not point Python at the old TypeScript SQLite file: these are separate
+schemas during migration.
 
 ## Database lifecycle
 
