@@ -2,7 +2,10 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 import { GET, POST } from './route'
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
+})
 it('preserves server error status without forwarding internal diagnostics', async () => {
   vi.stubGlobal(
     'fetch',
@@ -124,6 +127,52 @@ it('fails closed in production when the proxy secret is missing', async () => {
     code: 'backend_unavailable',
     detail: 'backend_unavailable',
   })
+  expect(fetcher).not.toHaveBeenCalled()
+})
+
+it('keeps the shopping bearer cookie Secure behind a production TLS proxy', async () => {
+  vi.stubEnv('NODE_ENV', 'production')
+  vi.stubEnv('COMMERCE_PROXY_SECRET', 'test-only-proxy-key-with-at-least-32-bytes')
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}')))
+  const response = await GET(new NextRequest('http://localhost:3000/api/commerce/cart'), {
+    params: Promise.resolve({ path: ['cart'] }),
+  })
+  expect(response.headers.get('set-cookie')).toContain('Secure')
+})
+
+it('rejects oversized streaming writes before contacting commerce', async () => {
+  let reads = 0
+  const cancel = vi.fn()
+  const stream = new ReadableStream<Uint8Array>(
+    {
+      pull(controller) {
+        reads++
+        controller.enqueue(new Uint8Array(8192))
+        if (reads === 20) controller.close()
+      },
+      cancel,
+    },
+    { highWaterMark: 0 },
+  )
+  const fetcher = vi.fn().mockResolvedValue(new Response('{}'))
+  vi.stubGlobal('fetch', fetcher)
+  const req = new NextRequest('http://localhost:3000/api/commerce/cart/items', {
+    method: 'POST',
+    headers: { 'content-length': '1' },
+  })
+  Object.defineProperty(req, 'body', { value: stream })
+  vi.spyOn(req, 'text').mockImplementation(() => new Response(stream).text())
+  const response = await POST(req, { params: Promise.resolve({ path: ['cart', 'items'] }) })
+  expect(response.status).toBe(413)
+  expect(await response.json()).toEqual({
+    code: 'invalid_request',
+    detail: 'Request body is too large',
+  })
+  expect(response.headers.get('cache-control')).toBe('no-store')
+  expect(response.headers.get('set-cookie')).toBeNull()
+  expect(reads).toBe(3)
+  expect(cancel).toHaveBeenCalledTimes(1)
+  expect(stream.locked).toBe(false)
   expect(fetcher).not.toHaveBeenCalled()
 })
 

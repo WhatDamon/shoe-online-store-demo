@@ -43,7 +43,7 @@ def cart_view(db: Session, session_id: str, *, check_stock: bool = False) -> dic
         select(CartItem, Variant, Product, Inventory)
         .join(Variant, CartItem.variant_id == Variant.id)
         .join(Product, Variant.product_id == Product.id)
-        .join(Inventory, Inventory.variant_id == Variant.id)
+        .outerjoin(Inventory, Inventory.variant_id == Variant.id)
         .where(CartItem.cart_id == session_id)
         .order_by(Variant.id)
         .execution_options(populate_existing=True)
@@ -51,10 +51,12 @@ def cart_view(db: Session, session_id: str, *, check_stock: bool = False) -> dic
     items = []
     total = Decimal("0.00")
     for item, variant, product, stock in rows:
-        sellable = product.is_active and variant.is_active
+        # Missing inventory is unavailable, never a reason to omit a cart line.
+        available = stock.available if stock is not None else 0
+        sellable = product.is_active and variant.is_active and stock is not None
         if check_stock and not sellable:
             raise VariantUnavailable()
-        if check_stock and item.quantity > stock.available:
+        if check_stock and item.quantity > available:
             raise InsufficientStock()
         subtotal = variant.price * item.quantity
         total += subtotal
@@ -69,7 +71,7 @@ def cart_view(db: Session, session_id: str, *, check_stock: bool = False) -> dic
                 quantity=item.quantity,
                 unit_price=str(variant.price),
                 subtotal=str(subtotal),
-                available=stock.available,
+                available=available,
                 sellable=sellable,
             )
         )

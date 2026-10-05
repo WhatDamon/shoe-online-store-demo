@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.application.commerce import expire_if_due, lock_cart, owned_order
+from app.application.commerce import as_utc, expire_if_due, lock_cart, owned_order
 from app.config import settings
 from app.domain.models import Order
 from app.infrastructure.database import SessionLocal
@@ -22,7 +22,7 @@ def expire_due_orders(
     now: datetime | None = None,
     batch_size: int | None = None,
 ) -> int:
-    cutoff = now or datetime.now(UTC)
+    cutoff = as_utc(now or datetime.now(UTC))
     # Close this read transaction before acquiring any write locks (SQLite WAL).
     with sessions() as db:
         candidates = db.execute(

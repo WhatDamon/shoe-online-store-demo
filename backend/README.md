@@ -24,7 +24,10 @@ with Decimal and serialized as decimal strings. The only provider is
 
 Pending orders reserve inventory for 30 minutes by default. The FastAPI lifespan runs a
 bounded in-process sweeper every 30 seconds; `python -m app.expire_orders` also runs one
-manual pass. Both paths use the same transactional release code as cancellation. Set
+manual pass. Both paths use the same transactional release code as cancellation.
+The sweep normalizes an explicit `now` to UTC before SQL candidate selection;
+naive datetimes are treated as UTC, matching the per-order expiry check. A scan
+before the exact deadline does not release stock; repeated scans release at most once. Set
 `RESERVATION_TTL_SECONDS`, `RESERVATION_SWEEP_SECONDS`, `RESERVATION_SWEEP_BATCH_SIZE` or
 `RESERVATION_SWEEPER_ENABLED=false` in `backend/.env` when needed. No external queue is used.
 
@@ -138,19 +141,19 @@ There is no scheduled sync, price sync, product rename migration or hard deletio
 `GET /health` verifies migration metadata is readable. Interactive API docs:
 `http://127.0.0.1:8000/docs`.
 
-| Method | Path | Input |
-|---|---|---|
-| GET | /api/v1/catalog/products | Public catalog |
-| GET | /api/v1/catalog/products/{handle} | Explicit variants, price strings, available stock |
-| GET | /api/v1/cart | Anonymous session |
-| POST | /api/v1/cart/items | `{ "variant_id": "UUID", "quantity": 1 }` |
-| PATCH | /api/v1/cart/items/{item_id} | `{ "quantity": 2 }` |
-| DELETE | /api/v1/cart/items/{item_id} | Anonymous session |
-| POST | /api/v1/checkout/preview | Re-read prices and check inventory |
-| POST | /api/v1/checkout/create-order | `Idempotency-Key` header, 8–128 characters |
-| GET | /api/v1/orders/{order_id} | Only owner session |
-| POST | /api/v1/orders/{order_id}/cancel | Idempotent cancellation and stock release |
-| POST | /api/v1/payments/session | `{ "order_id": "UUID" }`; always disabled |
+| Method | Path                              | Input                                             |
+| ------ | --------------------------------- | ------------------------------------------------- |
+| GET    | /api/v1/catalog/products          | Public catalog                                    |
+| GET    | /api/v1/catalog/products/{handle} | Explicit variants, price strings, available stock |
+| GET    | /api/v1/cart                      | Anonymous session                                 |
+| POST   | /api/v1/cart/items                | `{ "variant_id": "UUID", "quantity": 1 }`         |
+| PATCH  | /api/v1/cart/items/{item_id}      | `{ "quantity": 2 }`                               |
+| DELETE | /api/v1/cart/items/{item_id}      | Anonymous session                                 |
+| POST   | /api/v1/checkout/preview          | Re-read prices and check inventory                |
+| POST   | /api/v1/checkout/create-order     | `Idempotency-Key` header, 8–128 characters        |
+| GET    | /api/v1/orders/{order_id}         | Only owner session                                |
+| POST   | /api/v1/orders/{order_id}/cancel  | Idempotent cancellation and stock release         |
+| POST   | /api/v1/payments/session          | `{ "order_id": "UUID" }`; always disabled         |
 
 All non-public APIs require `X-Session-ID: <random UUID>` (a bearer credential).
 In production they also require the server-only `X-Internal-Proxy-Secret`, which
@@ -158,9 +161,14 @@ must match `COMMERCE_PROXY_SECRET` and contain at least 32 random bytes. The Nex
 proxy adds this header; browsers cannot supply or override it. Local development
 may leave the secret empty, but a configured secret is always checked.
 In the storefront, Next creates this credential in an HttpOnly, SameSite=Lax
-cookie (Secure over HTTPS); callers cannot override it with a browser header.
-The Next proxy checks same-origin writes, uses a route allowlist, does not cache
-commerce responses and has a 20-second upstream timeout. Bind Python to loopback
+cookie (always Secure in production, including TLS-terminating proxies; also Secure
+over HTTPS in development); callers cannot override it with a browser header.
+The Next proxy checks same-origin writes, bounds non-GET bodies to 16 KiB while
+reading (413 before contacting Python on overflow), uses a route allowlist, does
+not cache commerce responses and has a 20-second upstream timeout. A cart variant
+with no inventory row remains visible as unavailable; preview and checkout reject
+it rather than silently creating a partial order and clearing the cart.
+Bind Python to loopback
 for the local MVP. No CORS middleware is needed.
 
 Business, validation, HTTP routing and unexpected application failures return

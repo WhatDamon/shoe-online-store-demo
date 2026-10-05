@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { readRequestBody, RequestBodyError } from '@/server/guardrails/request-body'
 
 export const dynamic = 'force-dynamic'
+const MAX_BODY_BYTES = 16 * 1024
 const cookieName = 'evoloop_cart_session'
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -45,6 +47,21 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }
       { status: 503, headers: responseHeaders },
     )
   }
+  let body: Uint8Array | undefined
+  if (req.method !== 'GET') {
+    try {
+      body = await readRequestBody(req, MAX_BODY_BYTES)
+    } catch (error) {
+      const oversized = error instanceof RequestBodyError && error.code === 'too_large'
+      return NextResponse.json(
+        {
+          code: 'invalid_request',
+          detail: oversized ? 'Request body is too large' : 'Request body is invalid',
+        },
+        { status: oversized ? 413 : 422, headers: responseHeaders },
+      )
+    }
+  }
   const existing = req.cookies.get(cookieName)?.value
   const session = existing && uuid.test(existing) ? existing : crypto.randomUUID()
   const headers: Record<string, string> = {
@@ -62,7 +79,7 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }
       {
         method: req.method,
         headers,
-        body: req.method === 'GET' ? undefined : await req.text(),
+        body: body ? new TextDecoder().decode(body) : undefined,
         cache: 'no-store',
         signal: AbortSignal.timeout(20000),
         redirect: 'error',
@@ -91,7 +108,7 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }
     response.cookies.set(cookieName, session, {
       httpOnly: true,
       sameSite: 'lax',
-      secure: req.nextUrl.protocol === 'https:',
+      secure: production || req.nextUrl.protocol === 'https:',
       path: '/',
       maxAge: 60 * 60 * 24 * 30,
     })

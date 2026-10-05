@@ -117,6 +117,31 @@ def test_short_stock_rolls_back_order_and_cart(commerce, variant):
     assert client.get("/api/v1/cart").json()["items"][0]["quantity"] == 11
 
 
+def test_missing_inventory_keeps_cart_visible_and_blocks_partial_checkout(commerce, variant):
+    client, engine = commerce
+    other = client.get("/api/v1/catalog/products/dc-1001").json()["variants"][1]
+    add(client, variant)
+    add(client, other)
+    with Session(engine) as db, db.begin():
+        db.delete(db.get(Inventory, variant["id"]))
+    cart = client.get("/api/v1/cart").json()
+    assert len(cart["items"]) == 2
+    missing = next(item for item in cart["items"] if item["variant_id"] == variant["id"])
+    assert missing["available"] == 0
+    assert missing["sellable"] is False
+    for response in [client.post("/api/v1/checkout/preview"), checkout(client)]:
+        assert response.status_code == 409
+        assert response.json()["code"] == "variant_unavailable"
+    with Session(engine) as db:
+        assert db.scalar(select(func.count()).select_from(Order)) == 0
+        assert db.scalar(select(func.count()).select_from(Reservation)) == 0
+        stock = db.get(Inventory, other["id"])
+        assert (stock.available, stock.reserved) == (10, 0)
+    assert len(client.get("/api/v1/cart").json()["items"]) == 2
+    assert len(client.delete(f"/api/v1/cart/items/{missing['id']}").json()["items"]) == 1
+    assert checkout(client).status_code == 200
+
+
 def test_reserve_idempotency_cancel_and_audit(commerce, variant):
     client, engine = commerce
     add(client, variant, 2)

@@ -1,6 +1,6 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from threading import Event
 from uuid import uuid4
 
@@ -13,7 +13,7 @@ from app.application import commerce as service
 from app.application import expiry
 from app.application.commerce import as_utc
 from app.config import Settings, settings
-from app.domain.models import AuditLog, Inventory, Order, OrderItem, Reservation
+from app.domain.models import AuditLog, Cart, Inventory, Order, OrderItem, Reservation
 from app.main import app, lifespan
 
 
@@ -92,6 +92,35 @@ def test_new_deadline_is_server_owned_and_immutable_on_retry(commerce, variant, 
         == 0
     )
     assert expiry.expire_due_orders(sessionmaker(engine), now=deadline) == 1
+    assert_released_once(engine, variant, order["id"])
+
+
+@pytest.mark.parametrize("offset_hours", [-8, 0, 8, None])
+def test_sweep_normalizes_cutoff_before_sql_and_keeps_exact_deadline(
+    commerce, variant, offset_hours
+):
+    client, engine = commerce
+    order = place_order(client, variant)
+    deadline = datetime(2026, 9, 21, 12, tzinfo=UTC)
+    set_deadline(engine, order["id"], deadline)
+    sessions = sessionmaker(engine)
+    with Session(engine) as db:
+        cart_id = db.get(Order, order["id"]).cart_id
+        revision = db.get(Cart, cart_id).revision
+
+    def cutoff(instant):
+        if offset_hours is None:
+            return instant.replace(tzinfo=None)
+        return instant.astimezone(timezone(timedelta(hours=offset_hours)))
+
+    assert expiry.expire_due_orders(sessions, now=cutoff(deadline - timedelta(microseconds=1))) == 0
+    with Session(engine) as db:
+        assert db.get(Cart, cart_id).revision == revision
+        assert db.get(Order, order["id"]).status == "pending_payment"
+        stock = db.get(Inventory, variant["id"])
+        assert (stock.available, stock.reserved) == (8, 2)
+    assert expiry.expire_due_orders(sessions, now=cutoff(deadline)) == 1
+    assert expiry.expire_due_orders(sessions, now=cutoff(deadline)) == 0
     assert_released_once(engine, variant, order["id"])
 
 

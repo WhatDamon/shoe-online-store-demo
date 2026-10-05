@@ -4,6 +4,7 @@ import { chat, FALLBACK_ERROR_TEXT } from '@/server/ai/chat'
 import { encodeEvent } from '@/domain/chat-events'
 import type { ChatEvent, Mode } from '@/domain/chat-events'
 import { maxMessageChars } from '@/server/guardrails/text'
+import { readRequestBody } from '@/server/guardrails/request-body'
 import {
   AI_SESSION_COOKIE,
   isSameOriginRequest,
@@ -100,11 +101,8 @@ function parseBody(value: unknown): ParsedBody | null {
 }
 
 async function readBody(req: NextRequest): Promise<ParsedBody | null> {
-  const length = req.headers.get('content-length')
-  if (length && /^\d+$/.test(length) && Number(length) > MAX_BODY_BYTES) return null
   try {
-    const bytes = await req.arrayBuffer()
-    if (bytes.byteLength > MAX_BODY_BYTES) return null
+    const bytes = await readRequestBody(req, MAX_BODY_BYTES)
     const raw = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
     return parseBody(JSON.parse(raw))
   } catch {

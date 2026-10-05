@@ -1,5 +1,11 @@
 # 新 Agent 工作交接 — Evoloop
 
+> **提交与合并授权更新：2026-10-05。** 用户已明确要求主动发起合并和提交；下方检查点的“不提交、不 push”仅描述此前状态。本次提交仅包含已验收的 14 个文件，保留用户 `.gitignore` 与未跟踪教学文档。远端已核实存在上游 `WhatDamon/shoe-online-store-demo` 草稿 PR #14（`beifeng08:sql-certificate-and-AI-stock` → `main`）；提交前本地还有 26 个历史提交未推送。远端更新范围与关联自动部署副作用需明确后再推进，不强推、不部署、不操作业务数据库。局部测试通过不等于全仓阶段 C 或生产验收完成。
+
+> **续做验收：2026-10-05，仍基于 `f8e0964`，未提交。** 显式 UTC-8 `now` 的 SQLite expiry 漏选已独立复现，SQL 前复用 `as_utc`；回归覆盖 UTC-8/UTC/UTC+8/naive、截止前无写锁、精确截止释放一次及重复扫描。旧 AI smoke 的 `delta != error` 已复现，脚本改为签名 Cookie 合同；最新生产构建两个隔离 Mock 实例共 17 次 HTTP、229 条断言通过，包含第三回合 `turns` 拒绝。路由测试另验证实际 AI 入参为 Cookie UUID、不是完整签名串。最终 verify 593 passed/16 skipped；Python 109 passed/1 skipped；Ruff/format/mypy/compileall、全新 SQLite Alembic、45/45 构建通过。测试目录保留，临时服务全部停止，用户 `.gitignore` 与教学文档哈希保持一致。无新 schema/依赖/配置项；PG/TLS、浏览器 HTTPS、远端 CI、部署与其余阶段 C 审查仍待验收，不提交、不 push、不部署。下方较早检查点的两个候选已在本段关闭。
+
+> **本轮局部可靠性修复：2026-10-05，基于 `f8e0964`，未提交。** AI/commerce 共用逐块校验的 16 KiB 请求读取器，超限立即取消、不继续整流缓冲；生产购物 Cookie 强制 Secure。Python 购物车缺库存行不再被内连接隐藏：保留 unavailable 行并拒绝部分结账，避免整车清空。先失败回归后修复；verify 593 passed/16 skipped，Python 105 passed/1 skipped，静态质量、45/45 构建、隔离 Alembic 和真实回环双服务 HTTP 闭环通过。详情及限制见 [更新后的请求边界报告](./docs/ai-request-boundary-2026-10-03.md)。本轮 PG/TLS、远端 CI、浏览器 HTTPS 和正式部署未验收；测试使用全新数据库、已停止服务，业务库与用户已有文件保留。待续：非 UTC 显式 now 的 SQLite expiry 候选、过时 AI smoke 断言、其余阶段 C 全仓审查；不提交、不 push、不部署。
+
 > **目录停售传播：2026-10-03，F:/shoe-online-store-demo，基于 `54c6fa7`。** 阶段 C 新增商品/变体 `is_active` 与 Alembic 迁移 `c73a28f06b19`；显式 `app.sync_catalog` 默认只读预览，应用必须匹配计划版本，缺失身份停用但不删除，恢复必须显式 `--restore-present`。加购、数量修改和创建订单从 Python 重读可售状态；已有购物车显示停售并允许移除，历史订单、幂等重试、取消和到期释放保持可用。同步不导入价格、不调整库存、不改订单。前端 verify/build、双数据库回归、CLI 与迁移保护证据见 [停售传播报告](./docs/catalog-availability-2026-10-03.md)。新增商品、改名迁移、自动持续同步和正式部署仍按后续独立步骤处理。
 
 > **生产配置门禁：2026-10-03。** 新增 `npm run preflight -- -Environment production`，要求显式 `APP_ENV=production`，并在构建/启动前检查 PostgreSQL + TLS 验证、32 字节 AI Session 签名材料、非回环 Python 内部地址和 Shopify 默认关闭；输出不包含连接串、密钥或证书内容。Pester 回归覆盖缺失/错误/正确 `APP_ENV` 及其他不安全组合。该脚本是配置门禁，不证明真实证书、代理、域名或部署已上线。
@@ -60,24 +66,24 @@
 
 ### 0.2 证据标签
 
-| 标签 | 意义 | 不能推导出的结论 |
-| --- | --- | --- |
+| 标签     | 意义                                | 不能推导出的结论             |
+| -------- | ----------------------------------- | ---------------------------- |
 | 本轮核对 | 本轮读取了文件、代码或本地 Git 状态 | 不能证明运行、测试或线上行为 |
-| 历史验证 | 旧报告记载某日期、某版本执行通过 | 不能当作新组合版本的验收 |
-| 待整合 | 修复出现在其他分支或历史 PR 记录中 | 不能当作当前交易树已修复 |
-| 待验证 | 未建立对应环境或未执行检查 | 不能写成通过，也不能编造结果 |
-| 建议 | 接手后的执行方案 | 不等于用户已经要求立即实施 |
+| 历史验证 | 旧报告记载某日期、某版本执行通过    | 不能当作新组合版本的验收     |
+| 待整合   | 修复出现在其他分支或历史 PR 记录中  | 不能当作当前交易树已修复     |
+| 待验证   | 未建立对应环境或未执行检查          | 不能写成通过，也不能编造结果 |
+| 建议     | 接手后的执行方案                    | 不等于用户已经要求立即实施   |
 
 ## 1. 先选对工作区，避免在错误版本上继续开发
 
 以下来自本轮 `git worktree list --porcelain`、分支和 HEAD 核对；本轮没有 fetch，也没有重新查询 GitHub 或线上站点。
 
-| 代号 | 本机目录 | 分支 | 本轮 HEAD | 用途与限制 |
-| --- | --- | --- | --- | --- |
-| A | `F:/shoe-online-store-demo` | `sql-certificate-and-AI-stock` | `dd76ad81992a4dc1d95d6cdb7bbd6853b38ee867` | 本轮文档写入位置；旧展示/AI 路线及 SEO 草稿，不是完整 commerce 基线 |
-| B | `C:/Users/Administrator/.codex/worktrees/9106/shoe-online-store-demo` | `codex/handover-2026-09-30` | `44a94e0e073c43a2d4548d90ce4e08cbf7c1b5bc` | 本地交易实现和旧交接的证据位置；仍非安全补丁全集 |
-| C | `C:/Users/Administrator/.codex/worktrees/security-guardrails/shoe-online-store-demo` | `codex/commerce-error-boundary` | `bbf781b18ccff015fa2aa94173d14892aececd92` | 业务异常分支；目录名字不证明含全部安全修改 |
-| D | `C:/Users/Administrator/.codex/worktrees/seo-cleanup/shoe-online-store-demo` | `codex/cleanup-generated-artifacts` | `2f7b6fbf6d2c8841d3894747431ab86e5b0c5a53` | 已提交构建产物清理分支；不代表其他分支已清理 |
+| 代号 | 本机目录                                                                             | 分支                                | 本轮 HEAD                                  | 用途与限制                                                          |
+| ---- | ------------------------------------------------------------------------------------ | ----------------------------------- | ------------------------------------------ | ------------------------------------------------------------------- |
+| A    | `F:/shoe-online-store-demo`                                                          | `sql-certificate-and-AI-stock`      | `dd76ad81992a4dc1d95d6cdb7bbd6853b38ee867` | 本轮文档写入位置；旧展示/AI 路线及 SEO 草稿，不是完整 commerce 基线 |
+| B    | `C:/Users/Administrator/.codex/worktrees/9106/shoe-online-store-demo`                | `codex/handover-2026-09-30`         | `44a94e0e073c43a2d4548d90ce4e08cbf7c1b5bc` | 本地交易实现和旧交接的证据位置；仍非安全补丁全集                    |
+| C    | `C:/Users/Administrator/.codex/worktrees/security-guardrails/shoe-online-store-demo` | `codex/commerce-error-boundary`     | `bbf781b18ccff015fa2aa94173d14892aececd92` | 业务异常分支；目录名字不证明含全部安全修改                          |
+| D    | `C:/Users/Administrator/.codex/worktrees/seo-cleanup/shoe-online-store-demo`         | `codex/cleanup-generated-artifacts` | `2f7b6fbf6d2c8841d3894747431ab86e5b0c5a53` | 已提交构建产物清理分支；不代表其他分支已清理                        |
 
 这里只详细核对 A/B；C/D 的登记信息来自 Git，没有核验其当前工作区是否适合写入或复用。跨工作区写入仍应检查会话权限及是否有其他任务占用。
 
@@ -149,23 +155,23 @@ Get-ChildItem -Force -File -Filter '.env*' | Select-Object Name
 └───────────────────────────────────────────────────────────────────┘
 ```
 
-| 概念 | 本项目中的位置 | 重要区别 |
-| --- | --- | --- |
-| Python / FastAPI | 自建交易服务 | 决定交易规则，不代替数据库 |
-| SQL / SQLite / PostgreSQL | SQL 是操作语言；后两者是数据库系统 | Python 与 SQL 数据库需要协作，不应简单“解绑” |
-| Cloud SQL | 早期设计选择的云端 PostgreSQL 托管路线 | 兼容代码和选型记录不是已部署证明 |
-| Firebase / Firestore | 本轮检查未发现接入实现；早期设计没有选择 Firestore | 不要把 Cloud SQL 叫作本项目的 Firebase 后端；不对 Firebase 产品能力作绝对断言 |
-| Shopify Buy Button | 保留的另一条商品选择/结账路径 | 不经过 Python 交易服务；B 默认关闭，兼容代码尚未删除 |
-| SQLAlchemy / Drizzle | Python / TypeScript 各自的数据访问工具 | 不是同一个 ORM，也不是同一份业务 schema |
+| 概念                      | 本项目中的位置                                     | 重要区别                                                                      |
+| ------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Python / FastAPI          | 自建交易服务                                       | 决定交易规则，不代替数据库                                                    |
+| SQL / SQLite / PostgreSQL | SQL 是操作语言；后两者是数据库系统                 | Python 与 SQL 数据库需要协作，不应简单“解绑”                                  |
+| Cloud SQL                 | 早期设计选择的云端 PostgreSQL 托管路线             | 兼容代码和选型记录不是已部署证明                                              |
+| Firebase / Firestore      | 本轮检查未发现接入实现；早期设计没有选择 Firestore | 不要把 Cloud SQL 叫作本项目的 Firebase 后端；不对 Firebase 产品能力作绝对断言 |
+| Shopify Buy Button        | 保留的另一条商品选择/结账路径                      | 不经过 Python 交易服务；B 默认关闭，兼容代码尚未删除                          |
+| SQLAlchemy / Drizzle      | Python / TypeScript 各自的数据访问工具             | 不是同一个 ORM，也不是同一份业务 schema                                       |
 
 ### 2.1 数据权威与目录漂移
 
-| 数据 | 当前权威来源 | 不允许的误解 |
-| --- | --- | --- |
-| 展示文案、图片、博客、搜索材料 | TS 目录、供应商导入和内容文件 | 展示完整不代表可销售，营销内容仍需证据 |
-| 可售 variant、订单价格、库存 | Python 交易库 | 不接受客户端或 AI 提交的价格、库存、状态作真值 |
-| 订单身份、所有权、历史价格 | Python orders/order_items 和购物会话关联 | 不能只凭订单 ID 访问，商品改价不能改历史订单 |
-| AI 回复与推荐 | TS 检索材料与现有规则 | 不是实时库存、下单或支付工具；AI 卡片不带价格 |
+| 数据                           | 当前权威来源                             | 不允许的误解                                   |
+| ------------------------------ | ---------------------------------------- | ---------------------------------------------- |
+| 展示文案、图片、博客、搜索材料 | TS 目录、供应商导入和内容文件            | 展示完整不代表可销售，营销内容仍需证据         |
+| 可售 variant、订单价格、库存   | Python 交易库                            | 不接受客户端或 AI 提交的价格、库存、状态作真值 |
+| 订单身份、所有权、历史价格     | Python orders/order_items 和购物会话关联 | 不能只凭订单 ID 访问，商品改价不能改历史订单   |
+| AI 回复与推荐                  | TS 检索材料与现有规则                    | 不是实时库存、下单或支付工具；AI 卡片不带价格  |
 
 默认本地 TS 文件为 `data/local.db`，Python 从 `backend/` 启动时为 `backend/commerce.db`。两边环境配置独立，即使都叫 `DATABASE_URL`，也不得指向同一份旧 SQLite 文件。
 
@@ -226,19 +232,19 @@ Python 种子为每个颜色/尺码组合建立稳定 UUIDv5，初始库存是�
 
 ### 3.2 会话、金额、状态和到期
 
-| 合同 | 现有实现与限制 |
-| --- | --- |
-| 购物身份 | `evoloop_cart_session` HttpOnly、SameSite=Lax Cookie；HTTPS 时 Secure；Next 转为内部 `X-Session-ID`。不是完整登录/账号恢复系统 |
-| 所有权 | 购物车项、订单、支付按当前会话限定；Cookie 丢失不能找回原匿名订单 |
-| Python 暴露范围 | 本地绑定 `127.0.0.1`；内部 UUID 是 bearer credential，不能当成可直接公开的完整认证系统 |
-| 金额 | Python `Decimal` + `Numeric(12,2)`；HTTP 用非负两位小数字符串，例 `"59.00"`；不让 JS 浮点决定订单真值 |
-| 当前结算范围 | USD 商品小计；没有税费、运费、折扣、退款或完整多币种购物车 |
-| 订单状态 | 仅 `pending_payment` / `cancelled`；到期以取消原因 `expired` 表达 |
-| 支付 | 只有 `MockPaymentProvider`，返回 `payment_disabled`、`charged=false`，不能变为 paid |
-| 支付记录时机 | 当前是在请求 Mock 支付会话时惰性创建 payment/event，不是在下单时就创建支付占位 |
-| 到期 | 默认 1800 秒；进程内扫描默认 30 秒、每批最多 100；CLI 和部分订单请求也可触发释放。停机/积压可能延迟 |
-| 响应合同 | 后端 Pydantic 成功模型 + 前端手写 parser 已存在；不是 Zod/OpenAPI 自动生成，不覆盖所有跨字段计算一致性 |
-| 错误与日志 | B 仍有 `HTTPException` 进入 Application，统一安全错误、request ID 和日志边界尚待整合复核 |
+| 合同            | 现有实现与限制                                                                                                                 |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| 购物身份        | `evoloop_cart_session` HttpOnly、SameSite=Lax Cookie；HTTPS 时 Secure；Next 转为内部 `X-Session-ID`。不是完整登录/账号恢复系统 |
+| 所有权          | 购物车项、订单、支付按当前会话限定；Cookie 丢失不能找回原匿名订单                                                              |
+| Python 暴露范围 | 本地绑定 `127.0.0.1`；内部 UUID 是 bearer credential，不能当成可直接公开的完整认证系统                                         |
+| 金额            | Python `Decimal` + `Numeric(12,2)`；HTTP 用非负两位小数字符串，例 `"59.00"`；不让 JS 浮点决定订单真值                          |
+| 当前结算范围    | USD 商品小计；没有税费、运费、折扣、退款或完整多币种购物车                                                                     |
+| 订单状态        | 仅 `pending_payment` / `cancelled`；到期以取消原因 `expired` 表达                                                              |
+| 支付            | 只有 `MockPaymentProvider`，返回 `payment_disabled`、`charged=false`，不能变为 paid                                            |
+| 支付记录时机    | 当前是在请求 Mock 支付会话时惰性创建 payment/event，不是在下单时就创建支付占位                                                 |
+| 到期            | 默认 1800 秒；进程内扫描默认 30 秒、每批最多 100；CLI 和部分订单请求也可触发释放。停机/积压可能延迟                            |
+| 响应合同        | 后端 Pydantic 成功模型 + 前端手写 parser 已存在；不是 Zod/OpenAPI 自动生成，不覆盖所有跨字段计算一致性                         |
+| 错误与日志      | B 仍有 `HTTPException` 进入 Application，统一安全错误、request ID 和日志边界尚待整合复核                                       |
 
 AI Session 与购物会话是两条边界。购物 Cookie 已存在，不代表 AI 已经完成服务端身份/IP 修复。
 
@@ -258,18 +264,18 @@ a682dde201b4_reservation_expiry
 
 下表中的路径均相对于**选定的目标工作区根目录**。标为 B 的文件在 A 缺失时，先参考 B 或正确 Git 引用，不要据此重新实现。
 
-| 要解决的问题 | 首先阅读 | 直接相关验证 |
-| --- | --- | --- |
-| 商品展示/导入 | `src/domain/product.ts`、`src/server/catalog/adapter-contract.ts`、`db-adapter.ts`、`src/db/schema*.ts`、`src/app/api/catalog/route.ts` | catalog/DB 相关测试；检查缺失 seed 自动补回行为 |
-| 商品变体和购买（B） | `src/components/shop/product-actions.tsx`、`product-buy-bar.tsx` | `product-actions.test.tsx`、购买条测试 |
-| 购物车/结账/订单（B） | `src/components/shop/commerce-panel.tsx`、`src/app/cart/`、`checkout/`、`orders/` | commerce panel 测试、真实双服务 smoke |
-| 请求与响应（B） | `src/lib/commerce-client.ts`、`src/domain/commerce-response.ts`、`backend/app/schemas/responses.py` | TS parser/client 测试、`backend/tests/test_response_contract.py` |
-| Next 代理（B） | `src/app/api/commerce/[...path]/route.ts` | 同源、Cookie、错误状态、超时、路径白名单测试 |
-| Python 业务（B） | `backend/app/api/v1/routes.py` → `app/dependencies.py` → `app/application/commerce.py` → `app/domain/models.py` | `backend/tests/test_commerce.py`：回滚、所有权、幂等、竞争库存 |
-| 预占到期（B） | `backend/app/application/expiry.py`、`app/expire_orders.py`、`app/main.py` | `test_expiry.py`、`test_expiry_migration.py` |
-| 数据库生命周期（B） | `backend/app/infrastructure/database.py`、`migrations/`、`app/seed.py`、`app/config.py` | 独立数据库迁移；`test_database_snapshot.py` |
-| AI 与护栏 | `src/app/api/ai/chat/route.ts`、`src/server/ai/`、`guardrails/`、`search/repository.ts` | 选择已整合版本的 Session/IP、TTL/容量、预算并发测试 |
-| SEO（A 有草稿） | `docs/seo-geo-plan.md`、`src/lib/site.ts`、`seo.ts`、`src/app/robots.ts`、`sitemap.ts` | 域名/metadata 测试、生产构建、发布后真实 URL GET |
+| 要解决的问题          | 首先阅读                                                                                                                                | 直接相关验证                                                     |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| 商品展示/导入         | `src/domain/product.ts`、`src/server/catalog/adapter-contract.ts`、`db-adapter.ts`、`src/db/schema*.ts`、`src/app/api/catalog/route.ts` | catalog/DB 相关测试；检查缺失 seed 自动补回行为                  |
+| 商品变体和购买（B）   | `src/components/shop/product-actions.tsx`、`product-buy-bar.tsx`                                                                        | `product-actions.test.tsx`、购买条测试                           |
+| 购物车/结账/订单（B） | `src/components/shop/commerce-panel.tsx`、`src/app/cart/`、`checkout/`、`orders/`                                                       | commerce panel 测试、真实双服务 smoke                            |
+| 请求与响应（B）       | `src/lib/commerce-client.ts`、`src/domain/commerce-response.ts`、`backend/app/schemas/responses.py`                                     | TS parser/client 测试、`backend/tests/test_response_contract.py` |
+| Next 代理（B）        | `src/app/api/commerce/[...path]/route.ts`                                                                                               | 同源、Cookie、错误状态、超时、路径白名单测试                     |
+| Python 业务（B）      | `backend/app/api/v1/routes.py` → `app/dependencies.py` → `app/application/commerce.py` → `app/domain/models.py`                         | `backend/tests/test_commerce.py`：回滚、所有权、幂等、竞争库存   |
+| 预占到期（B）         | `backend/app/application/expiry.py`、`app/expire_orders.py`、`app/main.py`                                                              | `test_expiry.py`、`test_expiry_migration.py`                     |
+| 数据库生命周期（B）   | `backend/app/infrastructure/database.py`、`migrations/`、`app/seed.py`、`app/config.py`                                                 | 独立数据库迁移；`test_database_snapshot.py`                      |
+| AI 与护栏             | `src/app/api/ai/chat/route.ts`、`src/server/ai/`、`guardrails/`、`search/repository.ts`                                                 | 选择已整合版本的 Session/IP、TTL/容量、预算并发测试              |
+| SEO（A 有草稿）       | `docs/seo-geo-plan.md`、`src/lib/site.ts`、`seo.ts`、`src/app/robots.ts`、`sitemap.ts`                                                  | 域名/metadata 测试、生产构建、发布后真实 URL GET                 |
 
 保留 `src/domain` 的纯 TS 领域边界，Client Component 不得运行时导入 `src/server/**`；`import type` 擦除后不构成运行时依赖。`CanonicalSize` 使用 EU 整档；色号数组下标只是图库坐标，不是 variant ID。尺码换算表和部分商品文案是演示资料，不能升级为未经核实的商品承诺。
 
@@ -277,18 +283,18 @@ a682dde201b4_reservation_expiry
 
 ### 5.1 当前能力矩阵
 
-| 能力 | A | B | 交接判断 |
-| --- | --- | --- | --- |
-| 展示/搜索/收藏/AI | 有 | 保留 | 本轮读代码；不代表无缺陷或生产验收 |
-| Python 交易源码、代理与交易页面 | 缺失；残留被跟踪的 `.pyc`、数据库 | 有 | 本地 MVP 已有实现，不要在 A 误判成“后端已搭好” |
-| 预占到期释放 | 无完整源码 | 有 | 历史测试通过，组合基线须复测 |
-| 成功响应模型、前端 parser | 无 | 有 | 2026-09-30 工作已进入 B；错误规范仍待整合 |
-| TLS 身份校验 | 已整合验证：生产强制 `rejectUnauthorized:true`、CA/主机名校验与 fail-closed 配置 | 同样已整合；真实握手/数据库验收见 TLS 报告 | 当前代码不再提供生产明文或证书绕过路径 |
-| AI Map 有界、Session/IP、原子预算 | 旧路径 | 旧路径 | 独立修复存在，不能宣布已经整体解决 |
-| Shopify 显式关闭开关 | 无相同总开关 | 有 | 保留兼容入口，不等于删除账号/外部商店 |
-| robots/sitemap、SEO 方案 | 有草稿/文件 | 对应文件缺失 | A 文件存在不代表正确或上线 |
-| PostgreSQL 运行时及 TLS 联调 | 已有独立本地 PostgreSQL/TLS 验收报告与集成测试 | 已有独立本地 PostgreSQL/TLS 验收报告与集成测试 | 仍不等同于远端 CI、证书轮换或正式部署验收 |
-| 真实支付、账号恢复、后台管理、自动目录同步 | 不作为已完成能力 | 未实现 | 明确范围，不能靠 UI 或表名推断 |
+| 能力                                       | A                                                                                | B                                              | 交接判断                                       |
+| ------------------------------------------ | -------------------------------------------------------------------------------- | ---------------------------------------------- | ---------------------------------------------- |
+| 展示/搜索/收藏/AI                          | 有                                                                               | 保留                                           | 本轮读代码；不代表无缺陷或生产验收             |
+| Python 交易源码、代理与交易页面            | 缺失；残留被跟踪的 `.pyc`、数据库                                                | 有                                             | 本地 MVP 已有实现，不要在 A 误判成“后端已搭好” |
+| 预占到期释放                               | 无完整源码                                                                       | 有                                             | 历史测试通过，组合基线须复测                   |
+| 成功响应模型、前端 parser                  | 无                                                                               | 有                                             | 2026-09-30 工作已进入 B；错误规范仍待整合      |
+| TLS 身份校验                               | 已整合验证：生产强制 `rejectUnauthorized:true`、CA/主机名校验与 fail-closed 配置 | 同样已整合；真实握手/数据库验收见 TLS 报告     | 当前代码不再提供生产明文或证书绕过路径         |
+| AI Map 有界、Session/IP、原子预算          | 旧路径                                                                           | 旧路径                                         | 独立修复存在，不能宣布已经整体解决             |
+| Shopify 显式关闭开关                       | 无相同总开关                                                                     | 有                                             | 保留兼容入口，不等于删除账号/外部商店          |
+| robots/sitemap、SEO 方案                   | 有草稿/文件                                                                      | 对应文件缺失                                   | A 文件存在不代表正确或上线                     |
+| PostgreSQL 运行时及 TLS 联调               | 已有独立本地 PostgreSQL/TLS 验收报告与集成测试                                   | 已有独立本地 PostgreSQL/TLS 验收报告与集成测试 | 仍不等同于远端 CI、证书轮换或正式部署验收      |
+| 真实支付、账号恢复、后台管理、自动目录同步 | 不作为已完成能力                                                                 | 未实现                                         | 明确范围，不能靠 UI 或表名推断                 |
 
 历史回答中的粗略百分比不是验收指标。本项目尚无统一加权需求清单；报告应分别给出“实现、集成、测试、发布”的状态，不编造一个精确完成率。
 
@@ -296,16 +302,16 @@ a682dde201b4_reservation_expiry
 
 这些本地提交能用于找代码；提交日期/本地分支名不保证它是远端最新 head。
 
-| 主题 | 本地线索 | 旧交接中的 PR 位置 | 组合时保护什么 |
-| --- | --- | --- | --- |
-| PostgreSQL TLS | `d005c04` / `codex/verify-postgres-tls` | 上游 #15 包含相关修复 | 可信 CA/主机身份、错误信息不含秘密；真实 TLS 验证 |
-| AI 内存边界 | `c0e8980` / `codex/bound-ai-guardrail-state` | 上游 #15 | TTL 真清理、容量、key 校验、历史长度、单实例约束 |
-| AI Session/IP | `8f1d7a6`；Cookie 补丁 `b345188` | 上游 #15；fork #1 | Cookie 真实性/期限、可信代理策略；不能只随机生成 ID |
-| 原子预算 | `89b610e` / `codex/atomic-ai-budget` | 上游 #16 | 预占、结算、失败/中断释放、UTC 日期、并发与 schema 变化 |
-| 业务异常解耦 | `bbf781b` / `codex/commerce-error-boundary` | 上游 #17 | Application 不依赖 FastAPI，同时保留 B 新增 response_model 和事务范围 |
-| SQLite 测试快照 | B 含 `413a59f`；原补丁 `99b963a` | fork #2 | 用 backup 读取已提交 WAL 内容，不退回仅拷贝 `.db` |
-| 成功响应/客户端解析 | B 含 `eccb15e`、`857bb5e` | fork #3/#4 | 严格输出、回滚校验、未知字段隔离、失败重试复用 key |
-| 生成产物清理 | `2f7b6fb` / D | 旧上游 #14 另需复核 | 不把已有业务库、缓存和构建目录打包提交；不能擅删用户数据 |
+| 主题                | 本地线索                                     | 旧交接中的 PR 位置    | 组合时保护什么                                                        |
+| ------------------- | -------------------------------------------- | --------------------- | --------------------------------------------------------------------- |
+| PostgreSQL TLS      | `d005c04` / `codex/verify-postgres-tls`      | 上游 #15 包含相关修复 | 可信 CA/主机身份、错误信息不含秘密；真实 TLS 验证                     |
+| AI 内存边界         | `c0e8980` / `codex/bound-ai-guardrail-state` | 上游 #15              | TTL 真清理、容量、key 校验、历史长度、单实例约束                      |
+| AI Session/IP       | `8f1d7a6`；Cookie 补丁 `b345188`             | 上游 #15；fork #1     | Cookie 真实性/期限、可信代理策略；不能只随机生成 ID                   |
+| 原子预算            | `89b610e` / `codex/atomic-ai-budget`         | 上游 #16              | 预占、结算、失败/中断释放、UTC 日期、并发与 schema 变化               |
+| 业务异常解耦        | `bbf781b` / `codex/commerce-error-boundary`  | 上游 #17              | Application 不依赖 FastAPI，同时保留 B 新增 response_model 和事务范围 |
+| SQLite 测试快照     | B 含 `413a59f`；原补丁 `99b963a`             | fork #2               | 用 backup 读取已提交 WAL 内容，不退回仅拷贝 `.db`                     |
+| 成功响应/客户端解析 | B 含 `eccb15e`、`857bb5e`                    | fork #3/#4            | 严格输出、回滚校验、未知字段隔离、失败重试复用 key                    |
+| 生成产物清理        | `2f7b6fb` / D                                | 旧上游 #14 另需复核   | 不把已有业务库、缓存和构建目录打包提交；不能擅删用户数据              |
 
 **PR 编号必须带仓库。** 上游 #15 与 fork #15 不是同一对象。旧记录称 #15/#16/#17 是相同旧基线上的并列分支，不能假设相互包含；本轮没有重新查询 OPEN/merged/CI 状态。`codex/server-owned-ai-session` 的本地 head 当前为 `5bf12d4`，也不能只凭名字断定内容或最新程度。
 
@@ -324,13 +330,13 @@ a682dde201b4_reservation_expiry
 
 前后端可以并行实现，但要先共享最小接口和业务规则，并逐小功能接通；不要全程隔绝，到最后才补所有权、金额、幂等和错误语义。以下是建议，不是本轮已执行动作。
 
-| 顺序 | 具体工作 | 本阶段交付/退出条件 |
-| --- | --- | --- |
-| 1. 统一基线 | 核对远端与可用 checkout，保留现有修改；选实际最新的交易基线，逐主题整合既有补丁 | 有明确分支/SHA、补丁包含矩阵；没有重复补丁；没有被覆盖的响应校验/事务规则 |
-| 2. 安全与交易回归 | 按依赖分别合入 TLS/护栏/Session/IP、预算、异常边界；先局部测试后完整门禁 | SQLite 门禁、幂等、越权、并发、失败回滚、过期释放与预算释放有实际证据 |
-| 3. 双服务闭环 | 运行 Next + Python，在同一套代码/数据库上做 smoke 和浏览器验收 | 选变体 → 改购物车 → 创建待付款订单 → 重试同 ID → 取消/到期释放；不存在支付成功提示 |
-| 4. 生产与数据一致性 | 明确展示/交易字段权威；设计版本、对账、更名/停售传播；验证实际 PostgreSQL/TLS 与部署边界 | 真实环境连接与并发结果、迁移/备份/恢复方案、Python 内部访问策略、sweeper 存活证据 |
-| 5. 性能与 SEO | 先记录 SQL 数量/P95/N+1/分页问题，再处理域名、canonical、robots/sitemap、事实与内容 | 局部性能改进有对比；SEO 通过生产构建和真实 URL 验收，不以草稿数量验收 |
+| 顺序                | 具体工作                                                                                 | 本阶段交付/退出条件                                                                |
+| ------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| 1. 统一基线         | 核对远端与可用 checkout，保留现有修改；选实际最新的交易基线，逐主题整合既有补丁          | 有明确分支/SHA、补丁包含矩阵；没有重复补丁；没有被覆盖的响应校验/事务规则          |
+| 2. 安全与交易回归   | 按依赖分别合入 TLS/护栏/Session/IP、预算、异常边界；先局部测试后完整门禁                 | SQLite 门禁、幂等、越权、并发、失败回滚、过期释放与预算释放有实际证据              |
+| 3. 双服务闭环       | 运行 Next + Python，在同一套代码/数据库上做 smoke 和浏览器验收                           | 选变体 → 改购物车 → 创建待付款订单 → 重试同 ID → 取消/到期释放；不存在支付成功提示 |
+| 4. 生产与数据一致性 | 明确展示/交易字段权威；设计版本、对账、更名/停售传播；验证实际 PostgreSQL/TLS 与部署边界 | 真实环境连接与并发结果、迁移/备份/恢复方案、Python 内部访问策略、sweeper 存活证据  |
+| 5. 性能与 SEO       | 先记录 SQL 数量/P95/N+1/分页问题，再处理域名、canonical、robots/sitemap、事实与内容      | 局部性能改进有对比；SEO 通过生产构建和真实 URL 验收，不以草稿数量验收              |
 
 阶段 4 不要求一次性引入复杂同步平台；先把实际漂移问题与最小方案写清楚。只有确有多实例容量/共享状态需求后再评估 Redis 等基础设施，不默认拆微服务。
 
@@ -338,13 +344,13 @@ a682dde201b4_reservation_expiry
 
 ### 6.1 保留的历史脉络
 
-| 日期 | 历史阶段 | 对接手的意义 |
-| --- | --- | --- |
-| 2026-09-04～06 | 展示、目录、AI、供应商素材与兼容购买入口 | 原始目标含 demo，不能假定一开始就承诺完整商城 |
-| 2026-09-15 | 领域层、共享规则、AI 编排、状态处理、npm/Node 与架构记录 | 保留现有模块边界，不为接 Python 重写全部 TS |
-| 2026-09-21～22 | Python commerce、Next 代理、UI、到期释放与 Python CI | 交易闭环已有实现和历史验收；后来拆成多个交付分支 |
-| 2026-09-28～29 | TLS、AI 状态/身份/预算、业务异常、SQLite 快照等修复线 | 分散于多个分支，不代表所有修复已经组合 |
-| 2026-09-30 | 后端响应模型、前端解析/重试与交接 | B 包含最新本地响应合同；本轮新增文档入口和状态辨析 |
+| 日期           | 历史阶段                                                 | 对接手的意义                                       |
+| -------------- | -------------------------------------------------------- | -------------------------------------------------- |
+| 2026-09-04～06 | 展示、目录、AI、供应商素材与兼容购买入口                 | 原始目标含 demo，不能假定一开始就承诺完整商城      |
+| 2026-09-15     | 领域层、共享规则、AI 编排、状态处理、npm/Node 与架构记录 | 保留现有模块边界，不为接 Python 重写全部 TS        |
+| 2026-09-21～22 | Python commerce、Next 代理、UI、到期释放与 Python CI     | 交易闭环已有实现和历史验收；后来拆成多个交付分支   |
+| 2026-09-28～29 | TLS、AI 状态/身份/预算、业务异常、SQLite 快照等修复线    | 分散于多个分支，不代表所有修复已经组合             |
+| 2026-09-30     | 后端响应模型、前端解析/重试与交接                        | B 包含最新本地响应合同；本轮新增文档入口和状态辨析 |
 
 上述为日志/报告里的里程碑，不代表每天全部工作时长或部署时间。没有记录的日期不能补写“当天做了什么”。
 
@@ -464,16 +470,16 @@ backend/.venv/Scripts/python.exe scripts/smoke-commerce.py
 
 ### 7.4 历史测试结果与本轮证据分开
 
-| 项目 | 旧交接/报告记载 | 本轮证据 |
-| --- | --- | --- |
-| Python pytest | 阶段 C 最近基线：104 passed、1 skipped | 上一小步已重跑；本轮只改 TypeScript 限流输入边界 |
-| TS verify | 阶段 C 旧基线：67 文件 / 427 项 | 本轮通过：78 文件、581 passed、15 skipped |
-| 生产 build | 阶段 C 旧基线：成功、44 个静态页面 | 本轮通过：Next 16.3.4，45 个静态页面生成；trace 含双方言迁移文件 |
-| Ruff/format/mypy/compileall、SQLite 迁移 | 旧交接记载通过；TS 迁移单元测试本轮通过 | 后端门禁未在本轮重跑；TS PostgreSQL 迁移需独立测试库 |
-| 双服务 smoke 与浏览器 | 早期 MVP 报告有成功闭环及库存恢复记录 | 未执行；没有启动服务或下单 |
-| GitHub CI/PR、线上 SEO GET | 旧交接有日期与结果 | 未重新查询，不沿用为当前状态 |
-| PostgreSQL/TLS、负载、移动端指标 | 缺少当前组合版本完整验收证据 | 未执行；本轮没有相应验证环境 |
-| 本轮文档 | 新 HANDOVER + README 入口 | 目标 Markdown 格式、文件引用与 Git 差异检查，见本轮交付说明 |
+| 项目                                     | 旧交接/报告记载                         | 本轮证据                                                         |
+| ---------------------------------------- | --------------------------------------- | ---------------------------------------------------------------- |
+| Python pytest                            | 阶段 C 最近基线：104 passed、1 skipped  | 上一小步已重跑；本轮只改 TypeScript 限流输入边界                 |
+| TS verify                                | 阶段 C 旧基线：67 文件 / 427 项         | 本轮通过：78 文件、581 passed、15 skipped                        |
+| 生产 build                               | 阶段 C 旧基线：成功、44 个静态页面      | 本轮通过：Next 16.3.4，45 个静态页面生成；trace 含双方言迁移文件 |
+| Ruff/format/mypy/compileall、SQLite 迁移 | 旧交接记载通过；TS 迁移单元测试本轮通过 | 后端门禁未在本轮重跑；TS PostgreSQL 迁移需独立测试库             |
+| 双服务 smoke 与浏览器                    | 早期 MVP 报告有成功闭环及库存恢复记录   | 未执行；没有启动服务或下单                                       |
+| GitHub CI/PR、线上 SEO GET               | 旧交接有日期与结果                      | 未重新查询，不沿用为当前状态                                     |
+| PostgreSQL/TLS、负载、移动端指标         | 缺少当前组合版本完整验收证据            | 未执行；本轮没有相应验证环境                                     |
+| 本轮文档                                 | 新 HANDOVER + README 入口               | 目标 Markdown 格式、文件引用与 Git 差异检查，见本轮交付说明      |
 
 旧报告提到 TestClient/httpx/anyio 弃用警告与 Windows 测试临时目录权限问题；遇到时记录实际输出，区分依赖警告、权限失败和业务失败。
 

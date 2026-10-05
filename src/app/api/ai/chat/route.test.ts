@@ -179,7 +179,10 @@ describe('AI chat route session boundary', () => {
   it('reuses a server-signed session with only the remaining cookie lifetime', async () => {
     const first = await POST(request())
     const cookie = first.cookies.get(AI_SESSION_COOKIE)!.value
-    const id = chat.mock.calls[0][0].sessionKey
+    const id = cookie.split('.')[1]
+    expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
+    expect(chat.mock.calls[0][0].sessionKey).toBe(id)
+    expect(chat.mock.calls[0][0].sessionKey).not.toBe(cookie)
     vi.setSystemTime(now.getTime() + 5 * 60_000)
     const second = await POST(request({ cookie: `${AI_SESSION_COOKIE}=${cookie}` }))
     expect(chat).toHaveBeenLastCalledWith(
@@ -279,6 +282,34 @@ describe('AI chat route session boundary', () => {
     )
     expect(chat).not.toHaveBeenCalled()
   })
+
+  it.each([undefined, '1'])(
+    'stops oversized streaming bodies without trusting length %s',
+    async (length) => {
+      let reads = 0
+      const cancel = vi.fn()
+      const stream = new ReadableStream<Uint8Array>(
+        {
+          pull(controller) {
+            reads++
+            controller.enqueue(new Uint8Array(8192))
+            if (reads === 20) controller.close()
+          },
+          cancel,
+        },
+        { highWaterMark: 0 },
+      )
+      const req = request(length ? { 'content-length': length } : {})
+      Object.defineProperty(req, 'body', { value: stream })
+      vi.spyOn(req, 'arrayBuffer').mockImplementation(() => new Response(stream).arrayBuffer())
+      const response = await POST(req)
+      expect(response.status).toBe(422)
+      expect(reads).toBe(3)
+      expect(cancel).toHaveBeenCalledTimes(1)
+      expect(stream.locked).toBe(false)
+      expect(chat).not.toHaveBeenCalled()
+    },
+  )
 
   it.each(['http://127.0.0.1:3106', 'http://[::1]:3106'])(
     'preserves the original loopback origin %s before NextURL normalization',
