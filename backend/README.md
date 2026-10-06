@@ -24,7 +24,19 @@ with Decimal and serialized as decimal strings. The only provider is
 
 Pending orders reserve inventory for 30 minutes by default. The FastAPI lifespan runs a
 bounded in-process sweeper every 30 seconds; `python -m app.expire_orders` also runs one
-manual pass. Both paths use the same transactional release code as cancellation.
+manual batch. Both paths use the same transactional release code as cancellation.
+Each lifespan worker keeps its own transient `(expires_at, id)` cursor and a frozen
+UTC cutoff per pass. Failed orders still advance the scan so later healthy orders
+can run; an empty batch resets the pass and retries the earlier failures. Candidate
+read/close failures leave progress unchanged, and write failures retain the safe
+failure signal. A batch accepts 1-1000 candidates; it does not bound query runtime.
+Newly due orders wait for the next pass instead of indefinitely extending this one.
+This is not a database snapshot: late/backdated records can wait for wrap, and
+arbitrary continuous backdating or deadline edits have no strong fairness guarantee.
+Restarting a worker loses its cursor. The manual CLI remains a stateless single
+batch and can repeatedly encounter a bad oldest prefix; it is not the rotating worker.
+An explicit cursor must belong to one serial caller and one database, not be shared
+concurrently or reused after timing out a still-running sweep.
 The sweep normalizes an explicit `now` to UTC before SQL candidate selection;
 naive datetimes are treated as UTC, matching the per-order expiry check. A scan
 before the exact deadline does not release stock; repeated scans release at most once. Set
