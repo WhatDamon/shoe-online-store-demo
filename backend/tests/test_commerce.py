@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
@@ -172,6 +173,87 @@ def test_reserve_idempotency_cancel_and_audit(commerce, variant):
             "inventory_released",
         ]:
             assert actions.count(action) == 1
+
+
+@pytest.mark.parametrize("entry", ["cancel", "expired_cancel", "read", "retry", "payment"])
+@pytest.mark.parametrize("fault", ["missing", "short_reserved"])
+@pytest.mark.parametrize("broken_index", [0, 1])
+def test_release_failure_rolls_back_all_lines_and_allows_repair(
+    commerce, variant, entry, fault, broken_index
+):
+    client, engine = commerce
+    other = client.get("/api/v1/catalog/products/dc-1001").json()["variants"][1]
+    variants = sorted([variant, other], key=lambda item: item["id"])
+    for item in variants:
+        assert add(client, item, 2).status_code == 200
+    order = checkout(client).json()
+    broken = variants[broken_index]
+    healthy = variants[1 - broken_index]
+    with Session(engine) as db, db.begin():
+        if entry != "cancel":
+            db.get(Order, order["id"]).expires_at = datetime.now(UTC) - timedelta(seconds=1)
+        stock = db.get(Inventory, broken["id"])
+        if fault == "missing":
+            db.delete(stock)
+        else:
+            stock.reserved = 1
+
+    path = f"/api/v1/orders/{order['id']}"
+    if entry in ("cancel", "expired_cancel"):
+        response = client.post(path + "/cancel")
+    elif entry == "read":
+        response = client.get(path)
+    elif entry == "retry":
+        response = checkout(client)
+    else:
+        response = client.post("/api/v1/payments/session", json={"order_id": order["id"]})
+    assert response.status_code == 500
+    assert response.json() == {"code": "internal_error", "detail": "Request could not be completed"}
+    with Session(engine) as db:
+        persisted = db.get(Order, order["id"])
+        assert persisted.status == "pending_payment"
+        assert persisted.cancellation_reason is None
+        reservations = db.scalars(select(Reservation).where(Reservation.order_id == order["id"]))
+        assert [reservation.status for reservation in reservations] == ["active", "active"]
+        healthy_stock = db.get(Inventory, healthy["id"])
+        assert (healthy_stock.available, healthy_stock.reserved) == (8, 2)
+        broken_stock = db.get(Inventory, broken["id"])
+        if fault == "missing":
+            assert broken_stock is None
+        else:
+            assert (broken_stock.available, broken_stock.reserved) == (8, 1)
+        assert db.scalar(select(func.count()).select_from(Order)) == 1
+        assert (
+            db.scalar(
+                select(func.count())
+                .select_from(AuditLog)
+                .where(
+                    AuditLog.action.in_(["inventory_released", "order_cancelled", "order_expired"])
+                )
+            )
+            == 0
+        )
+
+    # Repair only the disposable fixture; the application must not invent inventory.
+    with Session(engine) as db, db.begin():
+        if fault == "missing":
+            db.add(Inventory(variant_id=broken["id"], available=8, reserved=2))
+        else:
+            db.get(Inventory, broken["id"]).reserved = 2
+    assert client.post(path + "/cancel").json()["status"] == "cancelled"
+    assert client.post(path + "/cancel").json()["status"] == "cancelled"
+    with Session(engine) as db:
+        for item in variants:
+            stock = db.get(Inventory, item["id"])
+            assert (stock.available, stock.reserved) == (10, 0)
+        assert (
+            db.scalar(
+                select(func.count())
+                .select_from(AuditLog)
+                .where(AuditLog.action == "inventory_released")
+            )
+            == 2
+        )
 
 
 def test_mock_never_charges_or_marks_paid(commerce, variant):

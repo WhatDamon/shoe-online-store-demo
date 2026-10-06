@@ -99,6 +99,57 @@ def test_new_deadline_is_server_owned_and_immutable_on_retry(commerce, variant, 
     assert_released_once(engine, variant, order["id"])
 
 
+@pytest.mark.parametrize("fault", ["missing", "short_reserved"])
+def test_sweep_preserves_failed_release_and_continues_healthy_orders(commerce, variant, fault):
+    client, engine = commerce
+    broken_order = place_order(client, variant)
+    other = client.get("/api/v1/catalog/products/dc-1001").json()["variants"][1]
+    client.headers["X-Session-ID"] = str(uuid4())
+    healthy_order = place_order(client, other, quantity=1)
+    cutoff = datetime.now(UTC)
+    set_deadline(engine, broken_order["id"], cutoff - timedelta(seconds=2))
+    set_deadline(engine, healthy_order["id"], cutoff - timedelta(seconds=1))
+    with Session(engine) as db, db.begin():
+        stock = db.get(Inventory, variant["id"])
+        if fault == "missing":
+            db.delete(stock)
+        else:
+            stock.reserved = 1
+
+    sessions = sessionmaker(engine)
+    with pytest.raises(RuntimeError, match="Reservation sweep failed for 1 orders"):
+        expiry.expire_due_orders(sessions, now=cutoff)
+    with Session(engine) as db:
+        broken = db.get(Order, broken_order["id"])
+        assert broken.status == "pending_payment"
+        assert broken.cancellation_reason is None
+        reservation = db.scalar(select(Reservation).where(Reservation.order_id == broken.id))
+        assert reservation.status == "active"
+        assert db.get(Order, healthy_order["id"]).status == "cancelled"
+        healthy_stock = db.get(Inventory, other["id"])
+        assert (healthy_stock.available, healthy_stock.reserved) == (10, 0)
+        assert (
+            db.scalar(
+                select(func.count())
+                .select_from(AuditLog)
+                .where(
+                    AuditLog.action == "inventory_released",
+                    AuditLog.entity_id == variant["id"],
+                )
+            )
+            == 0
+        )
+
+    with Session(engine) as db, db.begin():
+        if fault == "missing":
+            db.add(Inventory(variant_id=variant["id"], available=8, reserved=2))
+        else:
+            db.get(Inventory, variant["id"]).reserved = 2
+    assert expiry.expire_due_orders(sessions, now=cutoff) == 1
+    assert expiry.expire_due_orders(sessions, now=cutoff) == 0
+    assert_released_once(engine, variant, broken_order["id"])
+
+
 @pytest.mark.parametrize("offset_hours", [-8, 0, 8, None])
 def test_sweep_normalizes_cutoff_before_sql_and_keeps_exact_deadline(
     commerce, variant, offset_hours

@@ -198,14 +198,21 @@ def release_order(db: Session, order: Order, reason: str) -> None:
         .order_by(Reservation.variant_id)
     ).all()
     for reservation in reservations:
-        db.execute(
+        changed = db.execute(
             update(Inventory)
-            .where(Inventory.variant_id == reservation.variant_id)
+            .where(
+                Inventory.variant_id == reservation.variant_id,
+                Inventory.reserved >= reservation.quantity,
+            )
             .values(
                 available=Inventory.available + reservation.quantity,
                 reserved=Inventory.reserved - reservation.quantity,
             )
         )
+        # Never certify a release without its matching stock write. The caller's
+        # transaction also rolls back earlier lines when inventory is inconsistent.
+        if changed.rowcount != 1:  # type: ignore[attr-defined]
+            raise RuntimeError("Inventory release could not be completed")
         reservation.status = "released"
         audit(
             db,
