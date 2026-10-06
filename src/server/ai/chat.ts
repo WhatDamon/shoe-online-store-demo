@@ -7,6 +7,7 @@ import { estTokens, maxOutputTokens, truncateMessage } from '@/server/guardrails
 import { today } from '@/server/guardrails/budget'
 import { envStr } from '@/config'
 import { createDefaultRepository } from '@/server/search/repository'
+import { EmbeddingDispatchBlockedError } from '@/server/search/embedder'
 import type { ChatEvent } from '@/domain/chat-events'
 import type { AiContext, AiProvider, AiUsage } from './provider'
 import { aiModel, aiProvider } from './factory'
@@ -128,7 +129,11 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
       return result
     } catch (error) {
       try {
-        await guardrails.abandonBudget(embeddingRequestId)
+        if (error instanceof EmbeddingDispatchBlockedError) {
+          await guardrails.releaseBudget(embeddingRequestId)
+        } else {
+          await guardrails.abandonBudget(embeddingRequestId)
+        }
       } catch {
         logAi('error', 'ai_budget_finalization_failed', {
           request_id: traceId,

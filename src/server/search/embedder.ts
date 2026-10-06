@@ -1,9 +1,21 @@
-import { envStr } from '@/config'
+import { envFlag, envStr } from '@/config'
 
 let probe: boolean | null = null
 // 瞬时限流/过载不算「不可用」：不固化 probe，留待下个请求重探（避免免费额度 429 后
 // 整个进程生命周期静默禁用语义检索）。401/400/404 等确定性错误才置 false。
 const retryable = (r: Response) => r.status === 429 || r.status >= 500
+
+/** Only thrown before fetch; callers can safely release an unused reservation. */
+export class EmbeddingDispatchBlockedError extends Error {
+  constructor() {
+    super('Real AI is disabled')
+    this.name = 'EmbeddingDispatchBlockedError'
+  }
+}
+
+function assertRealAiEnabled(): void {
+  if (envFlag('AI_DISABLE_REAL')) throw new EmbeddingDispatchBlockedError()
+}
 
 export type EmbeddingProbeRunner = (operation: () => Promise<Response>) => Promise<Response>
 
@@ -12,6 +24,9 @@ export type EmbeddingProbeRunner = (operation: () => Promise<Response>) => Promi
 export async function embeddingsAvailable(
   options: { run?: EmbeddingProbeRunner } = {},
 ): Promise<boolean> {
+  // A cached capability must not bypass the operational kill switch. Do not
+  // cache this temporary decision, so re-enabling keeps the existing probe state.
+  if (envFlag('AI_DISABLE_REAL')) return false
   if (probe !== null) return probe
   const base = envStr('AI_BASE_URL')
   const model = envStr('AI_EMBEDDING_MODEL')
@@ -20,8 +35,10 @@ export async function embeddingsAvailable(
     return false
   }
   try {
-    const request = () =>
-      fetch(`${base}/embeddings`, {
+    const request = () => {
+      // Budget admission can await I/O; recheck immediately before dispatch.
+      assertRealAiEnabled()
+      return fetch(`${base}/embeddings`, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -32,6 +49,7 @@ export async function embeddingsAvailable(
         body: JSON.stringify({ model, input: 'ping', encoding_format: 'float' }),
         signal: AbortSignal.timeout(3_000),
       })
+    }
     const r = await (options.run ? options.run(request) : request())
     if (r.ok) probe = true
     else if (!retryable(r)) probe = false
@@ -51,6 +69,7 @@ export async function embeddingsAvailable(
 }
 
 export async function embed(texts: string[]): Promise<number[][]> {
+  assertRealAiEnabled()
   const res = await fetch(`${envStr('AI_BASE_URL')}/embeddings`, {
     method: 'POST',
     headers: {

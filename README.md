@@ -215,7 +215,11 @@ data, not a session or idempotency credential. See the [AI request boundary repo
 2. Set `AI_EMBEDDING_MODEL` + `AI_BASE_URL` to activate semantic retrieval; without them the
    assistant transparently uses keyword search over the catalog.
 3. Restart. Guardrails (rate limit, turn cap, daily budget) apply to real and Mock alike.
-   `AI_DISABLE_REAL=1` is the one-switch rollback to Mock.
+   `AI_DISABLE_REAL=1` is the one-switch rollback to Mock: it blocks new real chat and
+   embedding calls (including capability probes and cached capability results), while
+   local keyword recommendations remain available. Set it in the server environment
+   and restart; changing an environment file alone does not update a running process.
+   It does not cancel requests already dispatched or erase recorded usage.
 
 Each provider attempt and each embedding network call owns a separate budget reservation. SDK automatic retries are disabled,
 and upstream SDK logs are suppressed so private response content cannot bypass the
