@@ -79,6 +79,140 @@ describe('retrieve', () => {
     await expect(retrieve('sneaker', depsOf(makeRepo()))).rejects.toMatchObject({ code: 'budget' })
   })
 
+  it.each([
+    new Error('private-marker postgres://user:password@internal/db'),
+    { message: 'private-marker', token: 'private-token' },
+    null,
+  ])('降级只记录安全事件，不读取或输出异常内容 (%#)', async (failure) => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      mockEmbeddingsAvailable.mockResolvedValue(true)
+      mockEmbed.mockRejectedValue(failure)
+
+      expect(await retrieve('avocado', depsOf(makeRepo()))).toEqual([
+        { handle: '26016-m', score: expect.any(Number) },
+      ])
+      expect(warn.mock.calls).toEqual([
+        [JSON.stringify({ event: 'retrieval_fallback', strategy: 'keyword' })],
+      ])
+      expect(JSON.stringify(warn.mock.calls)).not.toContain('private')
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('异常 getter 和序列化钩子不会在降级时执行', async () => {
+    const inspect = vi.fn(() => {
+      throw new Error('private-inspection-marker')
+    })
+    const failure = Object.defineProperties(
+      {},
+      {
+        code: { get: inspect },
+        message: { get: inspect },
+        toJSON: { value: inspect },
+        toString: { value: inspect },
+      },
+    )
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      mockEmbeddingsAvailable.mockResolvedValue(true)
+      mockEmbed.mockRejectedValue(failure)
+      expect(await retrieve('avocado', depsOf(makeRepo()))).toEqual([
+        { handle: '26016-m', score: expect.any(Number) },
+      ])
+      expect(inspect).not.toHaveBeenCalled()
+      expect(warn).toHaveBeenCalledWith(
+        JSON.stringify({ event: 'retrieval_fallback', strategy: 'keyword' }),
+      )
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('撤销的 Proxy 异常仍可安全降级', async () => {
+    const failure = Proxy.revocable({}, {})
+    failure.revoke()
+    mockEmbeddingsAvailable.mockResolvedValue(true)
+    mockEmbed.mockRejectedValue(failure.proxy)
+    expect(await retrieve('avocado', depsOf(makeRepo()))).toEqual([
+      { handle: '26016-m', score: expect.any(Number) },
+    ])
+  })
+
+  it('商品批量嵌入失败不执行 message getter', async () => {
+    const inspect = vi.fn(() => {
+      throw Object.assign(new Error('private-marker'), { code: 'budget' })
+    })
+    mockEmbeddingsAvailable.mockResolvedValue(true)
+    mockEmbed.mockResolvedValueOnce([oneHot(0)])
+    mockEmbed.mockRejectedValueOnce(Object.defineProperty({}, 'message', { get: inspect }))
+    expect(await retrieve('avocado', depsOf(makeRepo()))).toEqual([
+      { handle: '26016-m', score: expect.any(Number) },
+    ])
+    expect(inspect).not.toHaveBeenCalled()
+    expect(mockEmbed).toHaveBeenCalledTimes(2)
+  })
+
+  it('批量预算拒绝即使含 429 也不得重试', async () => {
+    const refusal = Object.assign(new Error('429 daily cap'), { code: 'budget' })
+    vi.useFakeTimers()
+    try {
+      mockEmbeddingsAvailable.mockResolvedValue(true)
+      mockEmbed.mockResolvedValueOnce([oneHot(0)]).mockRejectedValue(refusal)
+      const result = expect(retrieve('avocado', depsOf(makeRepo()))).rejects.toBe(refusal)
+      await vi.runAllTimersAsync()
+      await result
+      expect(mockEmbed).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('瞬时失败后的重试预算拒绝原样传播且不记录降级', async () => {
+    const refusal = Object.assign(new Error('daily cap'), { code: 'budget' })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.useFakeTimers()
+    try {
+      mockEmbeddingsAvailable.mockResolvedValue(true)
+      mockEmbed
+        .mockResolvedValueOnce([oneHot(0)])
+        .mockRejectedValueOnce(new Error('429 overloaded'))
+        .mockRejectedValueOnce(refusal)
+      const result = expect(retrieve('avocado', depsOf(makeRepo()))).rejects.toBe(refusal)
+      await vi.runAllTimersAsync()
+      await result
+      expect(mockEmbed).toHaveBeenCalledTimes(3)
+      expect(warn).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+      warn.mockRestore()
+    }
+  })
+
+  it.each([null, undefined])('批量嵌入抛空值仍降级且不重试 (%#)', async (failure) => {
+    mockEmbeddingsAvailable.mockResolvedValue(true)
+    mockEmbed.mockResolvedValueOnce([oneHot(0)]).mockRejectedValueOnce(failure)
+    expect(await retrieve('avocado', depsOf(makeRepo()))).toEqual([
+      { handle: '26016-m', score: expect.any(Number) },
+    ])
+    expect(mockEmbed).toHaveBeenCalledTimes(2)
+  })
+
+  it.each(['429 overloaded', '503 unavailable'])('瞬时批量失败只重试一次 (%s)', async (message) => {
+    vi.useFakeTimers()
+    try {
+      mockEmbeddingsAvailable.mockResolvedValue(true)
+      mockEmbed.mockResolvedValueOnce([oneHot(0)]).mockRejectedValue(new Error(message))
+      const result = retrieve('avocado', depsOf(makeRepo()))
+      await vi.runAllTimersAsync()
+      expect(await result).toEqual([{ handle: '26016-m', score: expect.any(Number) }])
+      expect(mockEmbed).toHaveBeenCalledTimes(3)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('语义可用时懒嵌入缺失商品并缓存，余弦排序首位为查询对齐商品', async () => {
     mockEmbeddingsAvailable.mockResolvedValue(true)
     mockSemanticEmbed()
