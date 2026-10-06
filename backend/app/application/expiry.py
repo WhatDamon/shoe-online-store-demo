@@ -16,6 +16,15 @@ from app.infrastructure.database import SessionLocal
 logger = logging.getLogger("commerce.expiry")
 
 
+def _log_event(level: int, event: str, **fields: str | int) -> None:
+    try:
+        logger.log(level, json.dumps(dict(event=event, **fields)))
+    except Exception:
+        # Observability is best-effort: a broken handler/filter must not change
+        # transaction outcomes, hide the safe failure signal or kill the worker.
+        pass
+
+
 def expire_due_orders(
     sessions: sessionmaker[Session] = SessionLocal,
     *,
@@ -24,25 +33,44 @@ def expire_due_orders(
 ) -> int:
     cutoff = as_utc(now or datetime.now(UTC))
     # Close this read transaction before acquiring any write locks (SQLite WAL).
-    with sessions() as db:
-        candidates = db.execute(
-            select(Order.id, Order.cart_id)
-            .where(
-                Order.status == "pending_payment",
-                Order.expires_at <= cutoff,
-            )
-            .order_by(Order.expires_at, Order.id)
-            .limit(batch_size or settings.reservation_sweep_batch_size)
-        ).all()
+    try:
+        with sessions() as db:
+            candidates = db.execute(
+                select(Order.id, Order.cart_id)
+                .where(
+                    Order.status == "pending_payment",
+                    Order.expires_at <= cutoff,
+                )
+                .order_by(Order.expires_at, Order.id)
+                .limit(batch_size or settings.reservation_sweep_batch_size)
+            ).all()
+    except Exception:
+        _log_event(logging.ERROR, "reservation_sweep_failed")
+        raise RuntimeError("Reservation sweep candidate query failed") from None
     expired = 0
+    failed = 0
     for order_id, cart_id in candidates:
-        with sessions() as db, db.begin():
-            lock_cart(db, cart_id)
-            # Re-read AFTER locking: another worker/cancel may already have released it.
-            if expire_if_due(db, owned_order(db, cart_id, order_id), now=cutoff):
-                expired += 1
+        try:
+            with sessions() as db:
+                with db.begin():
+                    lock_cart(db, cart_id)
+                    # Re-read AFTER locking: another worker/cancel may have released it.
+                    released = expire_if_due(db, owned_order(db, cart_id, order_id), now=cutoff)
+                # Count only after commit, but before close: a cleanup failure
+                # cannot undo a successfully committed inventory release.
+                if released:
+                    expired += 1
+        except Exception:
+            # A transaction OR session cleanup failed; later orders still run.
+            # Do not print private DB exception text, values or session IDs.
+            failed += 1
+            _log_event(logging.ERROR, "reservation_expiry_failed", order_id=order_id)
     if expired:
-        logger.info(json.dumps(dict(event="reservations_expired", orders=expired)))
+        _log_event(logging.INFO, "reservations_expired", orders=expired)
+    if failed:
+        # Preserve the CLI/worker failure signal after recording partial progress.
+        # Never chain the original exception: tracebacks may expose DB credentials.
+        raise RuntimeError(f"Reservation sweep failed for {failed} orders") from None
     return expired
 
 
@@ -53,7 +81,7 @@ async def expiry_loop(stop: asyncio.Event) -> None:
         except Exception:
             # A transient DB outage must not silently kill cleanup until restart.
             # Database exceptions may contain connection strings or bound values.
-            logger.error(json.dumps(dict(event="reservation_sweep_failed")))
+            _log_event(logging.ERROR, "reservation_sweep_failed")
         try:
             await asyncio.wait_for(stop.wait(), timeout=settings.reservation_sweep_seconds)
         except TimeoutError:

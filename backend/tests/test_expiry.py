@@ -1,4 +1,8 @@
 import asyncio
+import json
+import logging
+import runpy
+import traceback
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta, timezone
 from threading import Event
@@ -6,7 +10,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import event, func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.application import commerce as service
@@ -226,7 +230,7 @@ def test_expiry_rolls_back_release_and_audit_together(commerce, variant, monkeyp
             raise HTTPException(500, "injected_failure")
 
     monkeypatch.setattr(service, "audit", fail)
-    with pytest.raises(HTTPException):
+    with pytest.raises(RuntimeError, match="Reservation sweep failed for 1 orders"):
         expiry.expire_due_orders(sessionmaker(engine))
     with Session(engine) as db:
         assert db.get(Order, order["id"]).status == "pending_payment"
@@ -246,6 +250,254 @@ def test_expiry_rolls_back_release_and_audit_together(commerce, variant, monkeyp
     monkeypatch.setattr(service, "audit", original)
     assert expiry.expire_due_orders(sessionmaker(engine)) == 1
     assert_released_once(engine, variant, order["id"])
+
+
+@pytest.mark.parametrize("failure_index", [0, 1, 2])
+def test_sweep_continues_after_one_failure_and_counts_only_commits(
+    commerce, variant, monkeypatch, caplog, failure_index
+):
+    client, engine = commerce
+    orders = [place_order(client, variant, quantity=1) for _ in range(3)]
+    deadline = datetime(2026, 9, 21, 12, tzinfo=UTC)
+    for index, order in enumerate(orders):
+        set_deadline(engine, order["id"], deadline + timedelta(seconds=index))
+    failed_id = orders[failure_index]["id"]
+    original = service.audit
+
+    def fail(db, entity, action, **details):
+        original(db, entity, action, **details)
+        if action == "order_expired" and entity == failed_id:
+            raise RuntimeError("private-marker postgres://user:password@internal/db")
+
+    caplog.set_level(logging.INFO, logger="commerce.expiry")
+    monkeypatch.setattr(service, "audit", fail)
+    sessions = sessionmaker(engine)
+    cutoff = deadline + timedelta(seconds=3)
+    with pytest.raises(RuntimeError):
+        expiry.expire_due_orders(sessions, now=cutoff)
+
+    with Session(engine) as db:
+        for index, order in enumerate(orders):
+            failed = index == failure_index
+            assert db.get(Order, order["id"]).status == (
+                "pending_payment" if failed else "cancelled"
+            )
+            reservation = db.scalar(select(Reservation).where(Reservation.order_id == order["id"]))
+            assert reservation.status == ("active" if failed else "released")
+        stock = db.get(Inventory, variant["id"])
+        assert (stock.available, stock.reserved) == (9, 1)
+        assert (
+            db.scalar(
+                select(func.count())
+                .select_from(AuditLog)
+                .where(AuditLog.action == "inventory_released")
+            )
+            == 2
+        )
+    events = [
+        json.loads(record.message) for record in caplog.records if record.name == "commerce.expiry"
+    ]
+    assert {"event": "reservations_expired", "orders": 2} in events
+    assert {"event": "reservation_expiry_failed", "order_id": failed_id} in events
+    assert "private-marker" not in caplog.text
+    assert "password" not in caplog.text
+
+    caplog.clear()
+    monkeypatch.setattr(service, "audit", original)
+    assert expiry.expire_due_orders(sessions, now=cutoff) == 1
+    assert expiry.expire_due_orders(sessions, now=cutoff) == 0
+    with Session(engine) as db:
+        stock = db.get(Inventory, variant["id"])
+        assert (stock.available, stock.reserved) == (10, 0)
+        assert (
+            db.scalar(
+                select(func.count())
+                .select_from(AuditLog)
+                .where(AuditLog.action == "inventory_released")
+            )
+            == 3
+        )
+
+
+def test_sweep_does_not_count_commit_failure(commerce, variant, caplog):
+    client, engine = commerce
+    order = place_order(client, variant)
+    deadline = datetime(2026, 9, 21, 12, tzinfo=UTC)
+    set_deadline(engine, order["id"], deadline)
+
+    class FailCommitSession(Session):
+        pass
+
+    def fail_commit(db):
+        raise RuntimeError("private-commit-marker")
+
+    event.listen(FailCommitSession, "before_commit", fail_commit)
+    caplog.set_level(logging.INFO, logger="commerce.expiry")
+    with pytest.raises(RuntimeError):
+        expiry.expire_due_orders(sessionmaker(engine, class_=FailCommitSession), now=deadline)
+    assert "reservations_expired" not in caplog.text
+    assert "private-commit-marker" not in caplog.text
+    with Session(engine) as db:
+        assert db.get(Order, order["id"]).status == "pending_payment"
+        stock = db.get(Inventory, variant["id"])
+        assert (stock.available, stock.reserved) == (8, 2)
+        assert db.scalar(select(Reservation)).status == "active"
+    assert expiry.expire_due_orders(sessionmaker(engine), now=deadline) == 1
+    assert_released_once(engine, variant, order["id"])
+
+
+@pytest.fixture(params=["handler", "filter"])
+def broken_expiry_logging(request, monkeypatch):
+    def fail(*args):
+        raise RuntimeError("private-logging-marker")
+
+    handler = logging.Handler()
+    monkeypatch.setattr(handler, "emit", fail)
+    monkeypatch.setattr(expiry.logger, "handlers", [handler])
+    monkeypatch.setattr(expiry.logger, "filters", [fail] if request.param == "filter" else [])
+    monkeypatch.setattr(expiry.logger, "level", logging.INFO)
+
+
+def test_logging_failure_keeps_partial_progress_and_safe_error(
+    commerce, variant, monkeypatch, broken_expiry_logging
+):
+    client, engine = commerce
+    orders = [place_order(client, variant, quantity=1) for _ in range(3)]
+    deadline = datetime(2026, 9, 21, 12, tzinfo=UTC)
+    for index, order in enumerate(orders):
+        set_deadline(engine, order["id"], deadline + timedelta(seconds=index))
+    original = service.audit
+
+    def fail(db, entity, action, **details):
+        original(db, entity, action, **details)
+        if action == "order_expired" and entity == orders[0]["id"]:
+            raise RuntimeError("private-database-marker")
+
+    monkeypatch.setattr(service, "audit", fail)
+    with pytest.raises(RuntimeError, match="Reservation sweep failed for 1 orders") as caught:
+        expiry.expire_due_orders(sessionmaker(engine), now=deadline + timedelta(seconds=3))
+    assert "private" not in "".join(traceback.format_exception(caught.value))
+    with Session(engine) as db:
+        assert db.get(Order, orders[0]["id"]).status == "pending_payment"
+        assert all(db.get(Order, order["id"]).status == "cancelled" for order in orders[1:])
+        stock = db.get(Inventory, variant["id"])
+        assert (stock.available, stock.reserved) == (9, 1)
+
+
+def test_logging_failure_does_not_change_success_count(commerce, variant, broken_expiry_logging):
+    client, engine = commerce
+    order = place_order(client, variant)
+    future = datetime.now(UTC) + timedelta(days=1)
+    assert expiry.expire_due_orders(sessionmaker(engine), now=future) == 1
+    assert_released_once(engine, variant, order["id"])
+
+
+@pytest.mark.parametrize("failure_at", ["open", "execute", "close"])
+def test_candidate_session_failure_has_safe_cli_traceback(
+    commerce, variant, monkeypatch, caplog, failure_at
+):
+    client, engine = commerce
+    order = place_order(client, variant)
+
+    class FailReadSession(Session):
+        def __init__(self, *args, **kwargs):
+            if failure_at == "open":
+                raise RuntimeError("private-candidate-marker")
+            super().__init__(*args, **kwargs)
+
+        def execute(self, *args, **kwargs):
+            if failure_at == "execute":
+                raise RuntimeError("private-candidate-marker")
+            return super().execute(*args, **kwargs)
+
+        def close(self):
+            super().close()
+            if failure_at == "close":
+                raise RuntimeError("private-candidate-marker")
+
+    original = expiry.expire_due_orders
+    monkeypatch.setattr(
+        expiry,
+        "expire_due_orders",
+        lambda: original(
+            sessionmaker(engine, class_=FailReadSession),
+            now=datetime.now(UTC) + timedelta(days=1),
+        ),
+    )
+    with pytest.raises(RuntimeError, match="Reservation sweep candidate query failed") as caught:
+        runpy.run_module("app.expire_orders", run_name="__main__")
+    assert "private-candidate-marker" not in "".join(traceback.format_exception(caught.value))
+    assert "private-candidate-marker" not in caplog.text
+    assert "reservation_sweep_failed" in caplog.text
+    with Session(engine) as db:
+        assert db.get(Order, order["id"]).status == "pending_payment"
+        stock = db.get(Inventory, variant["id"])
+        assert (stock.available, stock.reserved) == (8, 2)
+
+
+def test_committed_release_is_counted_before_close_failure(commerce, variant, caplog):
+    client, engine = commerce
+    orders = [place_order(client, variant, quantity=1) for _ in range(2)]
+
+    class FailCloseSession(Session):
+        def close(self):
+            super().close()
+            if self.info.get("committed"):
+                raise RuntimeError("private-close-marker")
+
+    def mark_committed(db):
+        db.info["committed"] = True
+
+    event.listen(FailCloseSession, "after_commit", mark_committed)
+    caplog.set_level(logging.INFO, logger="commerce.expiry")
+    with pytest.raises(RuntimeError, match="Reservation sweep failed for 2 orders") as caught:
+        expiry.expire_due_orders(
+            sessionmaker(engine, class_=FailCloseSession),
+            now=datetime.now(UTC) + timedelta(days=1),
+        )
+    events = [
+        json.loads(record.message) for record in caplog.records if record.name == "commerce.expiry"
+    ]
+    assert {"event": "reservations_expired", "orders": 2} in events
+    assert "private-close-marker" not in "".join(traceback.format_exception(caught.value))
+    assert "private-close-marker" not in caplog.text
+    with Session(engine) as db:
+        assert all(db.get(Order, order["id"]).status == "cancelled" for order in orders)
+        stock = db.get(Inventory, variant["id"])
+        assert (stock.available, stock.reserved) == (10, 0)
+        assert (
+            db.scalar(
+                select(func.count())
+                .select_from(AuditLog)
+                .where(AuditLog.action == "inventory_released")
+            )
+            == 2
+        )
+    assert (
+        expiry.expire_due_orders(sessionmaker(engine), now=datetime.now(UTC) + timedelta(days=1))
+        == 0
+    )
+
+
+def test_worker_survives_logging_failure(monkeypatch, broken_expiry_logging):
+    calls = []
+    monkeypatch.setattr(settings, "reservation_sweep_seconds", 0.01)
+
+    async def exercise():
+        stop = asyncio.Event()
+        loop = asyncio.get_running_loop()
+
+        def sweep():
+            calls.append(1)
+            if len(calls) == 1:
+                raise RuntimeError("private-worker-marker")
+            loop.call_soon_threadsafe(stop.set)
+
+        monkeypatch.setattr(expiry, "expire_due_orders", sweep)
+        await asyncio.wait_for(expiry.expiry_loop(stop), timeout=5)
+
+    asyncio.run(exercise())
+    assert len(calls) == 2
 
 
 def test_lifespan_releases_without_requests_and_stops(commerce, variant, monkeypatch):
