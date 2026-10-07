@@ -52,5 +52,6 @@ describe('retrieval gateway embedding budget seam', () => {
     await expect(retrieveProducts('find a shoe', 4, { runEmbedding })).resolves.toEqual([product])
     expect(calls).toEqual([['ping'], ['query text']])
     expect(mockEmbed).toHaveBeenCalledWith(['query text'])
+    expect(mockCatalog.getProductByHandle).not.toHaveBeenCalled()
   })
 })

@@ -30,20 +30,17 @@ DB = Annotated[Session, Depends(database, scope="function")]
 SessionID = Annotated[str, Depends(anonymous_session)]
 
 
-def product_view(db: Session, product: Product) -> dict:
-    variants = db.execute(
-        select(Variant, Inventory)
-        .join(Inventory)
-        .where(Variant.product_id == product.id, Variant.is_active.is_(True))
-        .order_by(Variant.color, Variant.size)
-    ).all()
-    media = db.scalars(select(Media).where(Media.product_id == product.id).order_by(Media.position))
+def _product_payload(
+    product: Product,
+    variants_by_product: dict[str, list[tuple[Variant, Inventory]]],
+    media_by_product: dict[str, list[Media]],
+) -> dict:
     return dict(
         id=product.id,
         handle=product.handle,
         title=product.title,
         description=product.description,
-        media=[dict(url=m.url, color=m.color) for m in media],
+        media=[dict(url=m.url, color=m.color) for m in media_by_product.get(product.id, [])],
         variants=[
             dict(
                 id=v.id,
@@ -55,19 +52,52 @@ def product_view(db: Session, product: Product) -> dict:
                 currency=v.currency,
                 available=i.available,
             )
-            for v, i in variants
+            for v, i in variants_by_product.get(product.id, [])
         ],
     )
 
 
+def product_views(db: Session, products: list[Product]) -> list[dict]:
+    if not products:
+        return []
+    product_ids = [product.id for product in products]
+    variants_by_product: dict[str, list[tuple[Variant, Inventory]]] = {
+        product_id: [] for product_id in product_ids
+    }
+    for variant, inventory in db.execute(
+        select(Variant, Inventory)
+        .join(Inventory)
+        .where(
+            Variant.product_id.in_(product_ids),
+            Variant.is_active.is_(True),
+        )
+        .order_by(Variant.product_id, Variant.color, Variant.size)
+    ).all():
+        variants_by_product[variant.product_id].append((variant, inventory))
+
+    media_by_product: dict[str, list[Media]] = {product_id: [] for product_id in product_ids}
+    for media in db.scalars(
+        select(Media)
+        .where(Media.product_id.in_(product_ids))
+        .order_by(Media.product_id, Media.position)
+    ).all():
+        media_by_product[media.product_id].append(media)
+
+    return [
+        _product_payload(product, variants_by_product, media_by_product) for product in products
+    ]
+
+
+def product_view(db: Session, product: Product) -> dict:
+    return product_views(db, [product])[0]
+
+
 @router.get("/catalog/products", response_model=list[ProductResponse])
 def products(db: DB) -> list[dict]:
-    return [
-        product_view(db, p)
-        for p in db.scalars(
-            select(Product).where(Product.is_active.is_(True)).order_by(Product.handle)
-        )
-    ]
+    active_products = list(
+        db.scalars(select(Product).where(Product.is_active.is_(True)).order_by(Product.handle))
+    )
+    return product_views(db, active_products)
 
 
 @router.get("/catalog/products/{handle}", response_model=ProductResponse)

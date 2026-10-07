@@ -35,6 +35,17 @@ describe('DbCatalogAdapter', () => {
     expect(fromDb?.title).toBe('DB-Edited')
   })
 
+  it('uses the repository handle lookup after seed synchronization', async () => {
+    const { adapter, repo } = make()
+    const find = vi.spyOn(repo, 'findProductByHandle')
+    const list = vi.spyOn(repo, 'listAllProducts')
+    await expect(adapter.getProductByHandle(seedProducts[0].handle)).resolves.toMatchObject({
+      handle: seedProducts[0].handle,
+    })
+    expect(find).toHaveBeenCalledWith(seedProducts[0].handle)
+    expect(list).toHaveBeenCalledOnce()
+  })
+
   it('add-only sync: missing seed rows are re-added, present rows keep DB edits', async () => {
     // 模拟已有人工编辑的既有表：删掉一款 seed、编辑另一款，再用全新适配器首读。
     const { adapter, repo } = make()

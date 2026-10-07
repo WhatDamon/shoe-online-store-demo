@@ -42,12 +42,12 @@ export async function getProductForMarket(handle: string): Promise<ProductView |
 }
 
 export async function getRelatedProducts(handle: string, limit = 3): Promise<ProductView[]> {
-  const current = await getProductForMarket(handle)
+  const products = await listProductsForMarket({})
+  const current = products.find((p) => p.handle === handle)
   if (!current) return []
-  const same = await listProductsForMarket({
-    collection: current.collections[0],
-  })
-  const rest = await listProductsForMarket({})
-  const pool = [...same, ...rest].filter((p) => p.handle !== handle)
+  const same = current.collections[0]
+    ? products.filter((p) => p.collections.includes(current.collections[0]))
+    : []
+  const pool = [...same, ...products].filter((p) => p.handle !== handle)
   return [...new Map(pool.map((p) => [p.handle, p])).values()].slice(0, limit)
 }
