@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { listProductsForMarket, getProductForMarket, getRelatedProducts } from './service'
 import { seedAdapter } from './seed-adapter'
 import { seedProducts } from './seed'
+import { catalog } from './adapter'
 
 const FIRST_HANDLE = seedProducts[0].handle
 
@@ -34,6 +35,34 @@ describe('catalog service', () => {
   })
   it('product missing -> null', async () => {
     expect(await getProductForMarket('nope')).toBeNull()
+  })
+  it('related products reuse one catalog snapshot and prioritize the first collection', async () => {
+    const adapter = catalog()
+    const getProducts = vi.spyOn(adapter, 'getProducts')
+    const getProductByHandle = vi.spyOn(adapter, 'getProductByHandle')
+    try {
+      const current = seedProducts[0]
+      const sameCollection = seedProducts.filter(
+        (product) =>
+          product.handle !== current.handle && product.collections.includes(current.collections[0]),
+      )
+      const others = seedProducts.filter(
+        (product) =>
+          product.handle !== current.handle &&
+          !product.collections.includes(current.collections[0]),
+      )
+      expect(sameCollection.length).toBeGreaterThan(0)
+      const related = await getRelatedProducts(FIRST_HANDLE, seedProducts.length)
+      expect(getProducts).toHaveBeenCalledTimes(1)
+      expect(getProductByHandle).not.toHaveBeenCalled()
+      expect(related.map((product) => product.handle)).toEqual(
+        [...sameCollection, ...others].map((product) => product.handle),
+      )
+      expect(new Set(related.map((product) => product.handle)).size).toBe(related.length)
+    } finally {
+      getProducts.mockRestore()
+      getProductByHandle.mockRestore()
+    }
   })
   it('related products exclude the current product', async () => {
     const related = await getRelatedProducts(FIRST_HANDLE)

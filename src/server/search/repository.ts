@@ -19,9 +19,8 @@ import type {
   BudgetUsage,
 } from '@/server/guardrails/budget-contract'
 
-// 仓储只做持久化与整表读写：筛选/查找留在内存（catalog/filter.ts）。
-// 前提是目录规模 ~10²（当前 29 款），全表 listAllProducts 再 find/filter 的成本可忽略；
-// 若增长到 10⁴ 量级，需把筛选下推到 SQL（Repository 增加 query 方法）。
+// 仓储负责持久化读写；目录组合筛选留在内存，精确键查询下推到 SQL。
+// listAllProducts 适用于需要完整目录快照的场景；按 handle 查找使用 findProductByHandle，避免重复整表读取。
 export function createRepository(db: AppDb) {
   async function abandonDailyBudget(requestId: string, before?: number): Promise<boolean> {
     return db.transaction((tx) => {
@@ -298,6 +297,10 @@ export function createRepository(db: AppDb) {
     },
     async listAllProducts(): Promise<ProductRecord[]> {
       return db.select().from(products)
+    },
+    async findProductByHandle(handle: string): Promise<ProductRecord | null> {
+      const [row] = await db.select().from(products).where(eq(products.handle, handle)).limit(1)
+      return row ?? null
     },
     async upsertProducts(records: ProductRecord[]): Promise<void> {
       for (const r of records) {

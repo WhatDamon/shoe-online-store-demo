@@ -1,5 +1,5 @@
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import event, func, select, update
 from sqlalchemy.orm import Session
 
 from app.api.v1 import routes
@@ -11,7 +11,9 @@ from app.domain.models import (
     OrderItem,
     Payment,
     PaymentEvent,
+    Product,
     Reservation,
+    Variant,
 )
 
 
@@ -38,6 +40,78 @@ def test_openapi_describes_every_success_response(commerce):
     schema = catalog["content"]["application/json"]["schema"]
     assert schema["type"] == "array"
     assert schema["items"]["$ref"] == "#/components/schemas/ProductResponse"
+
+
+def test_catalog_list_uses_batch_queries(commerce):
+    client, engine = commerce
+    statements: list[str] = []
+
+    def capture(_connection, _cursor, statement, _parameters, _context, _executemany):
+        if statement.lstrip().upper().startswith("SELECT"):
+            statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", capture)
+    try:
+        response = client.get("/api/v1/catalog/products")
+    finally:
+        event.remove(engine, "before_cursor_execute", capture)
+
+    assert response.status_code == 200
+    assert len(statements) == 3
+    assert sum("FROM products" in statement for statement in statements) == 1
+    assert sum("product_variants" in statement for statement in statements) == 1
+    assert sum("product_media" in statement for statement in statements) == 1
+
+
+def test_catalog_empty_list_reads_only_products(commerce):
+    client, engine = commerce
+    with Session(engine) as db, db.begin():
+        db.execute(update(Product).values(is_active=False))
+    statements: list[str] = []
+
+    def capture(_connection, _cursor, statement, _parameters, _context, _executemany):
+        if statement.lstrip().upper().startswith("SELECT"):
+            statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", capture)
+    try:
+        response = client.get("/api/v1/catalog/products")
+    finally:
+        event.remove(engine, "before_cursor_execute", capture)
+
+    assert response.status_code == 200
+    assert response.json() == []
+    assert len(statements) == 1
+    assert "FROM products" in statements[0]
+
+
+def test_catalog_batch_matches_details_and_preserves_active_filter_and_sort(commerce):
+    client, engine = commerce
+    with Session(engine) as db, db.begin():
+        db.execute(update(Product).where(Product.handle == "dc-1002").values(is_active=False))
+        product_id = db.scalar(select(Product.id).where(Product.handle == "dc-1001"))
+        inactive = db.scalar(select(Variant).where(Variant.product_id == product_id))
+        inactive.is_active = False
+        inactive_variant_id = inactive.id
+
+    response = client.get("/api/v1/catalog/products")
+    assert response.status_code == 200
+    products = response.json()
+    assert len(products) == 28
+    assert "dc-1002" not in [product["handle"] for product in products]
+    assert [product["handle"] for product in products] == sorted(
+        product["handle"] for product in products
+    )
+    for product in products:
+        detail = client.get(f"/api/v1/catalog/products/{product['handle']}")
+        assert detail.status_code == 200
+        assert detail.json() == product
+        variants = product["variants"]
+        assert [(variant["color"], variant["size"]) for variant in variants] == sorted(
+            (variant["color"], variant["size"]) for variant in variants
+        )
+        assert inactive_variant_id not in [variant["id"] for variant in variants]
+    assert client.get("/api/v1/catalog/products/dc-1002").status_code == 404
 
 
 @pytest.mark.parametrize(
@@ -69,16 +143,17 @@ def test_catalog_rejects_invalid_variant_output(commerce, monkeypatch, field, in
 
 def test_internal_catalog_fields_are_not_exposed(commerce, monkeypatch):
     client, _ = commerce
-    original = routes.product_view
+    original = routes.product_views
 
-    def internal_product(db, product):
-        result = original(db, product)
-        result["internal_token"] = "not-public"
-        for variant in result["variants"]:
-            variant["supplier_cost"] = "not-public"
-        return result
+    def internal_products(db, products):
+        results = original(db, products)
+        for result in results:
+            result["internal_token"] = "not-public"
+            for variant in result["variants"]:
+                variant["supplier_cost"] = "not-public"
+        return results
 
-    monkeypatch.setattr(routes, "product_view", internal_product)
+    monkeypatch.setattr(routes, "product_views", internal_products)
     for path in ("/api/v1/catalog/products", "/api/v1/catalog/products/dc-1001"):
         response = client.get(path)
         assert response.status_code == 200

@@ -301,6 +301,11 @@ export function createPostgresRepository(db: PgAppDb) {
       await ensurePgTables(db)
       return db.select().from(products)
     },
+    async findProductByHandle(handle: string): Promise<ProductRecord | null> {
+      await ensurePgTables(db)
+      const [row] = await db.select().from(products).where(eq(products.handle, handle)).limit(1)
+      return row ?? null
+    },
     async upsertProducts(records: ProductRecord[]): Promise<void> {
       await ensurePgTables(db)
       for (const r of records) {
