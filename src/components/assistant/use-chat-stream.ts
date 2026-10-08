@@ -144,7 +144,6 @@ export function useChatStream(): ChatStream {
   const [isStreaming, setIsStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [errorCode, setErrorCode] = useState<ChatErrorCode | null>(null)
-  const sessionKeyRef = useRef<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const lastReqRef = useRef<{
     mode: Mode
@@ -206,12 +205,10 @@ export function useChatStream(): ChatStream {
 
       void (async () => {
         try {
-          const sessionKey = (sessionKeyRef.current ??= uid())
           const res = await fetch('/api/ai/chat', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({
-              sessionKey,
               mode,
               text: userContent,
               product: p,

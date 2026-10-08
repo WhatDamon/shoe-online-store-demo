@@ -28,6 +28,18 @@ export const hashText = (s: string) => {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
+// Thrown values are unknown: read only own data properties, never getters or
+// coercion hooks. Even descriptor access can throw for a revoked/custom Proxy.
+function errorField(error: unknown, key: 'code' | 'message'): unknown {
+  if (error === null || typeof error !== 'object') return undefined
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(error, key)
+    return descriptor && 'value' in descriptor ? descriptor.value : undefined
+  } catch {
+    return undefined
+  }
+}
+
 /** 语义检索：整库懒 embed（缺/变更一次批量补算，勿逐条请求——省请求数、避开限流）。 */
 async function semanticRetrieve(query: string, deps: RetrievalDeps): Promise<RetrievalResult[]> {
   const { products, repo, embed } = deps
@@ -43,8 +55,9 @@ async function semanticRetrieve(query: string, deps: RetrievalDeps): Promise<Ret
   if (missing.length) {
     // 瞬时限流（429/5xx）：小退避后重试一次；仍失败抛出让上层降级关键词。
     const vecs = await embed(missing.map((m) => searchableText(m.product))).catch(async (e) => {
-      const msg = String((e as Error).message ?? '')
-      if (/\b(429|5\d\d)\b/.test(msg)) {
+      if (errorField(e, 'code') === 'budget') throw e
+      const msg = errorField(e, 'message')
+      if (typeof msg === 'string' && /\b(429|5\d\d)\b/.test(msg)) {
         await sleep(1_200)
         return embed(missing.map((m) => searchableText(m.product)))
       }
@@ -74,11 +87,15 @@ export async function retrieve(query: string, deps: RetrievalDeps): Promise<Retr
     try {
       return await semanticRetrieve(query, deps)
     } catch (e) {
+      // The application budget wrapper uses the stable GuardrailError code
+      // without making this search layer depend on the guardrails module.
+      // Budget denial must reach chat and stop provider work; only provider
+      // or transport failures are eligible for keyword fallback.
+      if (errorField(e, 'code') === 'budget') throw e
       // 语义侧故障（限流/过载/瞬时）不拖垮导购：本次请求降级关键词。
-      console.warn(
-        '[retrieval] embeddings failed (%s) — keyword fallback for this request',
-        (e as Error).message ?? e,
-      )
+      // Exceptions may contain credentials, SQL parameters or upstream bodies.
+      // Log only the fallback event, never the thrown value or its message.
+      console.warn(JSON.stringify({ event: 'retrieval_fallback', strategy: 'keyword' }))
     }
   }
   return keywordSearch(query, deps.products) // 无 embedding 能力 → 关键词降级

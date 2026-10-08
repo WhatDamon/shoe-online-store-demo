@@ -16,7 +16,8 @@ const { mockEmbed, mockEmbeddingsAvailable } = vi.hoisted(() => ({
   mockEmbed: vi.fn(),
   mockEmbeddingsAvailable: vi.fn(),
 }))
-vi.mock('@/server/search/embedder', () => ({
+vi.mock('@/server/search/embedder', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/server/search/embedder')>()),
   embeddingsAvailable: mockEmbeddingsAvailable,
   embed: mockEmbed,
 }))

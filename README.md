@@ -1,5 +1,9 @@
 # Evoloop — 3D-Printed Casual Shoes
 
+> **目录与 CI 更新（2026-10-02）：** 新增只读 `check:catalog` 门禁，比较 TypeScript 展示快照与 Python commerce 导入快照的稳定商品/变体键、价格、颜色、尺码和无尺码款；不会写入交易数据库。PostgreSQL TLS CI 在切换临时证书后执行完整服务重启，并确认 `ssl_cert_file`、`ssl_key_file` 已生效。当前结果与限制见 [目录漂移报告](./docs/catalog-drift-2026-10-02.md)。
+
+> **Current local integration (2026-10-01):** Commerce/security baseline `4177ec5`, error contracts/tracing `847e32e`, and actual PostgreSQL/TLS acceptance `128a762` are committed locally. AI now conservatively accounts for interrupted provider calls, recovers stale reservations and propagates stream cancellation. Read [HANDOVER.md](./HANDOVER.md), the [integration report](./docs/unified-baseline-2026-09-30.md), the [reliability update](./docs/reliability-2026-10-01.md), the [PostgreSQL acceptance report](./docs/postgres-acceptance-2026-10-01.md) and the [budget recovery report](./docs/ai-budget-recovery-2026-10-01.md). Local results do not establish deployment or remote CI success.
+
 **Evoloop** began as a student hackathon project and has grown into an **independent footwear
 project**. This repository is its consumer-facing storefront front-end — landing page, `/shop`
 browsing, product pages, a Markdown blog and a restrained, consumer-worded shopping assistant —
@@ -13,15 +17,14 @@ Built with **Next.js (App Router), Tailwind and shadcn/ui on the Node runtime (n
 manager)** — with a server-side shopping assistant that stays understated: consumer wording
 only, never "AI"-branded.
 
-The storefront has **no real checkout**: PDPs run a **custom demo flow** — demo price (placeholder
-**$59–79** band), size/color pickers and a **Buy now** CTA that opens a **payment-QR checkout
-dialog** (a placeholder demo QR; no real payment is initiated). A **Shopify Buy Button** channel
-(`SHOPIFY_BUY_*` env + handle map) is retained in the codebase but deliberately **dormant** — the
-demo never configures it (a switchable catalog adapter also remains for a future direct Storefront
-read). The catalog is a local seed of **29 real supplier styles** (imported from the supplier's
-workbook) with **real product photos** (WebP in `public/products/`); image-less entries fall back
-to programmatic SVG visuals. `/shop` also carries the "spend $50, get a free gift" offer with a
-gallery of leftover-offcut trinkets.
+The storefront has a **local commerce MVP**: choose a color and size, add the matching Python
+variant to the cart, preview server-calculated prices and create a `pending_payment` order.
+Orders reserve inventory and support cancellation and expiry. **Real payments are disabled**;
+the Mock provider never charges or marks an order paid. Shopify remains a compatibility path
+and requires explicit `SHOPIFY_ENABLED=true` plus its credentials; keep it disabled locally.
+The display catalog has **29 supplier styles** and real product photos; prices, inventory and
+promotional copy are demo data, not verified live offers. Python owns transaction prices and
+stock; the TypeScript display/search catalog is a separate data source.
 
 ## Tech stack
 
@@ -31,6 +34,7 @@ gallery of leftover-offcut trinkets.
 - **Drizzle ORM**, dual-driver: **SQLite** (`better-sqlite3`, default, zero-setup) or
   **Postgres** (`postgres.js`, Cloud SQL-ready) — chosen by `DB_DRIVER` in the environment
 - **Vitest** (unit + React Testing Library), **ESLint**, `tsc --noEmit`
+- **Python 3.12+**, FastAPI, Pydantic, SQLAlchemy 2 and Alembic for commerce
 - AI: OpenAI-compatible streaming client with a deterministic **Mock mode** when no key is set
 
 ## Prerequisites
@@ -53,14 +57,61 @@ npm run dev               # http://localhost:3000
 > `DB_DRIVER=postgres` (with a `DATABASE_URL=postgres://…`) switches to `postgres.js` —
 > both drivers run on Node, Vercel-ready.
 
-First run auto-creates the schema (**three** tables: `products` + `product_embeddings`,
-`ai_usage`) via idempotent `CREATE TABLE IF NOT EXISTS` on **either** driver — SQLite file at
-`./data/local.db`, or the Postgres database behind `DATABASE_URL`. No migration step.
+The TypeScript display/AI database has five tables: `products`, `product_embeddings`,
+`ai_usage`, `ai_budget_days` and `ai_budget_reservations`. Versioned Drizzle migrations
+under `drizzle/sqlite` and `drizzle/postgres` initialize them on either driver; the
+runtime still applies the migration automatically so local startup remains zero-setup.
+The baseline is idempotent for databases created by the former inline DDL and records
+applied versions in Drizzle's metadata table. The first daily reservation accounts for
+usage already in the legacy ledger. Python commerce uses a **separate database and
+explicit Alembic migrations**; application startup never creates its tables.
+
+To generate a new TypeScript migration after changing a schema, update both dialect
+schemas and run:
+
+```powershell
+npm run db:generate:sqlite
+npm run db:generate:postgres
+```
+
+Do not mix these files with the Python commerce migrations. Production traces include
+the SQL directories through `next.config.ts`; no separate migration command is required
+for the local runtime bootstrap.
+
+### Start the local commerce service
+
+Use Python 3.12+ and the pinned backend dependencies; see [backend/README.md](./backend/README.md).
+From the repository root in PowerShell, with a new or backed-up local demo database:
+
+```powershell
+if (!(Test-Path backend/.venv/Scripts/python.exe)) { py -3.12 -m venv backend/.venv }
+backend/.venv/Scripts/python.exe -m pip install -r backend/requirements-dev.lock
+if (!(Test-Path backend/.env)) { Copy-Item backend/.env.example backend/.env }
+Set-Location backend
+.venv/Scripts/python.exe -m alembic upgrade head
+.venv/Scripts/python.exe -m app.seed
+.venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+The Python service defaults to `APP_ENV=development` for local SQLite. Production
+must set `APP_ENV=production` and use a PostgreSQL URL with
+`sslmode=verify-full`; the service rejects SQLite and weaker PostgreSQL modes before
+creating an engine. See [the Python PostgreSQL TLS boundary report](./docs/python-postgres-tls-2026-10-03.md).
+
+In a second terminal at the repository root, keep `SHOPIFY_ENABLED=false`, set
+`PYTHON_API_URL=http://127.0.0.1:8000` and `AI_DISABLE_REAL=1`, then run `npm run dev`.
+Open `/product/dc-1001`, choose a color/size, add to `/cart`, change quantity, create an
+order at `/checkout`, and cancel it from `/orders/<id>`. Payment remains unavailable.
+Existing environment files must not be overwritten. Stop on any install/migration failure.
+
+For isolated alternate ports, the HTTP check accepts
+`backend/.venv/Scripts/python.exe scripts/smoke-commerce.py --base-url http://127.0.0.1:3100`.
+It creates and cancels demo orders; run only against a disposable/demo database.
 
 **Catalog lives in the `products` table.** The catalog adapter defaults to reading the table;
 when it is empty the first request auto-seeds it from the import layer (supplier JSON +
 curation). `CATALOG_SOURCE=seed` switches back to the pure in-memory import layer (used by unit
-tests); `SHOPIFY_*` still takes priority over both.
+tests); the reserved Shopify adapter takes priority only with `SHOPIFY_ENABLED=true` and both catalog credentials.
 
 ### What you can do without any setup
 
@@ -80,14 +131,39 @@ tests); `SHOPIFY_*` still takes priority over both.
 | `npm run start` | Serve the production build (Node runtime). |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run check:boundary` | Guards that `'use client'` modules carry no runtime `@/server/**` import. |
+| `npm run check:coupling` | Checks runtime import cycles, transitive client/domain boundaries and guardrails' budget port. |
+| `npm run check:catalog` | Read-only comparison of display/commerce snapshots and stable variant keys; set `CATALOG_DRIFT_DATABASE` for an optional local runtime DB check. |
 | `npm run lint` | ESLint over the repo |
-| `npm run test` | Vitest (63 files, 375 tests) on Node via the `better-sqlite3` driver. |
-| `npm run verify` | One-shot acceptance gate: `format:check` + `typecheck` + `check:boundary` + `lint` + `test`. |
+| `npm run test` | Vitest unit and integration tests on Node; see the dated integration report for actual counts. |
+| `npm run verify` | One-shot acceptance gate: formatting, typecheck, boundaries, coupling, catalog drift, lint and tests. |
 | `npm run test:watch` | Vitest watch mode |
 
-The acceptance gate is **format:check + typecheck + check:boundary + lint + test** (`npm run verify`),
-with **`npm run build`** run alongside it — all green on `main` (HEAD), and verified across
-**Node 22 / 24** in CI.
+The acceptance gate is **format:check + typecheck + check:boundary + check:coupling + check:catalog + lint + test** (`npm run verify`),
+with **`npm run build`** run separately. CI is configured for Node 22 / 24 and Python 3.12;
+local results do not establish the current remote CI or deployment state.
+
+### Isolated PostgreSQL acceptance
+
+Set `AI_TEST_POSTGRES_URL` only in a test process, pointing to a dedicated loopback
+database whose name ends in `_test`. Run
+`npm test -- src/server/search/repository-postgres.integration.test.ts`. The suite owns
+and removes one random schema, warms independent connections and verifies competing
+reservations, duplicate retries and rollback. Without the variable it is explicitly skipped.
+
+For TypeScript schema migration startup locking, set
+`AI_TEST_POSTGRES_MIGRATIONS_URL` to a separate disposable loopback database whose name
+ends in `_test`, then run
+`npm test -- src/db/postgres-migrations.integration.test.ts`. The test opens two independent
+`max=1` clients, starts both migrations together, and verifies that exactly one migration
+marker is written. Without the variable it is explicitly skipped; never point it at a
+commerce or production database.
+
+For TLS, use a disposable server configured with the public localhost-only fixture in
+`src/test/fixtures/postgres-tls.json`, set `AI_TEST_POSTGRES_TLS_URL` with hostname `localhost`,
+then run `npm test -- src/db/postgres-tls.integration.test.ts`. It executes a real encrypted
+query and rejects untrusted certificates and mismatched hostnames. These test keys must
+never be used for production. The PostgreSQL CI job prepares its own disposable server.
+See the acceptance report for local evidence and the separate Python test command.
 
 ## Environment variables
 
@@ -99,18 +175,39 @@ See [`.env.example`](.env.example) for the annotated template. Summary:
 | `AI_API_KEY` | *(empty)* | **Empty → Mock mode** (zero cost, demoable). Set to enable the real OpenAI-compatible provider. |
 | `AI_BASE_URL` | *(empty)* | OpenAI-compatible endpoint base URL (empty = official OpenAI) |
 | `AI_MODEL` | `gpt-5.6-luna` | Chat model for the real provider (2026-09: GPT-5.6 budget tier; quality-upgrade: `gpt-5.6-terra`) |
+| `AI_INCLUDE_USAGE` | `1` | Requests final streaming usage for exact settlement; set `0` only for gateways that reject `stream_options` (estimate fallback). |
 | `AI_EMBEDDING_MODEL` | `text-embedding-3-small` | Embedding model for semantic search (cached locally) |
-| `AI_MAX_TURNS` | `20` | Per-session turn cap (soft message when exceeded) |
-| `AI_MAX_OUTPUT_TOKENS` | `500` | Max output tokens per provider response |
-| `AI_REQUEST_TIMEOUT_MS` | `20000` | Provider request timeout |
-| `AI_MAX_MESSAGE_CHARS` | `800` | Max characters per incoming user message |
-| `AI_DAILY_TOKEN_CAP` | `1000000` | Daily token budget (SUM over `ai_usage` per UTC day) |
+| `AI_MAX_TURNS` | `20` (max `100`) | Per-session turn cap (soft message when exceeded) |
+| `AI_MAX_OUTPUT_TOKENS` | `500` (max `2000`) | Max output tokens per provider response |
+| `AI_REQUEST_TIMEOUT_MS` | `20000` (max `120000`) | Provider request timeout |
+| `AI_MAX_MESSAGE_CHARS` | `800` (max `4000`) | Max characters per incoming user message |
+| `AI_DAILY_TOKEN_CAP` | `1000000` (max `10000000`) | UTC estimated-token budget; atomic admission, completed usage settlement and conservative accounting for uncertain calls |
+| `AI_SESSION_SECRET` | *(required in production)* | Private signing secret, at least 32 bytes; missing/short configuration fails closed |
+| `TRUSTED_PROXY_IPS` | *(empty)* | Exact trusted immediate peer IPs; XFF is ignored without a verified peer |
 | `AI_DISABLE_REAL` | `0` | `1` forces Mock mode even with a key (abuse kill switch) |
 | `DB_DRIVER` | `sqlite` | `sqlite` (default) or `postgres` — selects the app DB driver |
-| `CATALOG_SOURCE` | `db` | Runtime catalog source: `db` = `products` table (default, auto-seeded when empty); `seed` = in-memory import layer (tests); `SHOPIFY_*` still wins |
+| `CATALOG_SOURCE` | `db` | Runtime catalog source: `db` = `products` table (default, auto-seeded when empty); `seed` = in-memory import layer (tests); explicitly enabled Shopify configuration takes priority |
 | `DATABASE_URL` | `./data/local.db` | sqlite: local file; postgres: `postgres://…` connection string |
-| `SHOPIFY_DOMAIN`, `SHOPIFY_STOREFRONT_TOKEN` | *(empty)* | Reserved. Catalog adapter switches seed → Shopify only when **both** are set (not yet active). |
-| `SHOPIFY_BUY_DOMAIN`, `SHOPIFY_BUY_TOKEN` | *(empty)* | **PDP Shopify Buy Button channel** (2026-09): when **both** are set, every PDP mapped in `src/server/catalog/shopify-buy.ts` (29/29 store products, handle-keyed) renders a real Buy Button that takes over variant selection + checkout; unset keeps the demo pickers/price. Independent of the two vars above on purpose (setting those would trip the catalog stub). |
+| `PG_SSL` | *(verified TLS in production)* | `1`/`verify-full` verifies certificates; plaintext `0` is development-only |
+| `PG_SSL_CA_FILE` | *(system roots)* | Optional readable PEM CA bundle, never committed |
+| `NODE_TLS_REJECT_UNAUTHORIZED` | *(unset)* | `0` is rejected in production before a PostgreSQL client is created; do not use it as a TLS workaround |
+| `PYTHON_API_URL` | `http://127.0.0.1:8000` | Server-only commerce endpoint; not exposed to browser JavaScript |
+| `COMMERCE_PROXY_SECRET` | *(empty for local demo)* | Shared server-only credential for Next → Python; production requires at least 32 random bytes |
+| `SHOPIFY_ENABLED` | `false` | Explicit compatibility purchase switch; keep disabled for the local MVP |
+| `SHOPIFY_DOMAIN`, `SHOPIFY_STOREFRONT_TOKEN` | *(empty)* | Reserved catalog stub; selected only with both credentials and `SHOPIFY_ENABLED=true`. It is not a working sync integration. |
+| `SHOPIFY_BUY_DOMAIN`, `SHOPIFY_BUY_TOKEN` | *(empty)* | Compatibility Buy Button credentials, independent of catalog credentials. Requires both plus `SHOPIFY_ENABLED=true`; disabled by default so PDPs use Python variants and cart. The external store was not tested in this integration. |
+
+Before a production build is started, set `APP_ENV=production` and run
+`npm run preflight -- -Environment production`. The explicit environment value is
+required so a production build cannot silently inherit the local development mode.
+The preflight checks the deployment boundary without printing secrets: PostgreSQL is selected,
+TLS verification is enabled, the AI session secret is long enough, Python is not
+exposed as a loopback production URL, the Next → Python proxy secret is long enough,
+and the unsupported Shopify purchase path is disabled. Development defaults remain
+compatible with the local SQLite/Mock setup.
+The AI Route Handler also rejects bodies above 16 KiB and invalid fields before
+creating a session or reserving budget; its `X-Request-ID` is server-owned correlation
+data, not a session or idempotency credential. See the [AI request boundary report](./docs/ai-request-boundary-2026-10-03.md).
 
 ### Enabling real AI
 
@@ -118,7 +215,30 @@ See [`.env.example`](.env.example) for the annotated template. Summary:
 2. Set `AI_EMBEDDING_MODEL` + `AI_BASE_URL` to activate semantic retrieval; without them the
    assistant transparently uses keyword search over the catalog.
 3. Restart. Guardrails (rate limit, turn cap, daily budget) apply to real and Mock alike.
-   `AI_DISABLE_REAL=1` is the one-switch rollback to Mock.
+   `AI_DISABLE_REAL=1` is the one-switch rollback to Mock: it blocks new real chat and
+   embedding calls (including capability probes and cached capability results), while
+   local keyword recommendations remain available. Set it in the server environment
+   and restart; changing an environment file alone does not update a running process.
+   It does not cancel requests already dispatched or erase recorded usage.
+
+Each provider attempt and each embedding network call owns a separate budget reservation. SDK automatic retries are disabled,
+and upstream SDK logs are suppressed so private response content cannot bypass the
+application's safe error logging. When the provider returns a valid final usage chunk,
+prompt and completion tokens are settled from that response. Missing or invalid usage
+falls back to the character estimate; `AI_INCLUDE_USAGE=0` selects that fallback explicitly
+for incompatible gateways. This is an accounting input, not a provider billing guarantee.
+Completed usage above the admission estimate is recorded even if it exceeds the configured cap;
+subsequent reservations are rejected. See the [usage accuracy report](./docs/ai-usage-accuracy-2026-10-02.md).
+
+Once provider work starts, failure, timeout or cancellation marks its reservation
+`abandoned` and consumes the full reserved estimate. This can overcount unbilled failures,
+but prevents uncertain work from receiving a refund. These amounts are audit estimates,
+not fake completed replies in `ai_usage`. Before-provider failures may release their budget.
+Reservation attempts recover at most 100 stale pending rows per minute per instance,
+after at least five minutes (or `3*AI_REQUEST_TIMEOUT_MS+60000`, whichever is greater).
+Recovery preserves accounting and uses an indexed scan; idle applications recover on
+their next reservation attempt. A recovery database failure stops admission and is retried
+on the next attempt. See the budget report for rollback and remaining production limits.
 
 ### Switching market / sizes
 
@@ -134,7 +254,7 @@ src/
   app/                     # App Router pages & routes
     page.tsx               # Landing (zero AI presence by design)
     shop/page.tsx          # /shop — SSR list, URL-state filters (collection/size/price/sort/q)
-    product/[handle]/page.tsx  # PDP — SSG (generateStaticParams), buy CTA placeholder
+    product/[handle]/page.tsx  # PDP — SSG shell plus Python variant/cart controls
     api/ai/chat/route.ts   # POST SSE endpoint (delta|productCards|sizeFit|done|error frames)
     og/route.tsx           # Local OpenGraph image (ImageResponse, no network)
   components/
@@ -147,7 +267,7 @@ src/
     search/                # embedder, keyword search, retrieval (embedding cache + cosine), vector
     ai/                    # providers (Mock/OpenAI-compatible), chat orchestration, SSE events, prompts
     guardrails/            # rate limit, session state (turns/TTL/trim), token budget, soft copy
-  db/                      # Drizzle dual-driver schemas (3 tables each: sqlite-core + pg-core), clients, product-row codec
+  db/                      # Drizzle dual-driver schemas (5 tables each: sqlite-core + pg-core), clients, product-row codec
   lib/                     # shared pure helpers (site, market, wishlist, size charts, formats, SEO)
   test/                    # test scaffolding (vitest setup + a11y axe gate)
 ```
@@ -162,37 +282,37 @@ src/
   `public/products/<handle>/`) and fall back to SVG visuals only when image-less. A separate
   `gifts.ts` module feeds the `/shop` free-gift gallery (gifts are display-only, never in the
   sellable catalog).
-- **Store buy channel** (2026-09): the linked Shopify store holds the same 29 products under
-  matching handles. `src/server/catalog/shopify-buy.ts` is a **low-coupling static map** (local
+- **Store buy channel** (2026-09): the repository retains mappings for 29 Shopify product
+  handles; current external store state is unverified. `src/server/catalog/shopify-buy.ts` is a **low-coupling static map** (local
   `handle` → store numeric id, no Product/DB/schema changes) read by the PDP page; when
   `SHOPIFY_BUY_DOMAIN` + `SHOPIFY_BUY_TOKEN` are set, the store-mapped PDP hides the demo
   price/pickers and mounts one parameterized `ShopifyBuyButton` (SDK `createComponent` loading
   the admin-generated options verbatim), letting the store own variants, price and checkout.
-  Unset → all PDPs run the custom demo flow (**Buy now** → demo payment-QR dialog, placeholder
-  `public/payments/checkout-demo-qr.png`; swap in a live QR image for a real payment demo).
+  Both credentials also require `SHOPIFY_ENABLED=true`. Otherwise PDPs use the Python
+  variant/cart flow. No QR image or client action enables real payment.
 - **AI**: RAG-lite, zero tool-calling — every real/gateway model only needs chat completions.
   Retrieved product cards are injected into the system prompt; the model must answer from that
   injected content only. Modes: `shopping`, `size-fit` (deterministic), `outfit`, `find-shoes`,
   and `support` (store-policy Q&A from the shared `src/lib/store-policy` facts).
-- **Guardrails** (all anonymous, no PII): in-memory token bucket rate limit (IP + session),
-  per-session turn cap + history trim + idle TTL, output-token cap + timeout, and a **persisted**
-  daily token budget on `ai_usage`. Soft copy everywhere ("taking a short break"), never
-  "rate limited". Runs entirely in-process (single-instance assumption — adequate for this demo
-  deployment; revisit before multi-instance hosting).
+- **Guardrails**: signed, expiring HttpOnly AI cookies; IP/session rate limits; bounded
+  stores with periodic TTL cleanup; history trimming; output caps and provider timeouts.
+  Atomic daily budget counters are persisted in the database. IP/turn/history limits
+  remain process-local: **deploy only one instance until shared state is designed and tested**.
+  Without a trusted immediate peer, all anonymous requests share a conservative IP bucket.
 - **Search**: embedding vectors cached in `product_embeddings` (contentHash-validated), keyed by
   `Product.id` (unchanged by the DB move), cosine in
   app code (fine below ~2k products — beyond that, move to a native vector backend).
 
 ## Known limitations
 
-- **This site has no cart or checkout.** The detail CTA is a demo **Buy now** that opens a
-  payment-QR dialog (`public/payments/checkout-demo-qr.png`, a placeholder that never charges) to
-  demonstrate the order flow; a dormant `getBuyUrl` adapter contract returns `null` and the
-  dormant Shopify Buy Button only activates if `SHOPIFY_BUY_*` env is ever configured.
+- The cart and pending-order workflow is a local MVP. It has no real payment, login recovery,
+  shipping, tax, refunds or automatic catalog synchronization. Cookie loss loses access to
+  anonymous orders. Python must remain internal; a UUID bearer credential is not public API authentication.
 - Unknown product handles return the not-found UI with **HTTP 200 + `noindex`** under the current
   `dynamicParams` SSG setting (a deliberate, documented tradeoff; revisit if SEO on 404s matters).
-- Compliance: no cookies, no tracking, no personal data sent to AI providers. Anonymous `ai_usage`
-  token counts are stored locally for budget enforcement only.
+- Essential anonymous AI and commerce cookies are used. AI token usage is estimated rather
+  than provider billing data. Process crashes may leave pending reservations; reconciliation
+  and real PostgreSQL runtime/load tests remain production follow-ups.
 
 ## Disclaimer
 

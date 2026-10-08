@@ -7,9 +7,8 @@ import type { AiContext } from './provider'
 import { NO_MATCH_TEXT, modeHandlers } from './handlers'
 import type { ChatRequest, TurnContext } from './turn'
 
-// 检索被整体替换：handler 单测不该碰 catalog / DB / 嵌入。这些路径的接线由 chat.test.ts 端到端覆盖。
+// 检索由 TurnContext 注入：handler 单测不该碰 catalog / DB / 嵌入。这些路径的接线由 chat.test.ts 端到端覆盖。
 const { mockRetrieveProducts } = vi.hoisted(() => ({ mockRetrieveProducts: vi.fn() }))
-vi.mock('./retrieval-gateway', () => ({ retrieveProducts: mockRetrieveProducts }))
 
 const collect = async (gen: AsyncGenerator<ChatEvent>): Promise<ChatEvent[]> => {
   const out: ChatEvent[] = []
@@ -41,11 +40,12 @@ function makeTurn(over: Partial<ChatRequest> = {}, reply = 'ok'): Turn {
     req,
     text: req.text,
     history: [],
+    retrieveProducts: mockRetrieveProducts,
     async *stream(system, messages) {
       systems.push(system)
       sent.push(messages)
       yield { type: 'delta', text: reply }
-      return reply
+      return { text: reply }
     },
     async record(system, userText, assistantText) {
       recorded.push({ system, userText, assistantText })

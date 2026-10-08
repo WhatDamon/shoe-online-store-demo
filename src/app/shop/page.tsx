@@ -11,12 +11,17 @@ import { ProductGrid } from '@/components/shop/product-grid'
 import { GiftGallery } from '@/components/shop/gift-gallery'
 import { EmptyState } from './empty-state'
 import { pageMetadata } from '@/lib/seo'
+import { absoluteUrl } from '@/lib/seo'
+import { JsonLd } from '@/components/seo/json-ld'
+import { itemListSchema, webPageSchema } from '@/lib/structured-data'
 
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = pageMetadata({
   title: 'Shop',
   description: 'Shop all styles — every pair is printed to order around your size.',
+  alternates: { canonical: '/shop' },
+  openGraph: { url: absoluteUrl('/shop'), type: 'website' },
 })
 
 type ShopSearchParams = { [key: string]: string | string[] | undefined }
@@ -47,6 +52,15 @@ export default async function ShopPage({
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-10">
+      <JsonLd
+        data={webPageSchema({
+          name: 'Shop Evoloop shoes',
+          description: 'Browse Evoloop casual shoe styles and their available size ranges.',
+          path: '/shop',
+          type: 'CollectionPage',
+        })}
+      />
+      <JsonLd data={itemListSchema(products)} />
       <header className="mb-6">
         <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Shop</h1>
         <p className="mt-1 text-sm text-neutral-500">

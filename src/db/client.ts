@@ -1,8 +1,12 @@
-import { mkdirSync } from 'node:fs'
+import { X509Certificate } from 'node:crypto'
+import { mkdirSync, readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { checkServerIdentity, type PeerCertificate } from 'node:tls'
 import Database from 'better-sqlite3'
-import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
+import { migrate as migrateSqlite } from 'drizzle-orm/better-sqlite3/migrator'
 import { drizzle as drizzlePg } from 'drizzle-orm/postgres-js'
+import { readMigrationFiles } from 'drizzle-orm/migrator'
 import postgres from 'postgres'
 import { schema } from './schema'
 import { schema as pgSchema } from './schema-postgres'
@@ -12,50 +16,17 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 
 export type AppDb = BetterSQLite3Database<typeof schema>
 export type PgAppDb = PostgresJsDatabase<typeof pgSchema>
+type PgClientDb = PgAppDb & { $client: ReturnType<typeof postgres> }
 type AnyDb = AppDb | PgAppDb
+const sqliteMigrations = { migrationsFolder: resolve(process.cwd(), 'drizzle/sqlite') }
+const postgresMigrations = { migrationsFolder: resolve(process.cwd(), 'drizzle/postgres') }
 
 export function createDb(file: string = process.env.DATABASE_URL ?? './data/local.db'): AppDb {
   const sqlite = new Database(file)
   sqlite.exec('PRAGMA journal_mode = WAL;')
-  sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS product_embeddings (
-      product_id TEXT PRIMARY KEY,
-      content_hash TEXT NOT NULL,
-      model TEXT NOT NULL,
-      vector TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS ai_usage (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      day TEXT NOT NULL,
-      model TEXT NOT NULL,
-      prompt_tokens INTEGER NOT NULL,
-      completion_tokens INTEGER NOT NULL,
-      session_key TEXT NOT NULL,
-      created_at INTEGER NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_ai_usage_day ON ai_usage(day);
-    CREATE TABLE IF NOT EXISTS products (
-      id TEXT PRIMARY KEY,
-      handle TEXT NOT NULL UNIQUE,
-      title TEXT NOT NULL,
-      subtitle TEXT NOT NULL,
-      description TEXT NOT NULL,
-      price_amount REAL NOT NULL,
-      currency TEXT NOT NULL,
-      product_type TEXT NOT NULL,
-      collections TEXT NOT NULL,
-      sizes TEXT NOT NULL,
-      colors TEXT NOT NULL,
-      features TEXT NOT NULL,
-      tags TEXT NOT NULL,
-      construction TEXT NOT NULL,
-      visual TEXT NOT NULL,
-      images TEXT NOT NULL,
-      fit_notes TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    );
-  `)
-  return drizzle(sqlite, { schema })
+  const database = drizzle(sqlite, { schema })
+  migrateSqlite(database, sqliteMigrations)
+  return database
 }
 
 let _db: AppDb | null = null
@@ -79,75 +50,128 @@ export function db(): AnyDb {
 }
 
 export function createPostgresDb(url: string = process.env.DATABASE_URL ?? ''): PgAppDb {
-  if (!url) throw new Error('DB_DRIVER=postgres requires DATABASE_URL (postgres://…) URL')
-  const ssl = pgConnectOptions()
-  const client = ssl ? postgres(url, { max: 10, ssl }) : postgres(url, { max: 10 })
-  return drizzlePg(client, { schema: pgSchema })
+  return drizzlePg(createPostgresClient(url), { schema: pgSchema })
 }
 
-// Cloud SQL（公网 IP）强制 TLS。serverless（Vercel）无法随部署携带 CA 证书文件、
-// Cloud SQL 公网证书链也不在 Node 系统根链内，故等价 sslmode=require（加密但跳过证书验证），
-// 配合强密码 + 授权网段收紧使用（详见 docs/shopify-store-setup 同款取舍文档/README env 表）。
-// PG_SSL 非空且非 '0' 即开启（Vercel 注入空串的安全默认：不误开）。
+export function createPostgresClient(
+  url: string,
+  env: Record<string, string | undefined> = process.env,
+) {
+  if (!url) throw new Error('DB_DRIVER=postgres requires DATABASE_URL (postgres://…) URL')
+  const ssl = pgConnectOptions(env)
+  let hostname = ''
+  if (ssl) {
+    try {
+      const parsed = new URL(url)
+      hostname = parsed.hostname.replace(/^\[|\]$/g, '')
+      if (
+        !['postgres:', 'postgresql:'].includes(parsed.protocol) ||
+        !hostname ||
+        hostname.includes(',')
+      ) {
+        throw new Error('invalid endpoint')
+      }
+    } catch {
+      throw new Error('Verified PostgreSQL TLS requires one explicit DATABASE_URL hostname')
+    }
+  }
+  // Always pass ssl explicitly: URL/PGSSL options must not weaken this policy.
+  return postgres(url, {
+    max: 10,
+    ssl: ssl
+      ? {
+          ...ssl,
+          // postgres.js omits SNI for IPs; Node can otherwise validate 'localhost'.
+          checkServerIdentity: (_name: string, certificate: PeerCertificate) =>
+            checkServerIdentity(hostname, certificate),
+        }
+      : false,
+  })
+}
+
+// Production always verifies TLS. Development can use an explicit local plaintext
+// connection; neither connection strings nor legacy `require` disable verification.
 export function pgConnectOptions(
   env: Record<string, string | undefined> = process.env,
-): { rejectUnauthorized: false } | null {
-  const ssl = (env.PG_SSL ?? '').trim()
-  return ssl !== '' && ssl !== '0' ? { rejectUnauthorized: false } : null
+): { rejectUnauthorized: true; ca?: string } | null {
+  const mode = (env.PG_SSL ?? '').trim().toLowerCase()
+  const caFile = (env.PG_SSL_CA_FILE ?? '').trim()
+  const production = (env.NODE_ENV ?? '').trim().toLowerCase() === 'production'
+  // Node's process-wide TLS escape hatch must never be present in a
+  // production process, even though the client below passes an explicit
+  // rejectUnauthorized=true option. Fail closed before creating a client.
+  if (production && (env.NODE_TLS_REJECT_UNAUTHORIZED ?? '').trim() === '0') {
+    throw new Error('NODE_TLS_REJECT_UNAUTHORIZED=0 is not allowed in production')
+  }
+  if (!['', '0', 'false', '1', 'true', 'require', 'verify-full'].includes(mode)) {
+    throw new Error('Invalid PG_SSL: use 1/verify-full, or 0 for local development')
+  }
+  const disabled = mode === '0' || mode === 'false'
+  if (disabled && (production || caFile)) {
+    throw new Error('PostgreSQL TLS cannot be disabled in production or with PG_SSL_CA_FILE')
+  }
+  if (disabled || (!mode && !production && !caFile)) return null
+  if (!caFile) return { rejectUnauthorized: true }
+  try {
+    const ca = readFileSync(caFile, 'utf8')
+    // Reject empty/malformed mounts before attempting a network connection.
+    new X509Certificate(ca)
+    return { rejectUnauthorized: true, ca }
+  } catch {
+    // Do not expose the file path, certificate, or underlying filesystem error.
+    throw new Error('PG_SSL_CA_FILE must contain a readable PEM certificate bundle')
+  }
 }
 
-// 启动自动建表（零迁移 DX，两侧一致）：每个 pg 实例只执行一次，失败可重试。
+const postgresMigrationLockKey = 'evoloop:postgres-schema-migrations'
+
+/**
+ * Run PostgreSQL migrations while holding a database-level transaction lock.
+ * Drizzle's built-in migrator reads the last migration before opening its
+ * transaction, so independent processes can otherwise execute the same file.
+ */
+async function migratePostgresWithLock(client: ReturnType<typeof postgres>): Promise<void> {
+  const migrations = readMigrationFiles(postgresMigrations)
+  await client.begin(async (tx) => {
+    await tx`SELECT pg_advisory_xact_lock(hashtextextended(${postgresMigrationLockKey}, 0))`
+    await tx`CREATE SCHEMA IF NOT EXISTS "drizzle"`
+    await tx`
+      CREATE TABLE IF NOT EXISTS "drizzle"."__drizzle_migrations" (
+        id SERIAL PRIMARY KEY,
+        hash text NOT NULL,
+        created_at bigint
+      )
+    `
+
+    const dbMigrations = await tx`
+      SELECT id, hash, created_at
+      FROM "drizzle"."__drizzle_migrations"
+      ORDER BY created_at DESC
+      LIMIT 1
+    `
+    const lastDbMigration = dbMigrations[0] as { created_at: string | number | null } | undefined
+    for (const migration of migrations) {
+      if (!lastDbMigration || Number(lastDbMigration.created_at) < migration.folderMillis) {
+        for (const statement of migration.sql) await tx.unsafe(statement)
+        await tx`
+          INSERT INTO "drizzle"."__drizzle_migrations" ("hash", "created_at")
+          VALUES (${migration.hash}, ${migration.folderMillis})
+        `
+      }
+    }
+  })
+}
+
+// 每个 pg 实例只运行一次版本化迁移，失败可重试。
 const pgTablesReady = new WeakMap<object, Promise<void>>()
 
 export function ensurePgTables(database: PgAppDb): Promise<void> {
   const pending = pgTablesReady.get(database)
   if (pending) return pending
-  const run = runPgDdl(database).catch((e) => {
+  const run = migratePostgresWithLock((database as PgClientDb).$client).catch((e) => {
     pgTablesReady.delete(database)
     throw e
   })
   pgTablesReady.set(database, run)
   return run
-}
-
-async function runPgDdl(db: PgAppDb): Promise<void> {
-  const statements = [
-    sql`CREATE TABLE IF NOT EXISTS product_embeddings (
-      product_id text PRIMARY KEY,
-      content_hash text NOT NULL,
-      model text NOT NULL,
-      vector text NOT NULL
-    )`,
-    sql`CREATE TABLE IF NOT EXISTS ai_usage (
-      id serial PRIMARY KEY,
-      day text NOT NULL,
-      model text NOT NULL,
-      prompt_tokens integer NOT NULL,
-      completion_tokens integer NOT NULL,
-      session_key text NOT NULL,
-      created_at bigint NOT NULL
-    )`,
-    sql`CREATE INDEX IF NOT EXISTS idx_ai_usage_day ON ai_usage (day)`,
-    sql`CREATE TABLE IF NOT EXISTS products (
-      id text PRIMARY KEY,
-      handle text NOT NULL UNIQUE,
-      title text NOT NULL,
-      subtitle text NOT NULL,
-      description text NOT NULL,
-      price_amount double precision NOT NULL,
-      currency text NOT NULL,
-      product_type text NOT NULL,
-      collections text NOT NULL,
-      sizes text NOT NULL,
-      colors text NOT NULL,
-      features text NOT NULL,
-      tags text NOT NULL,
-      construction text NOT NULL,
-      visual text NOT NULL,
-      images text NOT NULL,
-      fit_notes text NOT NULL,
-      created_at text NOT NULL
-    )`,
-  ]
-  for (const statement of statements) await db.execute(statement)
 }

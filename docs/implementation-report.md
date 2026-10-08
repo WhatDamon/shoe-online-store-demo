@@ -1,5 +1,7 @@
 # Implementation Report — Evoloop 3D-Printed Shoe Storefront (feat/shoe-store)
 
+> **当前实施入口（2026-10-01）：** 下文是历史展示站快照。当前已整合独立 Python commerce 与安全基线；真实 PostgreSQL 交易、预算并发、TLS 已验收，并继续修复预算恢复和流式取消。详见 [统一基线](./unified-baseline-2026-09-30.md)、[可靠性](./reliability-2026-10-01.md)、[PostgreSQL 验收](./postgres-acceptance-2026-10-01.md) 与 [预算恢复](./ai-budget-recovery-2026-10-01.md)。最新本地门禁为 553 项 TS 测试、112 项 Python 双数据库测试和生产构建；不等于已部署或阶段 C 全部完成。
+
 > **时效标注（2026-09-15 追加）：** 本报告是 HEAD `83fd694` 的**历史快照**，以下三处已与当前 HEAD 不符。
 > 保留原文不改写，以维持它作为历史记录的价值：
 >

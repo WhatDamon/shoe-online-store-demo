@@ -1,4 +1,4 @@
-import { bigint, doublePrecision, integer, pgTable, serial, text } from 'drizzle-orm/pg-core'
+import { bigint, doublePrecision, index, integer, pgTable, serial, text } from 'drizzle-orm/pg-core'
 
 // Postgres 方言 schema：列语义与 sqlite 版对齐，
 // 由 schema-parity 契约测试防漂移。createdAt 用 bigint（毫秒值超出 int32）。
@@ -9,15 +9,39 @@ export const productEmbeddings = pgTable('product_embeddings', {
   vector: text('vector').notNull(), // JSON number[]
 })
 
-export const aiUsage = pgTable('ai_usage', {
-  id: serial('id').primaryKey(),
-  day: text('day').notNull(),
-  model: text('model').notNull(),
-  promptTokens: integer('prompt_tokens').notNull(),
-  completionTokens: integer('completion_tokens').notNull(),
-  sessionKey: text('session_key').notNull(),
-  createdAt: bigint('created_at', { mode: 'number' }).notNull(), // sqlite INTEGER(64) 等价
+export const aiUsage = pgTable(
+  'ai_usage',
+  {
+    id: serial('id').primaryKey(),
+    day: text('day').notNull(),
+    model: text('model').notNull(),
+    promptTokens: integer('prompt_tokens').notNull(),
+    completionTokens: integer('completion_tokens').notNull(),
+    sessionKey: text('session_key').notNull(),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull(), // sqlite INTEGER(64) 等价
+  },
+  (table) => [index('idx_ai_usage_day').on(table.day)],
+)
+export const aiBudgetDays = pgTable('ai_budget_days', {
+  day: text('day').primaryKey(),
+  reservedTokens: integer('reserved_tokens').notNull().default(0),
+  usedTokens: integer('used_tokens').notNull().default(0),
 })
+export const aiBudgetReservations = pgTable(
+  'ai_budget_reservations',
+  {
+    requestId: text('request_id').primaryKey(),
+    day: text('day').notNull(),
+    reservedTokens: integer('reserved_tokens').notNull(),
+    actualTokens: integer('actual_tokens').notNull().default(0),
+    status: text('status').notNull(),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+  },
+  (table) => [
+    index('idx_ai_budget_reservations_day').on(table.day),
+    index('idx_ai_budget_reservations_recovery').on(table.status, table.createdAt, table.requestId),
+  ],
+)
 
 export const products = pgTable('products', {
   id: text('id').primaryKey(),
@@ -40,4 +64,10 @@ export const products = pgTable('products', {
   createdAt: text('created_at').notNull(),
 })
 
-export const schema = { productEmbeddings, aiUsage, products }
+export const schema = {
+  productEmbeddings,
+  aiUsage,
+  aiBudgetDays,
+  aiBudgetReservations,
+  products,
+}

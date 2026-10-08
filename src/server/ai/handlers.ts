@@ -7,7 +7,6 @@ import { getProductForMarket } from '@/server/catalog/service'
 import type { AiContext } from './provider'
 import { digestLines, productContextOf, toCard } from './context'
 import { systemFor } from './prompts'
-import { retrieveProducts } from './retrieval-gateway'
 import { adviceFor } from './size-input'
 import type { ModeHandler, TurnContext } from './turn'
 
@@ -61,9 +60,9 @@ const handleOutfit: ModeHandler = async function* (ctx) {
     ...ctx.history,
     { role: 'user', content: ctx.text || 'Give me outfit ideas.' },
   ]
-  const assistant = yield* ctx.stream(system, messages)
+  const reply = yield* ctx.stream(system, messages)
   // 记账用实际发给模型的那句：空文本会被替换成默认句。
-  await ctx.record(system, messages[messages.length - 1].content, assistant)
+  await ctx.record(system, messages[messages.length - 1].content, reply.text, reply.usage)
   yield { type: 'done' }
 }
 
@@ -71,8 +70,8 @@ const handleOutfit: ModeHandler = async function* (ctx) {
 const handleSupport: ModeHandler = async function* (ctx) {
   const system = systemFor('support', {})
   const messages: AiContext['messages'] = [...ctx.history, { role: 'user', content: ctx.text }]
-  const assistant = yield* ctx.stream(system, messages)
-  await ctx.record(system, ctx.text, assistant)
+  const reply = yield* ctx.stream(system, messages)
+  await ctx.record(system, ctx.text, reply.text, reply.usage)
   yield { type: 'done' }
 }
 
@@ -80,7 +79,7 @@ const handleSupport: ModeHandler = async function* (ctx) {
  * 拆成两个近乎相同的函数只会得到一层透传，故共用并按 req.mode 分叉。 */
 const handleCatalogModes: ModeHandler = async function* (ctx) {
   const { req, text } = ctx
-  const products = await retrieveProducts(text)
+  const products = await ctx.retrieveProducts(text)
   const digest = digestLines(products)
   // PDP 锚定（设计：FAB 打开带上当前鞋，shopping 自由提问也能针对该鞋回答）：
   // handle 可查 → 注入该鞋真实事实块（同 size-fit/outfit）；无效/未知 → 静默回退纯 digest
@@ -101,8 +100,8 @@ const handleCatalogModes: ModeHandler = async function* (ctx) {
   if (req.mode === 'find-shoes') {
     yield { type: 'productCards', items: products.map(toCard) }
   }
-  const assistant = yield* ctx.stream(system, messages)
-  await ctx.record(system, text, assistant)
+  const reply = yield* ctx.stream(system, messages)
+  await ctx.record(system, text, reply.text, reply.usage)
   yield { type: 'done' }
 }
 

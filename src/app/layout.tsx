@@ -5,6 +5,7 @@ import { Geist, Geist_Mono, Newsreader } from 'next/font/google'
 import './globals.css'
 import { WishlistProvider } from '@/components/shop/wishlist-provider'
 import { AssistantProvider } from '@/components/assistant/assistant-provider'
+import { SiteJsonLd } from '@/components/seo/site-json-ld'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       className={`${geistSans.variable} ${geistMono.variable} ${newsreader.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col bg-canvas text-ink">
+        <SiteJsonLd />
         <WishlistProvider>
           <AssistantProvider>{children}</AssistantProvider>
         </WishlistProvider>

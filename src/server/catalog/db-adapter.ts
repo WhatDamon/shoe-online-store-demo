@@ -48,8 +48,8 @@ export class DbCatalogAdapter implements CatalogAdapter {
 
   async getProductByHandle(handle: string): Promise<Product | null> {
     await this.ensureSynced()
-    const rows = await this.repo().listAllProducts()
-    return rows.map(productFromRecord).find((p) => p.handle === handle) ?? null
+    const row = await this.repo().findProductByHandle(handle)
+    return row ? productFromRecord(row) : null
   }
 
   async getCollections(): Promise<Collection[]> {

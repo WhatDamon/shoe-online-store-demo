@@ -5,6 +5,10 @@ import { PromiseStrip } from '@/components/marketing/promise-strip'
 import { CollectionCards } from '@/components/marketing/collection-cards'
 import { FeaturedGrid } from '@/components/marketing/featured-grid'
 import { StorySection } from '@/components/marketing/story-section'
+import { FaqSection } from '@/components/marketing/faq-section'
+import { JsonLd } from '@/components/seo/json-ld'
+import { faqSchema, webPageSchema } from '@/lib/structured-data'
+import { homepageFaq } from '@/lib/faq'
 
 // 标题语义（框架回归点）：root layout（含 title.template '%s — Evoloop'）处于
 // 3 段路由 [root, (landing) layout, page] 中“最后两段之外”，模板会应用到叶子 title，
@@ -21,11 +25,21 @@ export const metadata: Metadata = pageMetadata({
 export default function HomePage() {
   return (
     <>
+      <JsonLd
+        data={webPageSchema({
+          name: 'Evoloop — casual shoes made to order',
+          description:
+            'Explore Evoloop casual shoes, millimetre-based sizing, digital manufacturing, and the studio story.',
+          path: '/',
+        })}
+      />
       <Hero />
       <PromiseStrip />
       <CollectionCards />
       <FeaturedGrid />
       <StorySection />
+      <FaqSection />
+      <JsonLd data={faqSchema([...homepageFaq])} />
     </>
   )
 }

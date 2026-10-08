@@ -29,6 +29,13 @@ describe('products table repository (decision #17)', () => {
     expect((await repo.listAllProducts())[0].title).toBe('Renamed')
   })
 
+  it('finds one product by its indexed handle without requiring a full list', async () => {
+    const row = productToRecord(seedProducts[0])
+    await repo.upsertProducts([row])
+    await expect(repo.findProductByHandle(row.handle)).resolves.toEqual(row)
+    await expect(repo.findProductByHandle('missing-handle')).resolves.toBeNull()
+  })
+
   it('keeps products out of embedding/usage wipe isolation scope (wipe clears all three)', async () => {
     await repo.upsertProducts(seedProducts.slice(0, 1).map(productToRecord))
     await repo.wipe()

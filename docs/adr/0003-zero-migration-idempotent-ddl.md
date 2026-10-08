@@ -1,6 +1,9 @@
 # 0003 — 建表用幂等 DDL，不引入迁移工具
 
-**状态：** 已采纳 · **日期：** 2026-09-15（重构期决策）
+**状态：** 已被 [ADR 0007](./0007-versioned-typescript-migrations.md) 取代 · **日期：** 2026-09-15（重构期决策）
+
+本文保留当时的历史决策和背景。当前 TypeScript 展示/AI 数据库已改为版本化
+Drizzle 迁移；Python commerce 仍由 Alembic 管理，二者不共用迁移目录。
 
 ## 背景
 
