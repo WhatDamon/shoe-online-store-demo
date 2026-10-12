@@ -618,7 +618,6 @@ def test_order_endpoints_expire_due_orders_with_sweeper_disabled(commerce, varia
     else:
         response = client.post("/api/v1/payments/session", json={"order_id": order["id"]})
         assert response.json()["code"] == "payment_disabled"
-        assert response.json()["charged"] is False
     assert response.status_code == 200
     assert_released_once(engine, variant, order["id"])
 

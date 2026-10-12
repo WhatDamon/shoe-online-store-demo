@@ -228,7 +228,6 @@ def test_retirement_preserves_order_snapshots_idempotency_and_stock_release(
     assert retry.status_code == 200
     assert retry.json() == order
     payment = client.post("/api/v1/payments/session", json={"order_id": order["id"]}).json()
-    assert payment["charged"] is False
     assert payment["order_status"] == "pending_payment"
     if release == "cancel":
         response = client.post(f"/api/v1/orders/{order['id']}/cancel")

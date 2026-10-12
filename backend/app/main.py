@@ -127,4 +127,4 @@ async def request_log(
 @app.get("/health", response_model=HealthResponse)
 def health(db: DB) -> dict:
     db.execute(text("SELECT version_num FROM alembic_version"))
-    return {"status": "ok", "payment_enabled": False}
+    return {"status": "ok", "payment_enabled": settings.stripe_ready}

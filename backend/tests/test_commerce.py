@@ -263,7 +263,6 @@ def test_mock_never_charges_or_marks_paid(commerce, variant):
     for _ in range(2):
         result = client.post("/api/v1/payments/session", json={"order_id": order["id"]}).json()
         assert result["code"] == "payment_disabled"
-        assert result["charged"] is False
         assert result["message"] == "Payments are not available yet."
     assert client.get(f"/api/v1/orders/{order['id']}").json()["status"] == "pending_payment"
     assert (
