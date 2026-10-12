@@ -135,6 +135,5 @@ function toProduct(s: SupplierShoe, index: number): Product {
     createdAt: '2026-09-06T00:00:00Z',
   }
 }
-// 说明：seed 只含 29 款供应商正价目录，不含“店款”宿主商品——商店在售 PDP 的 Buy 接管
-// 由 handle→store-id 静态映射（src/server/catalog/shopify-buy.ts）覆盖，无需 seed 演示款。
+// 说明：seed 只含 29 款供应商正价目录，不含任何“店款”宿主商品。
 export const seedProducts: Product[] = shoes.map(toProduct)

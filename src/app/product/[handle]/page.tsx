@@ -4,7 +4,6 @@ import type { Metadata } from 'next'
 import { ArrowLeft } from 'lucide-react'
 import { catalog } from '@/server/catalog/adapter'
 import { getProductForMarket, getRelatedProducts } from '@/server/catalog/service'
-import { shopifyBuyConfigFor } from '@/server/catalog/shopify-buy'
 import { ProductGallery } from '@/components/shop/product-gallery'
 import { ProductActions } from '@/components/shop/product-actions'
 import { ProductColorSelectionProvider } from '@/components/shop/product-color-selection'
@@ -65,13 +64,7 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
   const product = await getProductForMarket(handle)
   if (!product) notFound()
 
-  // 商店直购（2026-09-06 全目录映射）：商店有同 handle 商品且 SHOPIFY_BUY_* env 已配 →
-  // 该 PDP 由 Shopify Buy Button 接管变体选择与结算（隐藏 demo 价与选择器）；否则维持 demo 购买条。
-  const buyConfig = shopifyBuyConfigFor(product.handle)
-  const [buyUrl, related] = await Promise.all([
-    catalog().getBuyUrl(product),
-    getRelatedProducts(product.handle, 3),
-  ])
+  const related = await getRelatedProducts(product.handle, 3)
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:py-8">
@@ -110,7 +103,7 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
                   {/* 真实货号：import.py 以 slugify(code) 生成 handle（29/29 code === handle.toUpperCase()），
                   故展示层由 handle 回大写即得供应商货号（如 DC-1001 / 26016-M）。原副标题
                   （"Unisex · 5 colorways"）与描述首句重复且无货号价值，替换为货号行更疏朗。
-                  若未来 handle 不再由货号派生（如 Shopify 商品），此推导需改为显式 code 字段。 */}
+                  若未来 handle 不再由货号派生（例如引入自建商品号），此推导需改为显式 code 字段。 */}
                   <p className="mt-1.5 text-[13px] uppercase tracking-wider text-neutral-500">
                     {product.handle.toUpperCase()}
                   </p>
@@ -123,16 +116,11 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
                 </div>
               </div>
 
-              {/* 商店直购形态：demo $ 价不显示（价格仅由 Buy Button 以店币呈现，决策：不并存误导） */}
-              {buyConfig == null ? (
-                <p className="text-2xl font-semibold text-ink">
-                  {formatPrice(product.price.amount)}
-                </p>
-              ) : null}
+              <p className="text-2xl font-semibold text-ink">{formatPrice(product.price.amount)}</p>
 
               <p className="text-[15px] leading-7 text-neutral-600">{product.description}</p>
 
-              <ProductActions product={product} buyUrl={buyUrl} buyConfig={buyConfig}>
+              <ProductActions product={product}>
                 <div className="flex flex-col gap-3">
                   {/* 详情手风琴分区标题：base-ui AccordionHeader 固定渲染 h3，
                   需 h2 祖先承接 h1 → h3 的标题层级（heading-order 修复）。 */}

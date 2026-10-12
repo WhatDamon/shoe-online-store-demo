@@ -28,11 +28,11 @@ describe('GET /api/catalog', () => {
     expect(body).toHaveLength(2)
     expect(body[0]).toMatchObject({ handle: first.handle, title: first.title })
     expect(body[1]).toMatchObject({ handle: second.handle, title: second.title })
-    // 摘要 shape：图片/色数/照片数/码段/商店态
+    // 摘要 shape：图片/色数/照片数/码段（无商店态：购买通道已收敛）
     expect(typeof body[0].image).toBe('string')
     expect(typeof body[0].colorCount).toBe('number')
     expect(typeof body[0].photoCount).toBe('number')
-    expect(body[0].storeAvailable).toBeTypeOf('boolean')
+    expect(body[0]).not.toHaveProperty('storeAvailable')
     expect('price' in body[0]).toBe(false) // 只读展示端点不带价
   })
 

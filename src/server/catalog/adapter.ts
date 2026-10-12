@@ -2,14 +2,11 @@ import { envStr } from '@/config'
 import type { CatalogAdapter } from './adapter-contract'
 import { DbCatalogAdapter } from './db-adapter'
 import { seedAdapter } from './seed-adapter'
-import { shopifyStub, shopifyEnabled } from './shopify-stub'
 
 // 运行时目录源：默认 DB（products 表，表空自动灌种）。优先级：
-//   SHOPIFY_* 均已配置 → shopify stub（契约占位，真实现后续）
 //   CATALOG_SOURCE=seed → 内存导入层（单元测试与兜底）
-//   其余 → DB
+//   其余（含任何历史取值）→ DB
 const pick = (): CatalogAdapter => {
-  if (shopifyEnabled()) return shopifyStub
   if (envStr('CATALOG_SOURCE') === 'seed') return seedAdapter
   return new DbCatalogAdapter()
 }

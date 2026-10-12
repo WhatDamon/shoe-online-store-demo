@@ -55,10 +55,4 @@ export class DbCatalogAdapter implements CatalogAdapter {
   async getCollections(): Promise<Collection[]> {
     return collections
   }
-
-  // 无 store → null（与 seed 阶段同一契约；真 Shopify 接入后由对应实现替换）。
-  async getBuyUrl(_product?: Product): Promise<null> {
-    void _product
-    return null
-  }
 }

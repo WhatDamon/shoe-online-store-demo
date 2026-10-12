@@ -14,7 +14,6 @@ const seedRow = {
   colorCount: 5,
   photoCount: 4,
   sizeRange: 'US 4.5–9.5',
-  storeAvailable: false,
 }
 
 let SavedPairs: ComponentType
@@ -72,11 +71,14 @@ describe('SavedPairs (/saved)', () => {
     expect(screen.getByText(/5 colors/)).toBeInTheDocument()
   })
 
-  it('shows the on-the-store marker when the summary reports it', async () => {
+  it('ignores a store marker left over in a cached catalog response', async () => {
+    // 审查重点 3：浏览器缓存里可能仍有含 storeAvailable 的历史响应。
+    // 客户端必须既不渲染商店标记，也不因多出字段而抛错。
     stubFetch([{ ...seedRow, storeAvailable: true }])
     window.localStorage.setItem('evoloop:wishlist', JSON.stringify(['dc-1001']))
     renderSaved()
-    expect(await screen.findByText(/On the store/)).toBeInTheDocument()
+    expect(await screen.findByText('Urban Bloom')).toBeInTheDocument()
+    expect(screen.queryByText(/On the store/)).not.toBeInTheDocument()
   })
 
   it('removing a row toggles the wishlist store and refetches', async () => {

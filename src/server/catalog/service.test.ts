@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
 import { listProductsForMarket, getProductForMarket, getRelatedProducts } from './service'
-import { seedAdapter } from './seed-adapter'
 import { seedProducts } from './seed'
 import { catalog } from './adapter'
 
@@ -26,12 +25,6 @@ describe('catalog service', () => {
     const items = await listProductsForMarket({})
     expect(items[0].sizeOptions.length).toBeGreaterThan(0)
     expect(items[0].sizeOptions[0].label).toMatch(/^(US|EU|UK|JP|CN) /)
-  })
-  it('getBuyUrl null when no store configured', async () => {
-    // 无 Shopify 凭证 → seed 适配器生效，getBuyUrl 恒 null（占位 + 适配器就绪）。
-    const p = await seedAdapter.getProductByHandle(FIRST_HANDLE)
-    expect(p).not.toBeNull()
-    if (p) expect(await seedAdapter.getBuyUrl(p)).toBeNull()
   })
   it('product missing -> null', async () => {
     expect(await getProductForMarket('nope')).toBeNull()
