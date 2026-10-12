@@ -20,7 +20,8 @@
 - 每个颜色/尺码组合有稳定 `variant_id`，不能用颜色数组下标识别。
 - `order_items` 保存下单时商品名、SKU、尺码、颜色、货币和价格快照。
 - 库存至少区分 `available` 和 `reserved`；预占、扣减、释放必须在明确事务中完成。
-- 所有结构变化通过 Alembic migration；检查升级、降级或前向修复策略。不得运行时自动建正式表。
+- Python 交易库的结构变化通过 Alembic migration；检查升级、降级或前向修复策略，不得用运行时 `create_all()` 代替正式迁移。
+- TypeScript 展示/AI 数据库**不在此列**：它使用版本化 Drizzle 迁移加幂等运行时 DDL，见 `task-routing.md` 的「数据库双轨」与 ADR 0003、0007。不可据上一条移除该侧的运行时初始化。
 
 ### API 和所有权
 

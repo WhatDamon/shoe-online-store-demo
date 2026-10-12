@@ -9,9 +9,12 @@
 
 | 命令 | 作用 |
 | --- | --- |
-| `npm run verify` | 展示/前端侧全套：`format:check` → `typecheck` → 边界 → 耦合 → 目录漂移 → `lint` → 单测 |
-| `npm run verify:python` | Python 全套：ruff format → ruff check → mypy → compileall → alembic check → pytest |
+| `npm run verify` | 展示/前端侧全套：`format:check` → `typecheck` → 边界 → 耦合 → 目录漂移 → 机械 slop 扫描 → `lint` → 单测 |
+| `npm run verify:python` | Python 全套：ruff format → ruff check → mypy → compileall → alembic check → 机械 slop 扫描 → slop 自检 → pytest |
 | `npm run verify:all` | 以上两者串联 |
+| `npm run check:slop` | 零依赖机械扫描（TS 侧）。阻塞项：无入口文件、死导出、不可达语句、stray-focus 测试、无理由 `@ts-ignore`。提示项：被注释掉的代码、标记词、条件跳过测试、未用 `--` 说明理由的 `eslint-disable` |
+| `npm run check:slop:python` | 同一思路的 Python 侧扫描（stdlib `ast`，不需要 venv 依赖）。阻塞项只有未使用的 import |
+| `npm run test:slop:python` | 跑 Python 扫描器内置的假阳性回归自检 |
 | `npm run preflight` | 部署前环境预检；加 `-- --environment production`（旧写法 `-Environment production` 仍可用） |
 | `npm run py -- -m <module> …` | 任意 Python 命令；解释器由 `scripts/py.mjs` 解析 |
 | `npm run build` | Next.js 生产构建 |
@@ -29,6 +32,20 @@
 | metadata / Route Handler / 缓存 | 先读 `node_modules/next/dist/docs/` 对应文档，再 `npm run build` |
 | 迁移 | `npm run db:migrate:python` 之后 `npm run check:python:migrate` |
 | 线上 SEO | 必须对正式 URL 实际复测（验收清单见 `docs/seo-geo-plan.md`） |
+| 改动删除了导出 / 文件，或新增测试 | `npm run check:slop`（TS）与 `npm run check:slop:python`（Python）；两侧都不覆盖语义判据，见下 |
+
+## 机械扫描的边界
+
+`check:slop` 只覆盖**机械可判定**的部分：无入口文件、死导出、不可达语句、stray-focus 测试、
+被注释掉的代码、标记词、条件跳过测试、无理由的抑制指令。它**测不出**注释是否空心、
+测试是否真在验证行为、抽象是否多余——这几类需要人判断，不要因为门禁通过就认为没有 slop。
+
+判据本身很容易写出假阳性。本项目人工审计期间，扫描器反复产出过假的「不可达」「被注释掉的代码」
+「死导出」，并在测试夹具上自指误报。每一类都按同一模式修：先证明检测器确实能触发（加
+sanity 计数），再用已知真值校准，最后把该类假阳性固化为回归用例；修复前必须先分清
+是检测器有 bug 还是测试断言写错——改检测器去迁就一个错的断言会掩盖真问题。
+这些回归用例位于 `scripts/check-slop.test.ts` 与 `check-slop-python.py --self-test`；
+改动判据后必须让它们保持绿色。
 
 ## 基线纪律
 

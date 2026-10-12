@@ -134,19 +134,21 @@ tests); the reserved Shopify adapter takes priority only with `SHOPIFY_ENABLED=t
 | `npm run check:boundary` | Guards that `'use client'` modules carry no runtime `@/server/**` import. |
 | `npm run check:coupling` | Checks runtime import cycles, transitive client/domain boundaries and guardrails' budget port. |
 | `npm run check:catalog` | Read-only comparison of display/commerce snapshots and stable variant keys; set `CATALOG_DRIFT_DATABASE` for an optional local runtime DB check. |
+| `npm run check:slop` | Zero-dependency mechanical slop scan: unreachable files/exports/statements and stray-focus tests fail the gate; commented-out code, markers and conditional skips are reported for human judgement. Covers only what is mechanically decidable. |
+| `npm run check:slop:python` | Same scan for `backend/`, via the resolved Python interpreter; run `--self-test` to exercise its built-in false-positive regressions. |
 | `npm run lint` | ESLint over the repo |
 | `npm run test` | Vitest unit and integration tests on Node; see the dated integration report for actual counts. |
-| `npm run verify` | One-shot acceptance gate: formatting, typecheck, boundaries, coupling, catalog drift, lint and tests. |
+| `npm run verify` | One-shot acceptance gate: formatting, typecheck, boundaries, coupling, catalog drift, mechanical slop scan, lint and tests. |
 | `npm run test:watch` | Vitest watch mode |
 | `npm run preflight` | Deployment-before environment gate: `npm run preflight -- --environment production`. Refuses insecure production settings and never prints secret values. |
 | `npm run py -- …` | Any Python command; resolves the `backend/.venv` interpreter on every platform. |
-| `npm run verify:python` | Python gate: ruff format, ruff check, mypy, compileall, alembic check, pytest. |
+| `npm run verify:python` | Python gate: ruff format, ruff check, mypy, compileall, alembic check, slop scan, pytest. |
 | `npm run verify:all` | `verify` followed by `verify:python`. |
 | `npm run test:python` | `pytest -q` inside `backend/`. |
 | `npm run db:migrate:python` | `alembic upgrade head` inside `backend/`. |
 | `npm run smoke:commerce` | Live HTTP commerce smoke test; needs both services running and a disposable database. |
 
-The acceptance gate is **format:check + typecheck + check:boundary + check:coupling + check:catalog + lint + test** (`npm run verify`),
+The acceptance gate is **format:check + typecheck + check:boundary + check:coupling + check:catalog + check:slop + lint + test** (`npm run verify`),
 with **`npm run build`** run separately. CI is configured for Node 22 / 24 and Python 3.12;
 local results do not establish the current remote CI or deployment state.
 
