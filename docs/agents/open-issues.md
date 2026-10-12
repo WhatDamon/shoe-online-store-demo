@@ -154,14 +154,15 @@ libpq 的 `verify-full` 负责；轮换步骤、CA 更新窗口与回滚都没�
 `docs/ai-budget-recovery-2026-10-01.md`、`docs/unified-baseline-2026-09-30.md` 的正文仍按旧路径提到
 `HANDOVER.md`。它们是有日期的历史记录，不应改写；此处登记以便读者找到新位置。
 
-### 5. 历史报告仍描述已下线的商店兼容购买通道
+### 5. 历史文档仍描述已下线的商店兼容购买通道
 
-若干带日期的报告与 `docs/superpowers/` 下的历史计划/规格仍描述一条商店兼容购买通道
-（静态 handle→店号映射、Buy Button 按管 PDP、`getBuyUrl` 预留接口）。它是**有日期的历史记录，
-不应改写**；当前代码不再包含该通道。
-**复核：** 在 `src/`、`scripts/` 中检索商店兼容配置与适配器方法名；除**故意钉住「陈旧配置被忽略」行为**
-的测试外，不应有命中。
-**要求：** 新代码不得以此为理由保留第二条购买通道或第二套变体/结算入口；历史报告不回写。
+若干带日期的报告、未改写的历史 ADR（`0004`、`0005`）与 `docs/superpowers/` 下的历史计划/规格仍描述一条
+商店兼容购买通道（静态 handle→店号映射、Buy Button 接管 PDP、`getBuyUrl` 预留接口）。它们是**定点决策记录，
+不应改写**；当前代码不再包含该通道，移除决策改由新 ADR 0008 登记（切片 C）。
+**复核：** `grep -rnE "getBuyUrl|storeAvailable" src scripts` 预期只命中**故意钉住历史响应容忍度**的测试
+（`src/app/api/catalog/route.test.ts`、`src/components/shop/saved-pairs.test.tsx`），不命中生产代码；
+`grep -rn "CATALOG_SOURCE" src/server/catalog` 应确认来源开关只剩 `seed` 与默认 `db`。
+**要求：** 新代码不得以此为理由保留第二条购买通道或第二套变体/结算入口；历史 ADR 与带日期的报告不回写。
 
 ---
 

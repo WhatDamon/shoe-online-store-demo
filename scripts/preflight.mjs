@@ -15,7 +15,6 @@ import { fileURLToPath } from 'node:url'
 
 export const ENVIRONMENTS = ['development', 'production']
 
-const TRUTHY = ['1', 'true', 'yes']
 const TRUSTED_TLS_MODES = ['1', 'true', 'require', 'verify-full']
 const PLAINTEXT_TLS_MODES = ['0', 'false']
 const LOOPBACK_HOSTS = ['127.0.0.1', 'localhost', '::1', '[::1]']
