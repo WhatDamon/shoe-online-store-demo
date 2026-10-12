@@ -1,7 +1,7 @@
 import { envStr } from '@/config'
 import { searchableText } from '@/domain/search-text'
 import type { Product } from '@/domain/product'
-import { cosine } from './vector'
+import { cosine, validateEmbeddingVectors } from './vector'
 import { keywordSearch } from './keyword'
 import type { Repository } from './repository'
 
@@ -17,7 +17,8 @@ export interface RetrievalDeps {
   repo: Repository
   /** 「这次能不能嵌入」由调用方（组合根）决定是否开启语义路径。 */
   canEmbed: () => Promise<boolean>
-  embed: (texts: string[]) => Promise<number[][]>
+  embed: (texts: string[], expectedDimension?: number) => Promise<number[][]>
+  signal?: AbortSignal
 }
 
 export const hashText = (s: string) => {
@@ -26,7 +27,21 @@ export const hashText = (s: string) => {
   return String(h)
 }
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  signal?.throwIfAborted()
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', abort)
+      resolve()
+    }, ms)
+    const abort = () => {
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', abort)
+      reject(signal?.reason)
+    }
+    signal?.addEventListener('abort', abort, { once: true })
+  })
+}
 
 // Thrown values are unknown: read only own data properties, never getters or
 // coercion hooks. Even descriptor access can throw for a revoked/custom Proxy.
@@ -42,10 +57,15 @@ function errorField(error: unknown, key: 'code' | 'message'): unknown {
 
 /** 语义检索：整库懒 embed（缺/变更一次批量补算，勿逐条请求——省请求数、避开限流）。 */
 async function semanticRetrieve(query: string, deps: RetrievalDeps): Promise<RetrievalResult[]> {
-  const { products, repo, embed } = deps
+  const { products, repo, embed, signal } = deps
   const model = envStr('AI_EMBEDDING_MODEL')
-  const [qVec] = await embed([query])
-  const cached = new Map((await repo.allEmbeddings(model)).map((r) => [r.productId, r]))
+  signal?.throwIfAborted()
+  const queryVectors = await embed([query])
+  signal?.throwIfAborted()
+  const [qVec] = validateEmbeddingVectors(queryVectors, 1)
+  const cachedRows = await repo.allEmbeddings(model)
+  signal?.throwIfAborted()
+  const cached = new Map(cachedRows.map((r) => [r.productId, r]))
   const missing: { product: Product; hash: string }[] = []
   for (const p of products) {
     const h = hashText(searchableText(p))
@@ -54,16 +74,28 @@ async function semanticRetrieve(query: string, deps: RetrievalDeps): Promise<Ret
   }
   if (missing.length) {
     // 瞬时限流（429/5xx）：小退避后重试一次；仍失败抛出让上层降级关键词。
-    const vecs = await embed(missing.map((m) => searchableText(m.product))).catch(async (e) => {
+    signal?.throwIfAborted()
+    const batch = await embed(
+      missing.map((m) => searchableText(m.product)),
+      qVec.length,
+    ).catch(async (e) => {
+      signal?.throwIfAborted()
       if (errorField(e, 'code') === 'budget') throw e
       const msg = errorField(e, 'message')
       if (typeof msg === 'string' && /\b(429|5\d\d)\b/.test(msg)) {
-        await sleep(1_200)
-        return embed(missing.map((m) => searchableText(m.product)))
+        await sleep(1_200, signal)
+        signal?.throwIfAborted()
+        return embed(
+          missing.map((m) => searchableText(m.product)),
+          qVec.length,
+        )
       }
       throw e
     })
+    signal?.throwIfAborted()
+    const vecs = validateEmbeddingVectors(batch, missing.length, qVec.length)
     for (let i = 0; i < missing.length; i++) {
+      signal?.throwIfAborted()
       await repo.upsertEmbedding({
         productId: missing[i].product.id,
         contentHash: missing[i].hash,
@@ -72,7 +104,9 @@ async function semanticRetrieve(query: string, deps: RetrievalDeps): Promise<Ret
       })
     }
   }
+  signal?.throwIfAborted()
   const rows = await repo.allEmbeddings(model)
+  signal?.throwIfAborted()
   const byId = new Map(products.map((p) => [p.id, p]))
   return rows
     .map((r) => ({
@@ -83,10 +117,14 @@ async function semanticRetrieve(query: string, deps: RetrievalDeps): Promise<Ret
 }
 
 export async function retrieve(query: string, deps: RetrievalDeps): Promise<RetrievalResult[]> {
-  if (await deps.canEmbed()) {
+  deps.signal?.throwIfAborted()
+  const available = await deps.canEmbed()
+  deps.signal?.throwIfAborted()
+  if (available) {
     try {
       return await semanticRetrieve(query, deps)
     } catch (e) {
+      deps.signal?.throwIfAborted()
       // The application budget wrapper uses the stable GuardrailError code
       // without making this search layer depend on the guardrails module.
       // Budget denial must reach chat and stop provider work; only provider
@@ -98,5 +136,6 @@ export async function retrieve(query: string, deps: RetrievalDeps): Promise<Retr
       console.warn(JSON.stringify({ event: 'retrieval_fallback', strategy: 'keyword' }))
     }
   }
+  deps.signal?.throwIfAborted()
   return keywordSearch(query, deps.products) // 无 embedding 能力 → 关键词降级
 }

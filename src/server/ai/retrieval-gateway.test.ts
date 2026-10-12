@@ -42,16 +42,41 @@ beforeEach(() => {
 })
 
 describe('retrieval gateway embedding budget seam', () => {
+  it('forwards caller cancellation to retrieval, probe and formal embedding', async () => {
+    const controller = new AbortController()
+    await retrieveProducts('query', 4, { signal: controller.signal })
+    expect(mockRetrieve).toHaveBeenCalledWith(
+      'query',
+      expect.objectContaining({
+        signal: controller.signal,
+      }),
+    )
+    expect(mockEmbeddingsAvailable).toHaveBeenCalledWith(
+      expect.objectContaining({
+        signal: controller.signal,
+      }),
+    )
+    expect(mockEmbed).toHaveBeenCalledWith(['query text'], {
+      signal: controller.signal,
+      expectedDimension: undefined,
+    })
+  })
+
   it('passes the budget wrapper to both the capability probe and embedding request', async () => {
     const calls: string[][] = []
+    const onDispatch = vi.fn()
     const runEmbedding: EmbeddingRunner = async (texts, operation) => {
       calls.push(texts)
-      return operation()
+      return operation({ onDispatch })
     }
 
     await expect(retrieveProducts('find a shoe', 4, { runEmbedding })).resolves.toEqual([product])
     expect(calls).toEqual([['ping'], ['query text']])
-    expect(mockEmbed).toHaveBeenCalledWith(['query text'])
+    expect(mockEmbed).toHaveBeenCalledWith(['query text'], {
+      onDispatch,
+      signal: undefined,
+      expectedDimension: undefined,
+    })
     expect(mockCatalog.getProductByHandle).not.toHaveBeenCalled()
   })
 })
