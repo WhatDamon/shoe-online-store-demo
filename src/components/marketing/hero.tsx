@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { ArrowDownIcon } from 'lucide-react'
+import { LocaleLink } from '@/components/i18n/locale-link'
 import { site } from '@/lib/site'
 import { HeroBackground } from './hero-background'
 
@@ -25,12 +26,14 @@ export function Hero() {
         </h1>
         <p className="mt-6 max-w-xl text-[15px] leading-7 text-white/75">{site.hero.title}</p>
         <div className="mt-10 flex flex-wrap items-center gap-4">
-          <Link
+          <LocaleLink
             href="/shop"
             className="inline-flex h-12 items-center justify-center rounded-full bg-white px-7 text-[15px] font-medium text-[#111111] transition-colors hover:bg-[#e5e5e5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
             {site.hero.cta}
-          </Link>
+          </LocaleLink>
+          {/* 纯 `#` 锚点留在 next/link：localePath 会把 `#collections` 当成站内路径变成
+              `/en#collections`，那是跳回首页而不是本页滚动。 */}
           <Link
             href="#collections"
             className="inline-flex h-12 items-center justify-center gap-2 rounded-full px-2 text-[15px] font-medium text-white transition-opacity hover:opacity-75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"

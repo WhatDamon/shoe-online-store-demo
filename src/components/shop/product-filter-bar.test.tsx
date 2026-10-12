@@ -35,7 +35,7 @@ describe('ProductFilterBar', () => {
     fireEvent.change(screen.getByLabelText('Sort'), {
       target: { value: 'price-asc' },
     })
-    expect(replaceMock).toHaveBeenCalledWith('/shop?sort=price-asc')
+    expect(replaceMock).toHaveBeenCalledWith('/en/shop?sort=price-asc')
   })
 
   it('sets the collection param when a collection is chosen', () => {
@@ -43,7 +43,7 @@ describe('ProductFilterBar', () => {
     fireEvent.change(screen.getByLabelText('Collection'), {
       target: { value: 'travel' },
     })
-    expect(replaceMock).toHaveBeenCalledWith('/shop?collection=travel')
+    expect(replaceMock).toHaveBeenCalledWith('/en/shop?collection=travel')
   })
 
   it('keeps existing params when applying a new filter', () => {
@@ -51,7 +51,7 @@ describe('ProductFilterBar', () => {
     fireEvent.change(screen.getByLabelText('Sort'), {
       target: { value: 'newest' },
     })
-    expect(replaceMock).toHaveBeenCalledWith('/shop?collection=travel&sort=newest')
+    expect(replaceMock).toHaveBeenCalledWith('/en/shop?collection=travel&sort=newest')
   })
 
   it('maps a price band to minPrice/maxPrice params', () => {
@@ -59,7 +59,7 @@ describe('ProductFilterBar', () => {
     fireEvent.change(screen.getByLabelText('Price'), {
       target: { value: '100-150' },
     })
-    expect(replaceMock).toHaveBeenCalledWith('/shop?minPrice=100&maxPrice=150')
+    expect(replaceMock).toHaveBeenCalledWith('/en/shop?minPrice=100&maxPrice=150')
   })
 
   it('toggles a size label in and out of the URL', () => {
@@ -67,7 +67,7 @@ describe('ProductFilterBar', () => {
     const size9 = screen.getByLabelText('US 9') as HTMLInputElement
     expect(size9.checked).toBe(true)
     fireEvent.click(size9)
-    expect(replaceMock).toHaveBeenCalledWith('/shop')
+    expect(replaceMock).toHaveBeenCalledWith('/en/shop')
   })
 
   it('submits the keyword search as q', () => {
@@ -76,13 +76,13 @@ describe('ProductFilterBar', () => {
       target: { value: 'slip-on' },
     })
     fireEvent.submit(screen.getByRole('search'))
-    expect(replaceMock).toHaveBeenCalledWith('/shop?q=slip-on')
+    expect(replaceMock).toHaveBeenCalledWith('/en/shop?q=slip-on')
   })
 
   it('clears all active filters', () => {
     renderBar(parseShopParams(new URLSearchParams('collection=travel&sort=price-desc')))
     fireEvent.click(screen.getByRole('button', { name: /clear all/i }))
-    expect(replaceMock).toHaveBeenCalledWith('/shop')
+    expect(replaceMock).toHaveBeenCalledWith('/en/shop')
   })
 
   it('composes two rapid changes without dropping the earlier param', () => {
@@ -94,14 +94,14 @@ describe('ProductFilterBar', () => {
     fireEvent.change(screen.getByLabelText('Collection'), {
       target: { value: 'travel' },
     })
-    expect(replaceMock).toHaveBeenLastCalledWith('/shop?collection=travel&sort=price-asc')
+    expect(replaceMock).toHaveBeenLastCalledWith('/en/shop?collection=travel&sort=price-asc')
   })
 
   it('accumulates two size chips toggled before the server commits', () => {
     renderBar()
     fireEvent.click(screen.getByLabelText('US 9'))
     fireEvent.click(screen.getByLabelText('US 8.5'))
-    expect(replaceMock).toHaveBeenLastCalledWith('/shop?size=US+9&size=US+8.5')
+    expect(replaceMock).toHaveBeenLastCalledWith('/en/shop?size=US+9&size=US+8.5')
   })
 
   it('rebases onto the restored committed URL after Back cancels an in-flight clear-all', () => {
@@ -111,13 +111,13 @@ describe('ProductFilterBar', () => {
     const travel = parseShopParams(new URLSearchParams('collection=travel'))
     const { rerender } = render(<ProductFilterBar initial={travel} {...options} />)
     fireEvent.click(screen.getByRole('button', { name: /clear all/i }))
-    expect(replaceMock).toHaveBeenLastCalledWith('/shop')
+    expect(replaceMock).toHaveBeenLastCalledWith('/en/shop')
     rerender(<ProductFilterBar initial={travel} {...options} />)
     // 后续变更应基于已提交的 collection=travel 合成，而不是被 Back 放弃的 /shop。
     fireEvent.change(screen.getByLabelText('Sort'), {
       target: { value: 'newest' },
     })
-    expect(replaceMock).toHaveBeenLastCalledWith('/shop?collection=travel&sort=newest')
+    expect(replaceMock).toHaveBeenLastCalledWith('/en/shop?collection=travel&sort=newest')
   })
 
   it('does not resurrect a sort that Back abandoned before it committed', () => {
@@ -128,11 +128,11 @@ describe('ProductFilterBar', () => {
     fireEvent.change(screen.getByLabelText('Sort'), {
       target: { value: 'price-asc' },
     })
-    expect(replaceMock).toHaveBeenLastCalledWith('/shop?sort=price-asc')
+    expect(replaceMock).toHaveBeenLastCalledWith('/en/shop?sort=price-asc')
     rerender(<ProductFilterBar initial={empty} {...options} />)
     fireEvent.change(screen.getByLabelText('Collection'), {
       target: { value: 'travel' },
     })
-    expect(replaceMock).toHaveBeenLastCalledWith('/shop?collection=travel')
+    expect(replaceMock).toHaveBeenLastCalledWith('/en/shop?collection=travel')
   })
 })

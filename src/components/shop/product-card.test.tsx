@@ -26,7 +26,7 @@ describe('ProductCard', () => {
   it('links to detail and shows price + size hint', () => {
     render(<ProductCard product={p} />)
     const link = screen.getByRole('link', { name: /daily drift/i })
-    expect(link).toHaveAttribute('href', '/product/daily-drift')
+    expect(link).toHaveAttribute('href', '/en/product/daily-drift')
     expect(screen.getByText('$128.00')).toBeInTheDocument()
     expect(screen.getByText(/US 8\.5/)).toBeInTheDocument()
   })

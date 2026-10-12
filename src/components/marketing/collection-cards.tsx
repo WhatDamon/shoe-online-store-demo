@@ -1,5 +1,5 @@
 import Image from 'next/image'
-import Link from 'next/link'
+import { LocaleLink } from '@/components/i18n/locale-link'
 import { catalog } from '@/server/catalog/adapter'
 import { ProductVisual } from '@/components/shop/product-visual'
 
@@ -57,7 +57,7 @@ export async function CollectionCards() {
         </h2>
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {cards.map((card) => (
-            <Link
+            <LocaleLink
               key={card.handle}
               href={`/shop?collection=${card.handle}`}
               className="group flex flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-surface transition-shadow hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
@@ -89,7 +89,7 @@ export async function CollectionCards() {
                 <h3 className="text-[15px] font-medium text-neutral-900">{card.name}</h3>
                 <p className="text-[13px] leading-snug text-neutral-500">{card.description}</p>
               </div>
-            </Link>
+            </LocaleLink>
           ))}
         </div>
       </div>

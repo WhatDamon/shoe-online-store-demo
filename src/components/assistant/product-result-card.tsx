@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import Link from 'next/link'
+import { LocaleLink } from '@/components/i18n/locale-link'
 import { ProductVisual } from '@/components/shop/product-visual'
 import { useOptionalWishlist } from '@/components/shop/wishlist-provider'
 import { WishlistHeart } from '@/components/shop/wishlist-icon'
@@ -11,7 +11,7 @@ import type { ProductCard as ProductCardEvent } from '@/domain/chat-events'
 // 一律不带价格——价格只在详情页/店铺出现（AI 不传播 demo 价段）。
 // 无照片的产品（目前目录无此情形）→ 以 ProductVisual 真实色卡 SVG 兜底。
 //
-// 收藏（Save pair）：心形是容器的绝对定位 sibling，绝不嵌套进主区 <Link>
+// 收藏（Save pair）：心形是容器的绝对定位 sibling，绝不嵌套进主区 <LocaleLink>
 // （interactive-inside-interactive 反模式）；Provider 缺席（孤立渲染/测试）时不渲染。
 const metaOf = (item: ProductCardEvent): string | null => {
   const parts: string[] = []
@@ -34,7 +34,7 @@ export function ProductResultCard({ item }: { item: ProductCardEvent }) {
 
   return (
     <div className="relative rounded-xl border border-neutral-200 bg-surface transition-colors hover:border-neutral-400">
-      <Link
+      <LocaleLink
         href={href}
         className="flex items-center gap-3 p-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
       >
@@ -64,7 +64,7 @@ export function ProductResultCard({ item }: { item: ProductCardEvent }) {
             <span className="mt-0.5 block text-[11px] leading-4 text-neutral-500">{meta}</span>
           ) : null}
         </span>
-      </Link>
+      </LocaleLink>
 
       {wishlist ? (
         <button

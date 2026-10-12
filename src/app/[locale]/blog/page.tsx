@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import Image from 'next/image'
+import { LocaleLink } from '@/components/i18n/locale-link'
 import { listPosts, type BlogPost } from '@/lib/blog'
 import { absoluteUrl, pageMetadata } from '@/lib/seo'
 import { JsonLd } from '@/components/seo/json-ld'
@@ -74,7 +74,7 @@ export default function BlogPage() {
       ) : (
         <div className="mt-10 flex flex-col divide-y divide-neutral-200">
           {posts.map((post) => (
-            <Link
+            <LocaleLink
               key={post.slug}
               href={`/blog/${post.slug}`}
               className="group flex flex-col gap-4 py-7 sm:flex-row sm:gap-6 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-neutral-400"
@@ -94,7 +94,7 @@ export default function BlogPage() {
                   </p>
                 ) : null}
               </div>
-            </Link>
+            </LocaleLink>
           ))}
         </div>
       )}

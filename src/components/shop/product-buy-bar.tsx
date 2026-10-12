@@ -1,7 +1,7 @@
 'use client'
 
-import Link from 'next/link'
 import { useState } from 'react'
+import { LocaleLink } from '@/components/i18n/locale-link'
 import { Button } from '@/components/ui/button'
 import type { CommerceVariant } from '@/domain/commerce'
 import { parseCartView } from '@/domain/commerce-response'
@@ -64,9 +64,9 @@ export function ProductBuyBar({
                 ? 'This color and size are unavailable.'
                 : `${colorName} · ${selectedLabel} selected`)}
       </p>
-      <Link href="/cart" className="text-sm underline underline-offset-4">
+      <LocaleLink href="/cart" className="text-sm underline underline-offset-4">
         View cart
-      </Link>
+      </LocaleLink>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import { LocaleLink } from '@/components/i18n/locale-link'
 
 export function EmptyState() {
   return (
@@ -8,12 +8,12 @@ export function EmptyState() {
         Try removing a filter or two — every style is printed to order, so your size is usually
         available.
       </p>
-      <Link
+      <LocaleLink
         href="/shop"
         className="mt-4 text-sm font-medium text-neutral-900 underline underline-offset-4 transition-colors hover:text-neutral-600"
       >
         Shop all styles
-      </Link>
+      </LocaleLink>
     </div>
   )
 }

@@ -7,6 +7,8 @@ import type { ShopFilter } from '@/lib/shop-search-params'
 import type { CanonicalSize } from '@/domain/product'
 import { footMmToEU } from '@/domain/size'
 import { mySize } from '@/lib/my-size'
+import { useLocale } from '@/components/i18n/locale-provider'
+import { localePath } from '@/i18n/locales'
 
 export interface FilterOption {
   value: string
@@ -60,6 +62,9 @@ export function ProductFilterBar({
   sizeOptions: { label: string; canonical: CanonicalSize }[]
 }) {
   const router = useRouter()
+  // 筛选改的是「当前语言下的 /shop」：裸 `/shop` 会先被 proxy 308 到 /en/shop，
+  // 每次改筛选多一次往返。
+  const locale = useLocale()
   const selectedSizes = new Set(initial.sizeLabels ?? [])
   const showClear = hasActiveFilters(initial)
   // 「我的尺码」命中：保存后所在码 chip 显示圆点 + aria（有码款即使未筛选也可辨识）。
@@ -88,7 +93,7 @@ export function ProductFilterBar({
   const update = (patch: Partial<ShopFilter>) => {
     const qs = serializeShopParams({ ...effectiveBase(), ...patch })
     baseRef.current = qs
-    router.replace(qs ? `/shop?${qs}` : '/shop')
+    router.replace(localePath(locale, qs ? `/shop?${qs}` : '/shop'))
   }
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {

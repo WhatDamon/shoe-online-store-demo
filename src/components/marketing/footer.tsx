@@ -1,5 +1,5 @@
-import Link from 'next/link'
 import { ExternalLink } from 'lucide-react'
+import { LocaleLink } from '@/components/i18n/locale-link'
 import { site } from '@/lib/site'
 
 export function Footer() {
@@ -7,25 +7,25 @@ export function Footer() {
     <footer className="bg-[#111111] text-[#fafaf8]">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 pb-8 pt-14 md:flex-row md:items-start md:justify-between">
         <div className="max-w-xs">
-          <Link
+          <LocaleLink
             href="/"
             className="text-xl font-semibold tracking-tight transition-opacity hover:opacity-80"
           >
             {site.name}
-          </Link>
+          </LocaleLink>
           <p className="mt-3 text-sm leading-6 text-[#fafaf8]/60">
             Casual shoes, printed to order in your size.
           </p>
         </div>
         <nav aria-label="Footer" className="flex flex-col gap-3 text-sm">
           {site.nav.map((item) => (
-            <Link
+            <LocaleLink
               key={item.href}
               href={item.href}
               className="text-[#fafaf8]/70 transition-colors hover:text-[#fafaf8]"
             >
               {item.label}
-            </Link>
+            </LocaleLink>
           ))}
         </nav>
         <p className="text-sm text-[#fafaf8]/50">© 2026 {site.name}</p>

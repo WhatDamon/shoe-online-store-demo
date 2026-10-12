@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 import { Geist, Newsreader } from 'next/font/google'
 import './globals.css'
 import { site } from '@/lib/site'
-import { DEFAULT_LOCALE } from '@/i18n/locales'
+import { DEFAULT_LOCALE, localePath } from '@/i18n/locales'
 import { messages } from '@/i18n/messages'
 
 // 全局 404：未匹配任何路由的 URL（如 /de/shop 落到 /en/de/shop）用它兜底。
@@ -47,7 +47,9 @@ export default function GlobalNotFound() {
             {t['notFound.title']}
           </h1>
           <p className="mt-3 max-w-md text-neutral-600">{t['notFound.description']}</p>
-          <Link href="/shop" className={CTA_CLASS}>
+          {/* 本页绕过 layout，没有 LocaleProvider 也没有可信语言段：逃生链接用默认语言推导，
+              与上方的文生来源一致（不硬编码 `/en/shop`）。 */}
+          <Link href={localePath(DEFAULT_LOCALE, '/shop')} className={CTA_CLASS}>
             {t['notFound.cta']}
           </Link>
         </div>

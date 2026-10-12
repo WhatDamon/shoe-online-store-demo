@@ -1,12 +1,14 @@
 'use client'
 
-import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { HeartIcon, MenuIcon, SearchIcon, ShoppingBagIcon, XIcon } from 'lucide-react'
 import { site } from '@/lib/site'
+import { LocaleLink } from '@/components/i18n/locale-link'
+import { useLocale } from '@/components/i18n/locale-provider'
 import { useWishlist } from '@/components/shop/wishlist-provider'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { localePath } from '@/i18n/locales'
 import { cn } from 'cn'
 
 /**
@@ -29,6 +31,9 @@ export function AppBar({
 } = {}) {
   const { items } = useWishlist()
   const count = items.length
+  // 搜索表单提交到 /shop：原生 GET 表单不经 Router，必须在渲染时带上 locale 前缀。
+  const locale = useLocale()
+  const shopPath = localePath(locale, '/shop')
   const [scrolled, setScrolled] = useState(false)
   // 移动菜单/搜索均用原生 <details>（零 JS 也可展开，见菜单注释）。
   const mobileMenuRef = useRef<HTMLDetailsElement>(null)
@@ -70,9 +75,9 @@ export function AppBar({
       )}
     >
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4">
-        <Link href="/cart" aria-label="Cart" className={iconLinkClass}>
+        <LocaleLink href="/cart" aria-label="Cart" className={iconLinkClass}>
           <ShoppingBagIcon className="size-5" />
-        </Link>
+        </LocaleLink>
         {/* 左：移动菜单（md 隐藏）+ 品牌 */}
         <div className="flex flex-1 items-center gap-2">
           {/* 移动导航：原生 <details> 披露，不依赖任何 JS/组件库/门户/焦点陷阱。
@@ -93,35 +98,35 @@ export function AppBar({
               className="absolute left-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-ink/10 bg-popover text-popover-foreground shadow-lg"
             >
               {site.nav.map((item) => (
-                <Link
+                <LocaleLink
                   key={item.href}
                   href={item.href}
                   onClick={() => mobileMenuRef.current?.removeAttribute('open')}
                   className="block px-4 py-3 text-[15px] font-medium text-foreground transition-colors hover:bg-muted"
                 >
                   {item.label}
-                </Link>
+                </LocaleLink>
               ))}
             </nav>
           </details>
-          <Link
+          <LocaleLink
             href="/"
             className="text-lg font-semibold tracking-tight transition-opacity hover:opacity-80"
           >
             {site.name}
-          </Link>
+          </LocaleLink>
         </div>
 
         {/* 中：桌面导航 */}
         <nav aria-label="Main" className="hidden flex-1 justify-center gap-8 md:flex">
           {site.nav.map((item) => (
-            <Link
+            <LocaleLink
               key={item.href}
               href={item.href}
               className="text-sm font-medium text-current transition-opacity hover:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-current"
             >
               {item.label}
-            </Link>
+            </LocaleLink>
           ))}
         </nav>
 
@@ -130,7 +135,7 @@ export function AppBar({
           {/* 桌面内联搜索：图标以输入框为锚绝对定位，垂直水平严格居中（不再用
               relative 硬推，避免偏移）；输入框 pl-10 让文字让出图标。 */}
           <form
-            action="/shop"
+            action={shopPath}
             role="search"
             aria-label="Search products"
             className="relative hidden items-center lg:flex"
@@ -171,7 +176,7 @@ export function AppBar({
               aria-label="Search products"
               className="absolute right-0 top-full z-50 mt-2 w-[min(26rem,calc(100vw-3.5rem))] border border-ink/10 bg-canvas p-2 text-ink shadow-lg"
             >
-              <form action="/shop" className="flex items-center gap-2">
+              <form action={shopPath} className="flex items-center gap-2">
                 <Input
                   name="q"
                   type="search"
@@ -191,7 +196,11 @@ export function AppBar({
 
           {/* 愿望单入口（决策：/saved 清单页）——心形徽标直达 Saved pairs；
               纯 <a> 链接（零 JS 也可达），count 读 WishlistProvider 快照。 */}
-          <Link href="/saved" aria-label={wishlistLabel} className={cn(iconLinkClass, 'relative')}>
+          <LocaleLink
+            href="/saved"
+            aria-label={wishlistLabel}
+            className={cn(iconLinkClass, 'relative')}
+          >
             <HeartIcon className="size-5" />
             <Badge
               variant="secondary"
@@ -199,7 +208,7 @@ export function AppBar({
             >
               {count}
             </Badge>
-          </Link>
+          </LocaleLink>
         </div>
       </div>
 

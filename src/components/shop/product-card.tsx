@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import Link from 'next/link'
+import { LocaleLink } from '@/components/i18n/locale-link'
 import { formatPrice } from '@/lib/format'
 import { sizeRangeLabel } from '@/lib/size-range'
 import type { ProductView } from '@/domain/product'
@@ -19,7 +19,7 @@ export function ProductCard({ product }: { product: ProductView }) {
 
   return (
     <article className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-surface transition-shadow hover:shadow-md">
-      <Link
+      <LocaleLink
         href={href}
         className="flex h-full flex-col focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
       >
@@ -58,10 +58,10 @@ export function ProductCard({ product }: { product: ProductView }) {
             {sizeHint ? <p className="text-xs text-neutral-500">{sizeHint}</p> : null}
           </div>
         </div>
-      </Link>
+      </LocaleLink>
       {hasWishlist ? (
         <div className="absolute right-2.5 top-2.5 z-10 rounded-full bg-surface/90 backdrop-blur-sm">
-          {/* 角落按钮是 Link 的兄弟节点（非后代）：点击它不会触发卡片导航 */}
+          {/* 角落按钮是链接的兄弟节点（非后代）：点击它不会触发卡片导航 */}
           <WishlistButton handle={product.handle} />
         </div>
       ) : null}

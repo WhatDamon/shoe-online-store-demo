@@ -1,7 +1,7 @@
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { ArrowLeft } from 'lucide-react'
+import { LocaleLink } from '@/components/i18n/locale-link'
 import { catalog } from '@/server/catalog/adapter'
 import { getProductForMarket, getRelatedProducts } from '@/server/catalog/service'
 import { shopifyBuyConfigFor } from '@/server/catalog/shopify-buy'
@@ -87,13 +87,13 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
       <AssistantPageAnchor handle={product.handle} title={product.title} />
       {/* 打印规格说明：可交互主体包 .print-hidden，@media print 只保留 .print-spec-sheet。 */}
       <div className="print-hidden">
-        <Link
+        <LocaleLink
           href="/shop"
           className="inline-flex items-center gap-1.5 text-sm text-neutral-500 transition-colors hover:text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
         >
           <ArrowLeft aria-hidden="true" className="size-4 shrink-0" />
           All shoes
-        </Link>
+        </LocaleLink>
 
         {/* 网格基础列显式 minmax(0,1fr)：无 lg 双列时若省略列模板，隐式 auto 轨道会按内容
           max-content 撑宽（缩略图条等不可折内容 → 窄屏横向滚动），显式约束让轨道尊重容器宽度。 */}

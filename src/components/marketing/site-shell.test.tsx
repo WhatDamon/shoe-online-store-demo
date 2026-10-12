@@ -17,7 +17,7 @@ describe('SiteShell', () => {
 
     // AppBar banner 存在于 main 之外（全站头）
     const banner = screen.getByRole('banner')
-    expect(within(banner).getByRole('link', { name: 'Evoloop' })).toHaveAttribute('href', '/')
+    expect(within(banner).getByRole('link', { name: 'Evoloop' })).toHaveAttribute('href', '/en')
 
     const main = screen.getByRole('main')
     expect(within(main).getByRole('heading', { name: 'Page content' })).toBeInTheDocument()
@@ -25,7 +25,7 @@ describe('SiteShell', () => {
 
     // Footer 底部导航
     const footer = screen.getByRole('contentinfo')
-    expect(within(footer).getByRole('link', { name: 'Shop' })).toHaveAttribute('href', '/shop')
+    expect(within(footer).getByRole('link', { name: 'Shop' })).toHaveAttribute('href', '/en/shop')
     // 核心 Slogan 收尾（品牌声明全站可见）
     expect(
       within(footer).getByText('3D Printed. Closed-Loop. A New Footwear Phenomenon.'),

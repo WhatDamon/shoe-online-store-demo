@@ -1,6 +1,6 @@
 'use client'
 
-import Link from 'next/link'
+import { LocaleLink } from '@/components/i18n/locale-link'
 import { useEffect, useRef, useState } from 'react'
 import type { CartView, OrderView } from '@/domain/commerce'
 import { parseCartView, parseOrderView } from '@/domain/commerce-response'
@@ -145,9 +145,9 @@ export function CommercePanel({
           >
             Refresh order status
           </button>
-          <Link href={`/orders/${order.id}`} className="text-sm underline">
+          <LocaleLink href={`/orders/${order.id}`} className="text-sm underline">
             Permanent order link (available only in this shopping session)
-          </Link>
+          </LocaleLink>
         </div>
       )}
       {view?.items.map((item) => (
@@ -204,9 +204,12 @@ export function CommercePanel({
       )}
       {view?.items.length === 0 && <p>Your cart is empty.</p>}
       {mode === 'cart' && Boolean(cart?.items.length) && !hasUnavailableItems && (
-        <Link href="/checkout" className="inline-block rounded-full bg-ink px-6 py-3 text-white">
+        <LocaleLink
+          href="/checkout"
+          className="inline-block rounded-full bg-ink px-6 py-3 text-white"
+        >
           Review checkout
-        </Link>
+        </LocaleLink>
       )}
       {mode === 'checkout' && !order && (
         <div className="space-y-3">
@@ -239,8 +242,8 @@ export function CommercePanel({
         </Button>
       )}
       <div className="flex gap-5 text-sm underline">
-        <Link href="/shop">Continue shopping</Link>
-        {mode !== 'cart' && <Link href="/cart">Back to cart</Link>}
+        <LocaleLink href="/shop">Continue shopping</LocaleLink>
+        {mode !== 'cart' && <LocaleLink href="/cart">Back to cart</LocaleLink>}
       </div>
     </section>
   )

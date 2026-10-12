@@ -1,8 +1,8 @@
 'use client'
 
 import Image from 'next/image'
-import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import { LocaleLink } from '@/components/i18n/locale-link'
 import { useWishlist } from './wishlist-provider'
 import { ProductVisual } from './product-visual'
 import { WishlistHeart } from './wishlist-icon'
@@ -80,12 +80,12 @@ export function SavedPairs() {
         <p className="mx-auto mt-1.5 max-w-sm text-sm leading-6 text-neutral-500">
           Tap the heart on any pair — in the shop or on a product page — and it will show up here.
         </p>
-        <Link
+        <LocaleLink
           href="/shop"
           className="mt-5 inline-flex items-center justify-center rounded-lg bg-ink px-4 py-2 text-sm font-medium text-canvas transition-opacity hover:opacity-85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
         >
           Browse the shop
-        </Link>
+        </LocaleLink>
       </div>
     )
   }
@@ -98,7 +98,7 @@ export function SavedPairs() {
           key={row.handle}
           className="relative flex items-center gap-3 rounded-xl border border-neutral-200 bg-surface p-2.5 transition-colors hover:border-neutral-400"
         >
-          <Link
+          <LocaleLink
             href={`/product/${row.handle}`}
             className="flex min-w-0 flex-1 items-center gap-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
           >
@@ -132,7 +132,7 @@ export function SavedPairs() {
                 {row.storeAvailable ? ' · On the store' : ''}
               </span>
             </span>
-          </Link>
+          </LocaleLink>
           <button
             type="button"
             onClick={() => toggle(row.handle)}

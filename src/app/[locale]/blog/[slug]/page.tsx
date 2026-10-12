@@ -1,10 +1,10 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import Image from 'next/image'
 import { notFound } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { LocaleLink } from '@/components/i18n/locale-link'
 import { getPost, listPosts } from '@/lib/blog'
 import { absoluteUrl, pageMetadata } from '@/lib/seo'
 import { JsonLd } from '@/components/seo/json-ld'
@@ -63,13 +63,13 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
           image: post.cover,
         })}
       />
-      <Link
+      <LocaleLink
         href="/blog"
         className="inline-flex items-center gap-1.5 text-sm text-neutral-500 transition-colors hover:text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
       >
         <ArrowLeft aria-hidden="true" className="size-4 shrink-0" />
         All posts
-      </Link>
+      </LocaleLink>
 
       {post.cover ? (
         <div className="relative mt-6 h-56 w-full overflow-hidden rounded-2xl border border-neutral-200/80 sm:h-72">
