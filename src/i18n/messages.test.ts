@@ -35,6 +35,7 @@ describe('messages', () => {
 const KEYS = [
   'nav.shop',
   'notFound.title',
+  'notFound.description',
   'notFound.cta',
 ] as const satisfies readonly (keyof Messages)[]
 

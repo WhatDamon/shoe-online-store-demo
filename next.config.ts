@@ -10,6 +10,11 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     '/*': ['./drizzle/sqlite/**/*', './drizzle/postgres/**/*'],
   },
+  // 根布局由顶层动态段 [locale] 定义，未匹配的 URL 需要一个不依赖任何 layout 的
+  // 全局 404（src/app/global-not-found.tsx）；Next 16 仍以 experimental 标记该能力。
+  experimental: {
+    globalNotFound: true,
+  },
 }
 
 export default nextConfig

@@ -8,6 +8,8 @@
 const en = {
   'nav.shop': 'Shop',
   'notFound.title': "We couldn't find that page",
+  'notFound.description':
+    'It may have moved, or the link may be out of date. The shop is still open, though.',
   'notFound.cta': 'Browse the shop',
 } as const
 
