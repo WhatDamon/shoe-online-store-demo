@@ -77,12 +77,6 @@ export function evaluatePreflight(env, environment) {
     }
   }
 
-  if (inList(env.SHOPIFY_ENABLED, TRUTHY)) {
-    failures.push(
-      'SHOPIFY_ENABLED=true is outside this MVP; keep the compatibility purchase path disabled.',
-    )
-  }
-
   if (
     inList(env.PG_SSL, PLAINTEXT_TLS_MODES) &&
     (environment === 'production' || !isBlank(env.PG_SSL_CA_FILE))

@@ -45,7 +45,6 @@ describe('preflight CLI', () => {
       PYTHON_API_URL: 'http://127.0.0.1:8000',
       AI_SESSION_SECRET: 'short',
       APP_ENV: 'development',
-      SHOPIFY_ENABLED: 'false',
     })
 
     for (const needle of [
@@ -114,14 +113,16 @@ describe('evaluatePreflight', () => {
   })
 
   it('treats a local plaintext development configuration as acceptable', () => {
-    expect(evaluatePreflight({ PG_SSL: '0', SHOPIFY_ENABLED: 'false' }, 'development')).toEqual([])
+    expect(evaluatePreflight({ PG_SSL: '0' }, 'development')).toEqual([])
   })
 
-  it('keeps the Shopify compatibility purchase path disabled in every environment', () => {
-    for (const value of ['1', 'true', 'yes', 'TRUE']) {
-      const failures = evaluatePreflight({ SHOPIFY_ENABLED: value }, 'development')
-      expect(failures.join('\n')).toContain('SHOPIFY_ENABLED')
-    }
+  it('ignores stale SHOPIFY_* keys', () => {
+    // 审查重点 1：存量 store 兼容配置必须被完全忽略，既不影响选择也不产生失败项。
+    const failures = evaluatePreflight(
+      { SHOPIFY_ENABLED: 'true', SHOPIFY_BUY_TOKEN: 'x' },
+      'development',
+    )
+    expect(failures).toEqual([])
   })
 
   it('counts secret length in bytes, not characters', () => {
