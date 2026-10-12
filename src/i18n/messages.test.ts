@@ -1,6 +1,8 @@
+import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { LOCALES } from './locales'
-import { messages, type Messages } from './messages'
+import { messages } from './messages'
 
 describe('messages', () => {
   it('每个声明的 locale 都有词典', () => {
@@ -30,18 +32,69 @@ describe('messages', () => {
   })
 })
 
-// 显式键表：表里写了词典没有的键（拼错、被删、被改名）时 satisfies 在编译期报错；
-// 词典加键而这张表没跟上时，下面的运行时断言失败。两条守卫方向互补。
-const KEYS = [
-  'nav.shop',
-  'og.title',
-  'notFound.title',
-  'notFound.description',
-  'notFound.cta',
-] as const satisfies readonly (keyof Messages)[]
+// 用 process.cwd() 而非 import.meta.url：vitest 把 import.meta.url 转成非 file: 协议，
+// `new URL(..., import.meta.url)` 会报「The URL must be of scheme file」（同
+// src/components/i18n/locale-path-coverage.test.ts）。vitest 以仓库根为 cwd。
+const SRC = join(process.cwd(), 'src')
+const I18N_DIR = join(SRC, 'i18n')
 
-describe('键表单源', () => {
-  it('运行时键集与显式键表一致', () => {
-    expect(Object.keys(messages('en')).sort()).toEqual([...KEYS].sort())
+/**
+ * 死词典项守卫：词典里每个键都必须在**消费点**被引用，否则它就是无从察觉的残留
+ * （组件删了、键留下）。静态守卫比「运行时键集与手写键表一致」更有价值：手写键表
+ * 只是词典的副本，而它带来的保证（键存在）在类型系统里已经由每个使用点承担。
+ *
+ * 检测面与口径：
+ * - 扫描 `src/**` 的 `.ts` / `.tsx`，**排除 `src/i18n/**` 自身**（词典与访问器不是消费点，
+ *   本文件里对键名的断言也不算引用）；
+ * - 其余文件**包括测试文件**的引用都算——`locale-provider.test.tsx` 在真实渲染路径上读
+ *   `nav.shop` 就是一种引用；
+ * - 只认**带引号的静态键访问**（`t['key']` / `t["key"]` / `` t[`key`] ``）。全仓没有动态
+ *   拼接键，因此这个口径可靠；裸词出现在注释里不算引用。
+ *
+ * 已知边界（不是缺陷，是口径）：因为测试文件的引用也算，「某个键只在测试里活着、生产里
+ * 忘了接」这一种漏检**不会**被本守卫抓到；它由抽取任务的「逐字一致」验收与正文等价核对
+ * 兜底。守卫口径保持单一，不额外加「生产引用」断言——那需要手工列键，又变回键表副本。
+ */
+const KEY_LITERAL = (key: string) => [`'${key}'`, `"${key}"`, `\`${key}\``]
+
+/** 该文件是否引用了这个键。 */
+function references(key: string, source: string): boolean {
+  return KEY_LITERAL(key).some((literal) => source.includes(literal))
+}
+
+/** 返回没有任何源文件引用的键（顺序保持传入顺序，便于定位）。 */
+function deadKeys(keys: readonly string[], sources: readonly string[]): string[] {
+  return keys.filter((key) => !sources.some((source) => references(key, source)))
+}
+
+/** 递归读取源码文本；`src/i18n/**` 整棵子树跳过（见上面的检测面）。 */
+function sourceTexts(dir: string, out: string[] = []): string[] {
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry)
+    if (statSync(full).isDirectory()) {
+      if (full !== I18N_DIR) sourceTexts(full, out)
+    } else if (/\.tsx?$/.test(full)) {
+      out.push(readFileSync(full, 'utf8'))
+    }
+  }
+  return out
+}
+
+describe('词典没有死键', () => {
+  // 零命中断言只在检测面本身有效时才有意义：先钉住「该命中的命中、该放行的放行」。
+  it('检测面认可带引号的静态键访问，且不把裸词当引用', () => {
+    const probe = (keys: string[], sources: string[]) => deadKeys(keys, sources)
+    expect(probe(['live.key'], ["const t = messages('en'); t['live.key']"])).toEqual([])
+    expect(probe(['live.key'], ['t["live.key"]'])).toEqual([])
+    expect(probe(['live.key'], ['t[`live.key`]'])).toEqual([])
+    expect(probe(['ghost.key'], ["t['other.key']"])).toEqual(['ghost.key'])
+    expect(probe(['ghost.key'], ['const t = messages(locale)'])).toEqual(['ghost.key'])
+    // 注释里出现裸键名不算引用（门禁不靠「文档提到过」
+    expect(probe(['live.key'], ['// live.key 已被 nav 改名'])).toEqual(['live.key'])
+  })
+
+  it('每个词典键都在 src/** 里被引用', () => {
+    const dead = deadKeys(Object.keys(messages('en')), sourceTexts(SRC))
+    expect(dead, `这些键没有任何消费点：${dead.join(', ')}`).toEqual([])
   })
 })
