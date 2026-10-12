@@ -53,7 +53,7 @@ export default async function RootLayout(props: {
     >
       <body className="flex min-h-full flex-col bg-canvas text-ink">
         <LocaleProvider locale={locale} messages={messages(locale)}>
-          <SiteJsonLd />
+          <SiteJsonLd locale={locale} />
           <WishlistProvider>
             <AssistantProvider>{props.children}</AssistantProvider>
           </WishlistProvider>

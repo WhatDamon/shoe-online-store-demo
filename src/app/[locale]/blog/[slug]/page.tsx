@@ -40,22 +40,25 @@ export async function generateMetadata(props: {
 }
 
 // 文章页（SSG）：/blog/[slug] 由 generateStaticParams 预渲染（与 PDP 同约定：新增/改动文章需重建）。
-export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params
+export default async function BlogPostPage(props: {
+  params: Promise<{ locale: string; slug: string }>
+}) {
+  const { locale: raw, slug } = await props.params
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE
   const post = getPost(slug)
   if (!post) notFound()
 
   return (
     <article className="mx-auto w-full max-w-3xl px-4 pb-16 pt-10 sm:pt-14">
       <JsonLd
-        data={breadcrumbSchema([
+        data={breadcrumbSchema(locale, [
           { name: 'Home', path: '/' },
           { name: 'Journal', path: '/blog' },
           { name: post.title, path: `/blog/${post.slug}` },
         ])}
       />
       <JsonLd
-        data={articleSchema({
+        data={articleSchema(locale, {
           slug: post.slug,
           title: post.title,
           description: post.description ?? `An Evoloop Journal article: ${post.title}.`,

@@ -31,10 +31,14 @@ export async function generateMetadata(props: {
 type ShopSearchParams = { [key: string]: string | string[] | undefined }
 
 export default async function ShopPage({
+  params,
   searchParams,
 }: {
+  params: Promise<{ locale: string }>
   searchParams: Promise<ShopSearchParams>
 }) {
+  const { locale: rawLocale } = await params
+  const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE
   const raw = (await searchParams) ?? {}
   const sp = new URLSearchParams()
   for (const [key, value] of Object.entries(raw)) {
@@ -57,14 +61,14 @@ export default async function ShopPage({
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-10">
       <JsonLd
-        data={webPageSchema({
+        data={webPageSchema(locale, {
           name: 'Shop Evoloop shoes',
           description: 'Browse Evoloop casual shoe styles and their available size ranges.',
           path: '/shop',
           type: 'CollectionPage',
         })}
       />
-      <JsonLd data={itemListSchema(products)} />
+      <JsonLd data={itemListSchema(locale, products)} />
       <header className="mb-6">
         <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Shop</h1>
         <p className="mt-1 text-sm text-neutral-500">

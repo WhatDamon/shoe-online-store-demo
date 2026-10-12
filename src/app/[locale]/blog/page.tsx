@@ -52,13 +52,15 @@ function CoverSlot({ post }: { post: BlogPost }) {
   )
 }
 
-export default function BlogPage() {
+export default async function BlogPage(props: { params: Promise<{ locale: string }> }) {
+  const { locale: raw } = await props.params
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE
   const posts = listPosts()
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 pb-16 pt-10 sm:pt-14">
       <JsonLd
-        data={webPageSchema({
+        data={webPageSchema(locale, {
           name: 'Evoloop Journal',
           description: 'Stories and practical guides from the Evoloop studio.',
           path: '/blog',

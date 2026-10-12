@@ -29,11 +29,14 @@ export async function generateMetadata(props: {
 // Landing 内容（顺序）：Hero / PromiseStrip / CollectionCards / FeaturedGrid /
 // StorySection。外壳（AppBar 透明遮罩 + Footer）由 (landing)/layout.tsx 提供。
 // 整页零 AI 痕迹（P1：助手入口不在此页）。
-export default function HomePage() {
+export default async function HomePage(props: { params: Promise<{ locale: string }> }) {
+  const { locale: raw } = await props.params
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE
+
   return (
     <>
       <JsonLd
-        data={webPageSchema({
+        data={webPageSchema(locale, {
           name: 'Evoloop — casual shoes made to order',
           description:
             'Explore Evoloop casual shoes, millimetre-based sizing, digital manufacturing, and the studio story.',
@@ -46,7 +49,7 @@ export default function HomePage() {
       <FeaturedGrid />
       <StorySection />
       <FaqSection />
-      <JsonLd data={faqSchema([...homepageFaq])} />
+      <JsonLd data={faqSchema(locale, [...homepageFaq])} />
     </>
   )
 }

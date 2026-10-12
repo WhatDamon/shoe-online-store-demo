@@ -60,8 +60,11 @@ export async function generateMetadata(props: {
 // PDP（SSG）：/product/[handle] 由 generateStaticParams 预渲染。
 // 未知 handle 在 dynamicParams=true（默认）下走按需渲染 → getProductForMarket null → notFound()，
 // 实测返回品牌化 not-found 壳（HTTP 200 + robots noindex）；若将来需要真 404 再设 dynamicParams=false。
-export default async function ProductPage({ params }: { params: Promise<{ handle: string }> }) {
-  const { handle } = await params
+export default async function ProductPage(props: {
+  params: Promise<{ locale: string; handle: string }>
+}) {
+  const { locale: raw, handle } = await props.params
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE
   const product = await getProductForMarket(handle)
   if (!product) notFound()
 
@@ -76,13 +79,13 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:py-8">
       <JsonLd
-        data={breadcrumbSchema([
+        data={breadcrumbSchema(locale, [
           { name: 'Home', path: '/' },
           { name: 'Shop', path: '/shop' },
           { name: product.title, path: `/product/${product.handle}` },
         ])}
       />
-      <JsonLd data={productSchema(product)} />
+      <JsonLd data={productSchema(locale, product)} />
       {/* 页面锚点（渲染 null）：FAB 打开时把当前鞋带给助手（设计：PDP 针对性介绍）。 */}
       <AssistantPageAnchor handle={product.handle} title={product.title} />
       {/* 打印规格说明：可交互主体包 .print-hidden，@media print 只保留 .print-spec-sheet。 */}
