@@ -15,6 +15,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
+from app.domain.states import ORDER_STATUSES, PAYMENT_STATUSES, RESERVATION_STATUSES, sql_in
+
 
 def identifier() -> str:
     return str(uuid4())
@@ -86,7 +88,7 @@ class Order(Base):
     __tablename__ = "orders"
     __table_args__ = (
         UniqueConstraint("cart_id", "idempotency_key"),
-        CheckConstraint("status IN ('pending_payment', 'cancelled')"),
+        CheckConstraint(sql_in("status", ORDER_STATUSES), name="ck_orders_order_status"),
         CheckConstraint("total >= 0"),
         Index("ix_orders_status_expires_at", "status", "expires_at"),
     )
@@ -101,6 +103,8 @@ class Order(Base):
     )
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancellation_reason: Mapped[str | None] = mapped_column(String(30))
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    refunded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class OrderItem(Base):
@@ -122,7 +126,10 @@ class Reservation(Base):
     __table_args__ = (
         UniqueConstraint("order_id", "variant_id"),
         CheckConstraint("quantity > 0"),
-        CheckConstraint("status IN ('active', 'released')"),
+        CheckConstraint(
+            sql_in("status", RESERVATION_STATUSES),
+            name="ck_inventory_reservations_reservation_status",
+        ),
     )
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=identifier)
     order_id: Mapped[str] = mapped_column(ForeignKey("orders.id"), index=True)
@@ -133,11 +140,21 @@ class Reservation(Base):
 
 class Payment(Base):
     __tablename__ = "payments"
-    __table_args__ = (CheckConstraint("status = 'disabled'"),)
+    __table_args__ = (
+        CheckConstraint(sql_in("status", PAYMENT_STATUSES), name="ck_payments_payment_status"),
+        Index("ix_payments_provider_reference", "provider_reference", unique=True),
+    )
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=identifier)
     order_id: Mapped[str] = mapped_column(ForeignKey("orders.id"), unique=True)
     provider: Mapped[str] = mapped_column(String(30), default="mock")
     status: Mapped[str] = mapped_column(String(30), default="disabled")
+    provider_reference: Mapped[str | None] = mapped_column(String(200))
+    payment_intent: Mapped[str | None] = mapped_column(String(200))
+    amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    currency: Mapped[str | None] = mapped_column(String(3))
+    created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    succeeded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    refunded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class PaymentEvent(Base):
@@ -154,6 +171,10 @@ class WebhookEvent(Base):
     provider: Mapped[str] = mapped_column(String(50))
     external_id: Mapped[str] = mapped_column(String(200))
     payload: Mapped[dict] = mapped_column(JSON)
+    status: Mapped[str] = mapped_column(String(20), default="received", server_default="received")
+    attempts: Mapped[int] = mapped_column(default=0, server_default="0")
+    received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class AuditLog(Base):
