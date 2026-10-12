@@ -16,7 +16,7 @@ def migrate(connection: Connection) -> None:
 
 if context.is_offline_mode():
     context.configure(
-        url=settings.database_url, target_metadata=target_metadata, literal_binds=True
+        url=settings.commerce_database_url, target_metadata=target_metadata, literal_binds=True
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -24,7 +24,7 @@ elif (connection := context.config.attributes.get("connection")) is not None:
     # Tests supply an isolated connection instead of changing global database settings.
     migrate(connection)
 else:
-    engine = make_engine(settings.database_url)
+    engine = make_engine(settings.commerce_database_url)
     try:
         with engine.connect() as connection:
             migrate(connection)

@@ -50,5 +50,5 @@ def make_engine(url: str, *, app_env: AppEnvironment | str | None = None) -> Eng
     return engine
 
 
-engine = make_engine(settings.database_url)
+engine = make_engine(settings.commerce_database_url)
 SessionLocal = sessionmaker(engine, class_=Session, expire_on_commit=False)

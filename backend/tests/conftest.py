@@ -21,14 +21,14 @@ from tests.postgres_support import postgres_database
 @pytest.fixture(scope="session")
 def template(tmp_path_factory):
     path = tmp_path_factory.mktemp("template") / "commerce.db"
-    original = settings.database_url
-    settings.database_url = f"sqlite:///{path.as_posix()}"
+    original = settings.commerce_database_url
+    settings.commerce_database_url = f"sqlite:///{path.as_posix()}"
     command.upgrade(Config(str(Path(__file__).parents[1] / "alembic.ini")), "head")
-    engine = make_engine(settings.database_url)
+    engine = make_engine(settings.commerce_database_url)
     with Session(engine) as db, db.begin():
         seed(db)
     engine.dispose()
-    settings.database_url = original
+    settings.commerce_database_url = original
     return path
 
 

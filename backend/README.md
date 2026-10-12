@@ -83,8 +83,10 @@ npm run py -- -m pip install 'stripe>=16,<17'   # the dependency just added to p
 npm run py -- -m pip freeze                     # copy only the new name==version lines
 ```
 
-Run from `backend/`: default database is `backend/commerce.db`. Backend `.env`
-is resolved independently of the Next.js environment. Set `DATABASE_URL` to
+Run from `backend/`: default database is `backend/commerce.db`. Python reads its own key,
+`COMMERCE_DATABASE_URL` — deliberately not the Next.js `DATABASE_URL`, which points at the
+separate display/AI database, so both sides can share one root `.env`. Set
+`COMMERCE_DATABASE_URL` to
 `postgresql+psycopg://user:password@localhost:5432/evoloop` for local PostgreSQL, then run
 the same Alembic and seed commands. For a production process, set `APP_ENV=production`
 and keep it aligned with `NODE_ENV=production`; an `.env` development override is

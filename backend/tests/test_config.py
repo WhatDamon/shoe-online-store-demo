@@ -18,17 +18,17 @@ PROXY_SECRET = "abcdefghijklmnopqrstuvwxyz123456"
 
 
 def test_reads_root_env_file(monkeypatch, tmp_path):
-    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("COMMERCE_DATABASE_URL", raising=False)
     monkeypatch.delenv("RESERVATION_TTL_SECONDS", raising=False)
     root_env = tmp_path / ".env"
     root_env.write_text(
-        "DATABASE_URL=sqlite:///./from-root.db\nRESERVATION_TTL_SECONDS=900\n",
+        "COMMERCE_DATABASE_URL=sqlite:///./from-root.db\nRESERVATION_TTL_SECONDS=900\n",
         encoding="utf-8",
     )
 
     loaded = Settings(_env_file=(root_env,))
 
-    assert loaded.database_url == "sqlite:///./from-root.db"
+    assert loaded.commerce_database_url == "sqlite:///./from-root.db"
     assert loaded.reservation_ttl_seconds == 900
     assert config.ROOT_ENV == Path(config.__file__).parents[2] / ".env"
     assert Settings.model_config["env_file"] == (config.ROOT_ENV, config.BACKEND_ENV)
@@ -51,6 +51,31 @@ def test_backend_env_overrides_root_env(monkeypatch, tmp_path):
     assert loaded.commerce_proxy_secret == "root-secret"
     assert config.BACKEND_ENV == Path(config.__file__).parents[1] / ".env"
     assert Settings.model_config["env_file"] == (config.ROOT_ENV, config.BACKEND_ENV)
+
+
+def test_next_database_url_never_reaches_python(monkeypatch, tmp_path):
+    """The shared root `.env` also carries Next's DATABASE_URL: Python must ignore it.
+
+    DATABASE_URL is the Next/Drizzle display+AI database (`./data/local.db`) while Python
+    owns the commerce database; honouring that key would break the documented
+    "copy one root .env" setup by pointing the backend at the wrong file.
+    """
+    monkeypatch.delenv("COMMERCE_DATABASE_URL", raising=False)
+    monkeypatch.setenv("DATABASE_URL", "postgresql://display.example/next")
+    assert Settings(_env_file=None).commerce_database_url == "sqlite:///./commerce.db"
+
+    next_only = tmp_path / "next-only.env"
+    next_only.write_text("DATABASE_URL=./data/local.db\n", encoding="utf-8")
+
+    assert Settings(_env_file=(next_only,)).commerce_database_url == "sqlite:///./commerce.db"
+
+    both_keys = tmp_path / "both.env"
+    both_keys.write_text(
+        "DATABASE_URL=./data/local.db\nCOMMERCE_DATABASE_URL=sqlite:///./from-root.db\n",
+        encoding="utf-8",
+    )
+
+    assert Settings(_env_file=(both_keys,)).commerce_database_url == "sqlite:///./from-root.db"
 
 
 @pytest.mark.parametrize("name", ["PUBLIC_SITE_URL", "NEXT_PUBLIC_SITE_URL"])

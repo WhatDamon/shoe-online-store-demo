@@ -22,7 +22,11 @@ def default_app_environment() -> AppEnvironment:
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=(ROOT_ENV, BACKEND_ENV), extra="ignore")
     app_env: AppEnvironment = Field(default_factory=default_app_environment)
-    database_url: str = "sqlite:///./commerce.db"
+    # Deliberately its own key, not `DATABASE_URL`: the shared root `.env` uses that name
+    # for the Next/Drizzle display+AI database (`./data/local.db`), a different file.
+    commerce_database_url: str = Field(
+        default="sqlite:///./commerce.db", validation_alias="COMMERCE_DATABASE_URL"
+    )
     commerce_proxy_secret: str = ""
     reservation_ttl_seconds: int = Field(default=1800, ge=1, le=604800)
     reservation_sweep_seconds: int = Field(default=30, ge=1, le=3600)
