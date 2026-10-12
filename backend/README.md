@@ -70,6 +70,19 @@ The lock file pins the versions actually verified. To resolve fresh versions fro
 `uv pip install --python .venv/bin/python -r pyproject.toml --extra dev`
 (Windows: `.venv/Scripts/python.exe`).
 
+`backend/requirements-dev.lock` is a flat, fully pinned list (`name==version`, lowercase
+normalized names, alphabetical) installed verbatim by CI and by the setup commands above.
+It has no generator: after adding a dependency to `pyproject.toml`, install that lower
+bound and append only the packages the install added, in alphabetical order and using the
+normalized lowercase name. Do not re-freeze the whole environment to add one package:
+that moves unrelated pins verified separately, and the local interpreter version differs
+from CI's. Take each new version from the install output, not from a guessed number.
+
+```bash
+npm run py -- -m pip install 'stripe>=16,<17'   # the dependency just added to pyproject.toml
+npm run py -- -m pip freeze                     # copy only the new name==version lines
+```
+
 Run from `backend/`: default database is `backend/commerce.db`. Backend `.env`
 is resolved independently of the Next.js environment. Set `DATABASE_URL` to
 `postgresql+psycopg://user:password@localhost:5432/evoloop` for local PostgreSQL, then run

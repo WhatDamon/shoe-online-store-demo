@@ -3,6 +3,7 @@ annotated-doc==0.0.5
 annotated-types==0.8.0
 anyio==4.15.1
 certifi==2026.7.22
+charset-normalizer==3.5.2
 click==8.5.0
 colorama==0.4.6
 fastapi==0.141.1
@@ -28,10 +29,13 @@ pydantic-settings==2.15.0
 pygments==2.21.0
 pytest==9.1.1
 python-dotenv==1.2.3
+requests==2.34.2
 ruff==0.16.8
 sqlalchemy==2.0.54
 starlette==1.6.0
+stripe==16.0.0
 typing-extensions==4.16.0
 typing-inspection==0.4.4
 tzdata==2026.4
+urllib3==2.8.0
 uvicorn==0.53.0
