@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { LOCALES, type Locale } from './locales'
-import { messages } from './messages'
+import { LOCALES } from './locales'
+import { messages, type Messages } from './messages'
 
 describe('messages', () => {
   it('每个声明的 locale 都有词典', () => {
@@ -30,10 +30,16 @@ describe('messages', () => {
   })
 })
 
-describe('Messages 类型', () => {
-  it('类型与运行时键集一致', () => {
-    const keys = Object.keys(messages('en')).sort()
-    const typed: Array<keyof ReturnType<typeof messages>> = keys as never
-    expect(typed.length).toBe(keys.length)
+// 显式键表：表里写了词典没有的键（拼错、被删、被改名）时 satisfies 在编译期报错；
+// 词典加键而这张表没跟上时，下面的运行时断言失败。两条守卫方向互补。
+const KEYS = [
+  'nav.shop',
+  'notFound.title',
+  'notFound.cta',
+] as const satisfies readonly (keyof Messages)[]
+
+describe('键表单源', () => {
+  it('运行时键集与显式键表一致', () => {
+    expect(Object.keys(messages('en')).sort()).toEqual([...KEYS].sort())
   })
 })
