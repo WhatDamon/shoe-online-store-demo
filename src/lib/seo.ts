@@ -81,7 +81,13 @@ const ogImage = (locale: Locale): string => `/og?locale=${locale}`
 /**
  * 逐语言的 canonical 与 hreflang。
  *
- * - `canonical` 永远是**该 locale 下指向自身**的绝对 URL（规格 §8.5）；
+ * **`locale` 的语义是「本页内容语言」**（也是 canonical 与 hreflang 的目标语言），**不是「URL 段语言」**。
+ * 阶段 1 两者恒等；阶段 3 的内容回退页（URL 段是 `zh-CN`、正文是英文原文、canonical 指向英文原文）
+ * 需要这个分裂：届时调用方必须传**内容语言**（`en`），否则 canonical 会指到一个并不存在的译文
+ * （规格 §8.2/§8.3，C3/C4 是阻塞规则）。若某天真需要同时表达两者，那时再引入独立的
+ * `canonicalLocale`——现在不加参数（YAGNI）。
+ *
+ * - `canonical` 永远是**该内容语言**下同一 path 的绝对 URL（规格 §8.5）；
  * - `languages` 只在 `availableLocales` 非空时输出：内容回退页不该向爬虫声明一对
  *   并不存在的译文（规格 §8.2/§8.3）；默认值 `LOCALES` 表达「该页在每种已声明语言下都存在」；
  * - `x-default` 与语言对成对出现，指向默认语言。
@@ -116,6 +122,9 @@ export const alternatesFor = (
 /**
  * 页面元数据的组装点。locale 是必填的第一参数：canonical、hreflang、`og:locale` 与
  * OG 图 URL 都只能由它决定，调用方无法再自造一个「全站同一处」的 canonical。
+ *
+ * **`locale` 的语义是「本页内容语言」**，同时是 canonical 与 `og:url` 的目标语言（与
+ * `alternatesFor` 同一语义）。阶段 3 的回退页 URL 段语言 ≠ 内容语言，调用方必须传内容语言。
  *
  * `path` 是**未带 locale 前缀的站内路径**（`/shop`、`/blog/x`），前缀由本模块经
  * `localePath` 施加；缺省 `/` 落在**该语言的站点根**（`/en`），不是无前缀的 `/`。

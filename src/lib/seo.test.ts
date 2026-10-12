@@ -1,7 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { PageMetadataOverrides } from './seo'
 import { site } from './site'
 
 const ENV_KEY = 'NEXT_PUBLIC_SITE_URL'
+
+/**
+ * 编译期夹具：页面不得自造 `openGraph.url`（它与 canonical 同源，自造会导致两者不一致）。
+ * `PageMetadataOverrides.openGraph` 上的 `url?: never` 是这条禁止的实现，本行的
+ * `@ts-expect-error` 就是它的守卫：禁止一旦被改回 `Omit` 或删掉，这个赋值不再报错，
+ * `npm run typecheck` 会因 `@ts-expect-error` 未生效报 TS2578。
+ *
+ * 该夹具只在类型层成立，运行时无守卫——真正的运行时断言见下方「自造的 url 压不过 canonical」。
+ */
+// @ts-expect-error — openGraph.url 在 PageMetadataOverrides 上被类型级禁止（统一由 pageMetadata 产出）
+const selfMadeOgUrl: PageMetadataOverrides = { openGraph: { url: 'https://example.com/self-made' } }
 
 afterEach(() => {
   delete process.env[ENV_KEY]
@@ -122,6 +134,14 @@ describe('pageMetadata 的逐语言输出', () => {
     const meta = pageMetadata('en', { title: 'Shop', path: '/shop' })
     expect(meta.openGraph?.images).toEqual(['/og?locale=en'])
     expect(meta.twitter?.images).toEqual(['/og?locale=en'])
+    expect(meta.openGraph?.url).toBe(`${site.url}/en/shop`)
+  })
+
+  it('页面塞进自造的 openGraph.url 也压不过 canonical（与类型级禁止互补）', async () => {
+    const { pageMetadata } = await import('./seo')
+    // selfMadeOgUrl 的赋值在类型层已被拒（见文件头夹具）；这里钉住运行时的兜底顺序：
+    // pageMetadata 在展开 overrides 之后才写 url，页面给的值不可能盖掉 canonical。
+    const meta = pageMetadata('en', { title: 'Shop', path: '/shop', ...selfMadeOgUrl })
     expect(meta.openGraph?.url).toBe(`${site.url}/en/shop`)
   })
 

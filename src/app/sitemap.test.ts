@@ -43,6 +43,14 @@ describe('sitemap', () => {
     })
   })
 
+  it('商品与文章条目确实进了 sitemap（不是只有站点级 3 条）', async () => {
+    const urls = (await sitemap()).map((entry) => entry.url)
+    // 钉真实存在的 handle / slug，而不是数量（数量随目录漂移，且删掉 products/posts 两段
+    // 仍可能因静态条目与图片断言而全绿）。
+    expect(urls).toContain(`${site.url}/en/product/dc-1001`)
+    expect(urls).toContain(`${site.url}/en/blog/finding-your-evoloop-size`)
+  })
+
   it('同一 URL 不重复出现', async () => {
     const urls = (await sitemap()).map((entry) => entry.url)
     expect(new Set(urls).size).toBe(urls.length)

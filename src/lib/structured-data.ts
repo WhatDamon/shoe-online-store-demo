@@ -9,6 +9,13 @@ export type JsonLdObject = Record<string, unknown>
  * 结构化数据：URL 一律带 locale 前缀（与 canonical 同源，规格 §6.4/§8.4），
  * `inLanguage` 用**内容实际语言**（规格 §8.5）。
  *
+ * ## `locale` 参数的语义（改这里之前先读完）
+ *
+ * 本文件所有构造器的 `locale` 都是**内容语言**，不是「URL 段语言」：文档级节点的 URL 前缀与
+ * `inLanguage` 都由它决定。阶段 1 两者恒等；阶段 3 的回退页（URL 段是 `zh-CN`、正文是英文原文）
+ * 必须传**内容语言**（`en`），`inLanguage` 才会是实际内容语言（规格 §8.3/§8.5）。
+ * 若某天真需要同时表达「页面所在 URL」与「内容语言」，那时再引入独立参数——现在不加（YAGNI）。
+ *
  * ## `@id` 政策（改这里之前先读完）
  *
  * `@id` 是**图节点身份**，被同一页面里的其它节点引用（`publisher` / `manufacturer` /
