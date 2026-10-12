@@ -1,4 +1,4 @@
-import type { CartLine, CartView, CommerceProduct, OrderView } from './commerce'
+import type { CartLine, CartView, CommerceProduct, OrderView, PaymentView } from './commerce'
 
 function invalid(): never {
   throw new Error('Invalid commerce response')
@@ -44,11 +44,16 @@ export function parseCommerceProduct(value: unknown): CommerceProduct {
       return {
         id: text(variant.id),
         color: text(variant.color),
+        color_hex: text(variant.color_hex),
         size: integer(variant.size, 1),
         price: money(variant.price),
         currency: currency(variant.currency),
         available: integer(variant.available, 0),
       }
+    }),
+    media: list(data.media, (entry) => {
+      const media = record(entry)
+      return { color: media.color === null ? null : text(media.color), url: text(media.url) }
     }),
   }
 }
@@ -100,6 +105,27 @@ export function parseOrderView(value: unknown): OrderView {
     expires_at: expires,
     cancellation_reason: reason,
     payment_enabled: false,
+    message: text(data.message),
+  }
+}
+
+export function parsePaymentView(value: unknown): PaymentView {
+  const data = record(value)
+  if (
+    data.code !== 'payment_disabled' ||
+    data.payment_enabled !== false ||
+    data.provider !== 'mock' ||
+    data.charged !== false ||
+    (data.order_status !== 'pending_payment' && data.order_status !== 'cancelled')
+  )
+    invalid()
+  return {
+    code: data.code,
+    payment_enabled: data.payment_enabled,
+    provider: data.provider,
+    charged: data.charged,
+    order_id: text(data.order_id),
+    order_status: data.order_status,
     message: text(data.message),
   }
 }

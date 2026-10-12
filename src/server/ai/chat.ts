@@ -106,6 +106,7 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
    * cannot spend the chat provider's reservation or bypass the daily cap.
    */
   const runEmbedding: EmbeddingRunner = async (texts, operation) => {
+    opts.signal?.throwIfAborted()
     const tokens = Math.max(
       1,
       texts.reduce((total, value) => total + estTokens(value), 0),
@@ -113,8 +114,17 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
     const embeddingRequestId = crypto.randomUUID()
     const embeddingModel = envStr('AI_EMBEDDING_MODEL', 'embedding')
     await guardrails.reserveBudget(embeddingRequestId, tokens, budgetDay)
+    let dispatched = false
+    let operationCompleted = false
     try {
-      const result = await operation()
+      if (opts.signal?.aborted)
+        throw new EmbeddingDispatchBlockedError('Embedding cancelled before dispatch')
+      const result = await operation({
+        onDispatch: () => {
+          dispatched = true
+        },
+      })
+      operationCompleted = true
       if (result instanceof Response && !result.ok) {
         await guardrails.abandonBudget(embeddingRequestId)
       } else {
@@ -129,7 +139,7 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
       return result
     } catch (error) {
       try {
-        if (error instanceof EmbeddingDispatchBlockedError) {
+        if (!dispatched && !operationCompleted && error instanceof EmbeddingDispatchBlockedError) {
           await guardrails.releaseBudget(embeddingRequestId)
         } else {
           await guardrails.abandonBudget(embeddingRequestId)
@@ -146,7 +156,7 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
   }
 
   const retrieveForChat = (query: string, limit?: number) =>
-    retrieveCatalogProducts(query, limit, { runEmbedding })
+    retrieveCatalogProducts(query, limit, { runEmbedding, signal: opts.signal })
 
   const reserveFor = async (system: string, messages: AiContext['messages']) => {
     const prompt = [system, ...messages.map((message) => message.content)]

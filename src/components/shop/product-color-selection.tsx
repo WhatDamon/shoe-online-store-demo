@@ -1,38 +1,25 @@
 'use client'
 
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 import type { ProductView } from '@/domain/product'
 
 interface ProductColorSelectionValue {
-  colorIndex: number
-  setColorIndex: (index: number) => void
-  imagesFollowColors: boolean
+  imageFocus: { url: string | null }
+  focusImage: (url: string | null) => void
 }
 
 const ProductColorSelectionContext = createContext<ProductColorSelectionValue | null>(null)
 
+// Only purchase actions publish image focus. Browsing the gallery never changes a variant.
 export function ProductColorSelectionProvider({
-  product,
   children,
 }: {
   product: ProductView
   children: ReactNode
 }) {
-  const [colorIndex, setColorIndex] = useState(0)
-  const colorCount = product.colors?.length ?? 0
-  const imageCount = product.images?.length ?? 0
-  const imagesFollowColors = colorCount > 1 && colorCount === imageCount
-
-  const value = useMemo<ProductColorSelectionValue>(
-    () => ({
-      colorIndex,
-      setColorIndex: (index) => {
-        if (index >= 0 && index < colorCount) setColorIndex(index)
-      },
-      imagesFollowColors,
-    }),
-    [colorCount, colorIndex, imagesFollowColors],
-  )
+  const [imageFocus, setImageFocus] = useState<{ url: string | null }>({ url: null })
+  const focusImage = useCallback((url: string | null) => setImageFocus({ url }), [])
+  const value = useMemo(() => ({ imageFocus, focusImage }), [imageFocus, focusImage])
 
   return (
     <ProductColorSelectionContext.Provider value={value}>

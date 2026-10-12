@@ -237,7 +237,39 @@ payment response rolls back its writes. These contracts preserve existing respon
 field names, nullable expiry fields and HTTP status codes; no migration is needed.
 Run the regression checks from the backend directory:
 
-    python -m pytest -q tests/test_response_contract.py
+    python -m pytest -q tests/test_response_contract.py tests/test_contract_export.py
+
+The frontend API types are generated from this application's OpenAPI, with explicit
+page projections and runtime validation retained. After changing a response model or
+route, regenerate and commit all three artifacts from the repository root:
+
+    npm run contract:generate
+    npm run contract:check
+    npm run contract:test
+
+Install `backend/requirements-dev.lock` first. The default interpreter is `python`;
+set `COMMERCE_PYTHON` to the backend virtual environment's Python when necessary.
+`backend/export_contract.py` runs a fresh isolated worker with a runtime environment
+allowlist, in-memory database configuration and the sweeper disabled. It skips dotenv
+reads and fails on database/network connection attempts; it does not run migrations,
+seed data or application lifespan. This is a side-effect guard for trusted repository
+code, not a security sandbox for untrusted Python. The worker has a 20-second limit.
+On timeout it requests owned process-tree termination and verifies exit before
+reporting that the worker was terminated. If termination or verification fails, it
+returns a distinct cleanup error without claiming tree exit. All launcher waits
+have deadlines. Worker output is collected in temporary files, so a surviving
+descendant cannot block pipe closure or leak partial output on a timeout.
+Successful export assumes trusted imports do not launch independent background
+children: it collects output when the worker launcher exits, not after arbitrary
+children finish. Windows timeout verification covers the tree captured at cleanup;
+it is not lifecycle supervision for continuously spawning or detached processes.
+Generation accepts only local OpenAPI references, including discriminator mappings,
+and rejects external example sources.
+`contract:check` is read-only and fails if API types, the OpenAPI snapshot or the
+Python-validated sample snapshot drift. It is included in `npm run verify` and CI.
+The snapshots contain synthetic contract examples, not customer or business data.
+Generated types describe full API objects; `src/domain/commerce.ts` retains page
+projections and the existing optional cart inventory fields for legacy responses.
 
 Expired orders remain readable with their original line snapshots and order ID, are returned
 as `status=cancelled` with `cancellation_reason=expired`, and have `expires_at` in the response.

@@ -1,3 +1,26 @@
+/** Validate the complete batch before any caller writes or scores its vectors. */
+export function validateEmbeddingVectors(
+  value: unknown,
+  count: number,
+  expectedDimension?: number,
+): number[][] {
+  const invalid = () => new Error('Invalid embedding response')
+  if (!Array.isArray(value) || value.length !== count) throw invalid()
+  let dimension = expectedDimension
+  for (const vector of value) {
+    if (!Array.isArray(vector) || vector.length === 0) throw invalid()
+    dimension ??= vector.length
+    if (vector.length !== dimension) throw invalid()
+    let normSquared = 0
+    for (const component of vector) {
+      if (typeof component !== 'number' || !Number.isFinite(component)) throw invalid()
+      normSquared += component * component
+    }
+    if (!Number.isFinite(normSquared) || normSquared === 0) throw invalid()
+  }
+  return value
+}
+
 const magnitude = (v: number[]) => Math.sqrt(v.reduce((s, x) => s + x * x, 0))
 
 /** 余弦相似度。维度不一致（如换 embedding 模型后旧行残留）或零向量都按不命中处理。 */

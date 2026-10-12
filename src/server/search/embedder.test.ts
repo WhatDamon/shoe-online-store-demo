@@ -36,6 +36,137 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+describe('bounded embedding responses', () => {
+  it.each([
+    ['missing data', {}],
+    ['wrong count', { data: [] }],
+    ['extra rows', { data: [{ embedding: [1] }, { embedding: [1] }] }],
+    ['missing vector', { data: [{}] }],
+    ['empty vector', { data: [{ embedding: [] }] }],
+    ['string component', { data: [{ embedding: ['1'] }] }],
+    ['null component', { data: [{ embedding: [null] }] }],
+    ['zero norm', { data: [{ embedding: [0, 0] }] }],
+    ['overflow norm', { data: [{ embedding: [1e308] }] }],
+    ['underflow norm', { data: [{ embedding: [1e-300] }] }],
+    ['out of range index', { data: [{ index: 1, embedding: [1] }] }],
+  ])('rejects %s without exposing payload', async (_name, payload) => {
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(payload)))
+    const { embed } = await import('./embedder')
+    await expect(embed(['query'])).rejects.toThrow('Invalid embedding response')
+  })
+
+  it.each([NaN, Infinity, -Infinity])('rejects nonfinite component %s', async (component) => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ embedding: [component] }] }),
+    } as Response)
+    const { embed } = await import('./embedder')
+    await expect(embed(['query'])).rejects.toThrow('Invalid embedding response')
+  })
+
+  it.each([
+    [{ embedding: [1] }, { embedding: [1, 0] }],
+    [
+      { index: 0, embedding: [1] },
+      { index: 0, embedding: [1] },
+    ],
+    [{ index: 0, embedding: [1] }, { embedding: [1] }],
+    [
+      { index: 0.5, embedding: [1] },
+      { index: 1, embedding: [1] },
+    ],
+  ])('rejects inconsistent batches (%#)', async (...data) => {
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ data })))
+    const { embed } = await import('./embedder')
+    await expect(embed(['a', 'b'])).rejects.toThrow('Invalid embedding response')
+  })
+
+  it('maps explicit response indexes back to input order', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [
+            { index: 1, embedding: [0, 1] },
+            { index: 0, embedding: [1, 0] },
+          ],
+        }),
+      ),
+    )
+    const { embed } = await import('./embedder')
+    await expect(embed(['a', 'b'])).resolves.toEqual([
+      [1, 0],
+      [0, 1],
+    ])
+  })
+
+  it('rejects pre-dispatch cancellation with explicit unused-cost proof', async () => {
+    const controller = new AbortController()
+    controller.abort(new Error('caller stopped'))
+    const { embed, EmbeddingDispatchBlockedError } = await import('./embedder')
+    await expect(embed(['query'], { signal: controller.signal })).rejects.toBeInstanceOf(
+      EmbeddingDispatchBlockedError,
+    )
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it.each(['headers', 'body'])('bounds stalled %s with the configured deadline', async (phase) => {
+    vi.stubEnv('AI_REQUEST_TIMEOUT_MS', '40')
+    const pending = (signal: AbortSignal) =>
+      new Promise<never>((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+      })
+    vi.mocked(fetch).mockImplementation(async (_url, init) => {
+      const signal = init?.signal as AbortSignal
+      // Keep a bounded baseline failure instead of waiting for the default test timeout.
+      if (!signal) throw new Error('missing bounded request signal')
+      if (phase === 'headers') return pending(signal)
+      const response = new Response(null)
+      response.json = () => pending(signal)
+      return response
+    })
+    const { embed } = await import('./embedder')
+    await expect(embed(['query'])).rejects.toMatchObject({ name: 'TimeoutError' })
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['headers', 'body'])(
+    'propagates in-flight caller cancellation during %s',
+    async (phase) => {
+      const controller = new AbortController()
+      const reason = new Error('caller stopped')
+      vi.mocked(fetch).mockImplementation(async (_url, init) => {
+        const signal = init?.signal as AbortSignal
+        if (!signal) throw new Error('missing caller signal')
+        const pending = () =>
+          new Promise<never>((_resolve, reject) => {
+            signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+            queueMicrotask(() => controller.abort(reason))
+          })
+        if (phase === 'headers') return pending()
+        const response = new Response(null)
+        response.json = pending
+        return response
+      })
+      const { embed } = await import('./embedder')
+      await expect(embed(['query'], { signal: controller.signal })).rejects.toBe(reason)
+      expect(fetch).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it('does not cache cancelled probe success and permits a fresh probe', async () => {
+    const controller = new AbortController()
+    const reason = new Error('probe stopped')
+    vi.mocked(fetch).mockImplementationOnce(async () => {
+      controller.abort(reason)
+      return new Response(null)
+    })
+    const { embeddingsAvailable } = await import('./embedder')
+    await expect(embeddingsAvailable({ signal: controller.signal })).rejects.toBe(reason)
+    await expect(embeddingsAvailable()).resolves.toBe(true)
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+})
+
 describe('embedding capability probe', () => {
   it('preserves a budget refusal from its request wrapper', async () => {
     vi.stubEnv('AI_BASE_URL', 'https://embedding.example.test/v1')

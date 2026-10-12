@@ -16,6 +16,16 @@ const FIRST = seedProducts[0]
 
 const makeRepo = (): Repository => createRepository(createDb(':memory:'))
 
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((done, fail) => {
+    resolve = done
+    reject = fail
+  })
+  return { promise, resolve, reject }
+}
+
 /** products 显式传入：生产由组合根（ai/retrieval-gateway）注入 catalog().getProducts({})。 */
 const depsOf = (repo: Repository, over: Partial<RetrievalDeps> = {}): RetrievalDeps => ({
   products: seedProducts,
@@ -70,6 +80,175 @@ describe('retrieve', () => {
   it('关键词零命中返回空数组', async () => {
     mockEmbeddingsAvailable.mockResolvedValue(false)
     expect(await retrieve('zzzqwertyplokmnb', depsOf(makeRepo()))).toEqual([])
+  })
+
+  it.each([new Error('caller cancelled'), { message: 'private-cancel-marker' }, null])(
+    '调用前已取消时原样传播原因且不检查嵌入能力 (%#)',
+    async (reason) => {
+      const controller = new AbortController()
+      controller.abort(reason)
+      const repo = makeRepo()
+      const read = vi.spyOn(repo, 'allEmbeddings')
+      const upsert = vi.spyOn(repo, 'upsertEmbedding')
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      try {
+        mockEmbeddingsAvailable.mockResolvedValue(true)
+        mockSemanticEmbed()
+
+        await expect(retrieve('avocado', depsOf(repo, { signal: controller.signal }))).rejects.toBe(
+          reason,
+        )
+        expect(mockEmbeddingsAvailable).not.toHaveBeenCalled()
+        expect(mockEmbed).not.toHaveBeenCalled()
+        expect(read).not.toHaveBeenCalled()
+        expect(upsert).not.toHaveBeenCalled()
+        expect(warn).not.toHaveBeenCalled()
+      } finally {
+        read.mockRestore()
+        upsert.mockRestore()
+        warn.mockRestore()
+      }
+    },
+  )
+
+  it.each([true, false])('等待 canEmbed 时取消不继续检索（能力结果 %s）', async (available) => {
+    const controller = new AbortController()
+    const reason = new Error('caller cancelled during capability check')
+    const started = deferred<void>()
+    const capability = deferred<boolean>()
+    const repo = makeRepo()
+    const read = vi.spyOn(repo, 'allEmbeddings')
+    const upsert = vi.spyOn(repo, 'upsertEmbedding')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      mockEmbeddingsAvailable.mockImplementation(() => {
+        started.resolve(undefined)
+        return capability.promise
+      })
+      mockSemanticEmbed()
+      const result = expect(
+        retrieve('avocado', depsOf(repo, { signal: controller.signal })),
+      ).rejects.toBe(reason)
+      await started.promise
+      controller.abort(reason)
+      capability.resolve(available)
+      await result
+
+      expect(mockEmbeddingsAvailable).toHaveBeenCalledTimes(1)
+      expect(mockEmbed).not.toHaveBeenCalled()
+      expect(read).not.toHaveBeenCalled()
+      expect(upsert).not.toHaveBeenCalled()
+      expect(warn).not.toHaveBeenCalled()
+    } finally {
+      read.mockRestore()
+      upsert.mockRestore()
+      warn.mockRestore()
+    }
+  })
+
+  it('query 嵌入 resolve 后取消不读取缓存', async () => {
+    const controller = new AbortController()
+    const reason = new Error('caller cancelled after query embedding')
+    const started = deferred<void>()
+    const query = deferred<number[][]>()
+    const repo = makeRepo()
+    const read = vi.spyOn(repo, 'allEmbeddings')
+    const upsert = vi.spyOn(repo, 'upsertEmbedding')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      mockEmbeddingsAvailable.mockResolvedValue(true)
+      mockSemanticEmbed()
+      mockEmbed.mockImplementationOnce(() => {
+        started.resolve(undefined)
+        return query.promise
+      })
+      const result = expect(
+        retrieve('avocado', depsOf(repo, { signal: controller.signal })),
+      ).rejects.toBe(reason)
+      await started.promise
+      query.resolve([oneHot(0)])
+      controller.abort(reason)
+      await result
+
+      expect(mockEmbed).toHaveBeenCalledTimes(1)
+      expect(read).not.toHaveBeenCalled()
+      expect(upsert).not.toHaveBeenCalled()
+      expect(warn).not.toHaveBeenCalled()
+    } finally {
+      read.mockRestore()
+      upsert.mockRestore()
+      warn.mockRestore()
+    }
+  })
+
+  it('batch 嵌入 resolve 后取消不写入任何缓存且不再次读取缓存', async () => {
+    const controller = new AbortController()
+    const reason = new Error('caller cancelled after batch embedding')
+    const started = deferred<void>()
+    const batch = deferred<number[][]>()
+    const repo = makeRepo()
+    const read = vi.spyOn(repo, 'allEmbeddings')
+    const upsert = vi.spyOn(repo, 'upsertEmbedding')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      mockEmbeddingsAvailable.mockResolvedValue(true)
+      mockSemanticEmbed()
+      mockEmbed.mockResolvedValueOnce([oneHot(0)]).mockImplementationOnce(() => {
+        started.resolve(undefined)
+        return batch.promise
+      })
+      const result = expect(
+        retrieve('avocado', depsOf(repo, { signal: controller.signal })),
+      ).rejects.toBe(reason)
+      await started.promise
+      batch.resolve(seedProducts.map((_, idx) => oneHot(idx)))
+      controller.abort(reason)
+      await result
+
+      expect(mockEmbed).toHaveBeenCalledTimes(2)
+      expect(read).toHaveBeenCalledTimes(1)
+      expect(upsert).not.toHaveBeenCalled()
+      expect(warn).not.toHaveBeenCalled()
+    } finally {
+      read.mockRestore()
+      upsert.mockRestore()
+      warn.mockRestore()
+    }
+  })
+
+  it.each(['成功', '失败'])('缓存读取%s后取消原样传播原因且不降级', async (outcome) => {
+    const controller = new AbortController()
+    const reason = new Error('caller cancelled after cache read')
+    const started = deferred<void>()
+    const cached = deferred<Awaited<ReturnType<Repository['allEmbeddings']>>>()
+    const repo = makeRepo()
+    const read = vi.spyOn(repo, 'allEmbeddings').mockImplementationOnce(() => {
+      started.resolve(undefined)
+      return cached.promise
+    })
+    const upsert = vi.spyOn(repo, 'upsertEmbedding')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      mockEmbeddingsAvailable.mockResolvedValue(true)
+      mockSemanticEmbed()
+      const result = expect(
+        retrieve('avocado', depsOf(repo, { signal: controller.signal })),
+      ).rejects.toBe(reason)
+      await started.promise
+      if (outcome === '成功') cached.resolve([])
+      else cached.reject(new Error('private-cache-failure-marker'))
+      controller.abort(reason)
+      await result
+
+      expect(mockEmbed).toHaveBeenCalledTimes(1)
+      expect(read).toHaveBeenCalledTimes(1)
+      expect(upsert).not.toHaveBeenCalled()
+      expect(warn).not.toHaveBeenCalled()
+    } finally {
+      read.mockRestore()
+      upsert.mockRestore()
+      warn.mockRestore()
+    }
   })
 
   it('预算拒绝不会被吞掉为关键词降级', async () => {
@@ -208,8 +387,180 @@ describe('retrieve', () => {
       await vi.runAllTimersAsync()
       expect(await result).toEqual([{ handle: '26016-m', score: expect.any(Number) }])
       expect(mockEmbed).toHaveBeenCalledTimes(3)
+      expect(mockEmbed.mock.calls.slice(1).map((call) => call[1])).toEqual([DIM, DIM])
     } finally {
       vi.useRealTimers()
+    }
+  })
+
+  it.each(['429 overloaded', '503 unavailable'])(
+    '批量 %s 的重试等待中取消及时完成且不发起二次 batch',
+    async (message) => {
+      const controller = new AbortController()
+      const reason = { message: 'private-retry-cancel-marker' }
+      const repo = makeRepo()
+      const read = vi.spyOn(repo, 'allEmbeddings')
+      const upsert = vi.spyOn(repo, 'upsertEmbedding')
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const resolved = vi.fn()
+      const rejected = vi.fn()
+      vi.useFakeTimers()
+      try {
+        mockEmbeddingsAvailable.mockResolvedValue(true)
+        mockSemanticEmbed()
+        mockEmbed.mockResolvedValueOnce([oneHot(0)]).mockRejectedValueOnce(new Error(message))
+        const result = retrieve('avocado', depsOf(repo, { signal: controller.signal })).then(
+          resolved,
+          rejected,
+        )
+        await vi.advanceTimersByTimeAsync(0)
+        expect(mockEmbed).toHaveBeenCalledTimes(2)
+        await vi.advanceTimersByTimeAsync(600)
+        expect(resolved).not.toHaveBeenCalled()
+        expect(rejected).not.toHaveBeenCalled()
+
+        controller.abort(reason)
+        await vi.advanceTimersByTimeAsync(0)
+        // 未走完 1200ms 退避，取消已经完成；不能等到重试定时器触发才处理。
+        expect(rejected).toHaveBeenCalledTimes(1)
+        expect(rejected.mock.calls[0][0]).toBe(reason)
+        expect(resolved).not.toHaveBeenCalled()
+        await result
+        expect(mockEmbed).toHaveBeenCalledTimes(2)
+        expect(read).toHaveBeenCalledTimes(1)
+        expect(upsert).not.toHaveBeenCalled()
+        expect(warn).not.toHaveBeenCalled()
+
+        await vi.advanceTimersByTimeAsync(1_200)
+        expect(mockEmbed).toHaveBeenCalledTimes(2)
+        expect(read).toHaveBeenCalledTimes(1)
+        expect(upsert).not.toHaveBeenCalled()
+        expect(warn).not.toHaveBeenCalled()
+      } finally {
+        vi.clearAllTimers()
+        vi.useRealTimers()
+        read.mockRestore()
+        upsert.mockRestore()
+        warn.mockRestore()
+      }
+    },
+  )
+
+  it.each([
+    { kind: '数量不足', vectors: [] },
+    {
+      kind: '数量过多',
+      vectors: [
+        [1, 0],
+        [0, 1],
+      ],
+    },
+    { kind: '空向量', vectors: [[]] },
+    { kind: 'NaN', vectors: [[1, Number.NaN]] },
+    { kind: '正无穷', vectors: [[1, Number.POSITIVE_INFINITY]] },
+    { kind: '负无穷', vectors: [[1, Number.NEGATIVE_INFINITY]] },
+    { kind: '非数值元素', vectors: [['private-vector-marker', 1]] },
+    { kind: '零向量', vectors: [[0, 0]] },
+    { kind: '非有限范数', vectors: [[Number.MAX_VALUE, Number.MAX_VALUE]] },
+  ])('query 嵌入 $kind 时安全降级且零缓存写入', async ({ vectors }) => {
+    const repo = makeRepo()
+    const read = vi.spyOn(repo, 'allEmbeddings')
+    const upsert = vi.spyOn(repo, 'upsertEmbedding')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      mockEmbeddingsAvailable.mockResolvedValue(true)
+      mockSemanticEmbed()
+      mockEmbed.mockResolvedValueOnce(vectors)
+
+      expect(await retrieve('avocado', depsOf(repo))).toEqual([
+        { handle: '26016-m', score: expect.any(Number) },
+      ])
+      expect(mockEmbed).toHaveBeenCalledTimes(1)
+      expect(read).not.toHaveBeenCalled()
+      expect(upsert).not.toHaveBeenCalled()
+      expect(warn.mock.calls).toEqual([
+        [JSON.stringify({ event: 'retrieval_fallback', strategy: 'keyword' })],
+      ])
+    } finally {
+      read.mockRestore()
+      upsert.mockRestore()
+      warn.mockRestore()
+    }
+  })
+
+  it.each([
+    { kind: '空批次', change: () => [] },
+    { kind: '数量不足', change: (vectors: number[][]) => vectors.slice(0, -1) },
+    { kind: '数量过多', change: (vectors: number[][]) => [...vectors, oneHot(0)] },
+    { kind: '末尾空向量', change: (vectors: number[][]) => [...vectors.slice(0, -1), []] },
+    {
+      kind: '末尾 NaN',
+      change: (vectors: number[][]) => [
+        ...vectors.slice(0, -1),
+        oneHot(DIM - 1).map((n, idx) => (idx === 0 ? Number.NaN : n)),
+      ],
+    },
+    {
+      kind: '末尾非有限数',
+      change: (vectors: number[][]) => [
+        ...vectors.slice(0, -1),
+        oneHot(DIM - 1).map((n, idx) => (idx === 0 ? Number.POSITIVE_INFINITY : n)),
+      ],
+    },
+    {
+      kind: '末尾非数值元素',
+      change: (vectors: number[][]) => [
+        ...vectors.slice(0, -1),
+        oneHot(DIM - 1).map((n, idx) => (idx === 0 ? 'private-vector-marker' : n)),
+      ],
+    },
+    {
+      kind: '末尾零向量',
+      change: (vectors: number[][]) => [
+        ...vectors.slice(0, -1),
+        Array.from({ length: DIM }, () => 0),
+      ],
+    },
+    {
+      kind: '末尾非有限范数',
+      change: (vectors: number[][]) => [
+        ...vectors.slice(0, -1),
+        Array.from({ length: DIM }, () => Number.MAX_VALUE),
+      ],
+    },
+    {
+      kind: '批内维度不一致',
+      change: (vectors: number[][]) => [...vectors.slice(0, -1), [...oneHot(DIM - 1), 0]],
+    },
+    {
+      kind: '整批维度与 query 不一致',
+      change: (vectors: number[][]) => vectors.map((vector) => [...vector, 0]),
+    },
+  ])('batch 嵌入 $kind 时整批拒绝并安全降级且零缓存写入', async ({ change }) => {
+    const repo = makeRepo()
+    const read = vi.spyOn(repo, 'allEmbeddings')
+    const upsert = vi.spyOn(repo, 'upsertEmbedding')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      mockEmbeddingsAvailable.mockResolvedValue(true)
+      mockSemanticEmbed()
+      // 保留合法前缀，把损坏向量放到末尾；逐条校验并写入会被零调用断言拦住。
+      const vectors = change(seedProducts.map((_, idx) => oneHot(idx)))
+      mockEmbed.mockResolvedValueOnce([oneHot(0)]).mockResolvedValueOnce(vectors)
+
+      expect(await retrieve('avocado', depsOf(repo))).toEqual([
+        { handle: '26016-m', score: expect.any(Number) },
+      ])
+      expect(mockEmbed).toHaveBeenCalledTimes(2)
+      expect(read).toHaveBeenCalledTimes(1)
+      expect(upsert).not.toHaveBeenCalled()
+      expect(warn.mock.calls).toEqual([
+        [JSON.stringify({ event: 'retrieval_fallback', strategy: 'keyword' })],
+      ])
+    } finally {
+      read.mockRestore()
+      upsert.mockRestore()
+      warn.mockRestore()
     }
   })
 

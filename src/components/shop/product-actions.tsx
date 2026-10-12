@@ -4,10 +4,9 @@ import { useSyncExternalStore, useEffect, useState, type ReactNode } from 'react
 import type { CommerceProduct } from '@/domain/commerce'
 import { parseCommerceProduct } from '@/domain/commerce-response'
 import { commerceRequest } from '@/lib/commerce-client'
-import type { CanonicalSize } from '@/domain/product'
-import type { ProductView } from '@/domain/product'
+import type { CanonicalSize, ProductView, SizeSystem } from '@/domain/product'
 import type { ShopifyBuyConfig } from '@/server/catalog/shopify-buy'
-import { footMmToEU } from '@/domain/size'
+import { footMmToEU, sizeLabel } from '@/domain/size'
 import { mySize } from '@/lib/my-size'
 import { useAssistant } from '@/components/assistant/assistant-provider'
 import { SizeSelector } from './size-selector'
@@ -18,59 +17,122 @@ import { useOptionalProductColorSelection } from './product-color-selection'
 
 interface ProductActionsProps {
   product: ProductView
-  /** 服务端已算好的结算 URL（无 store → null） */
   buyUrl: string | null
-  /**
-   * 商店在售配置（2026-09-06 全目录）：非 null 时该 PDP 为「商店直购」形态 ——
-   * 尺码/颜色选择与 demo 购买条整体隐藏，只渲染 Shopify Buy Button（其 iframe 内自带
-   * 商店真实变体选择与店币价格）；Find my size / 手风琴 / 护理海报等 demo 内容保留。
-   */
   buyConfig?: ShopifyBuyConfig | null
-  /**
-   * 由页面（RSC）注入、渲染于 "Find my size" 与购买条之间的内容
-   * （材质/合脚手风琴，无尺码依赖）。
-   */
+  sizeSystem?: SizeSystem
   children?: ReactNode
 }
 
-// PDP 购买群集（顺序）：颜色选择（多色款，受控）→ 尺码选择 → "Find my size" → 手风琴（children 插槽）→ 购买条。
-// children 插槽让本集群保持单一 'use client' 边界共享 selected 状态，同时允许页面以 RSC 注入中间内容；
-// 持有所选尺码/颜色状态，供购买条在无 store 阶段做 aria-live 说明。
-export function ProductActions({ product, buyConfig = null, children }: ProductActionsProps) {
+const CATALOG_TIMEOUT_MS = 15_000
+
+export function ProductActions(props: ProductActionsProps) {
+  // A new product or purchase provider cannot inherit an old transaction selection.
+  return <ProductPurchase key={`${props.product.handle}:${props.buyConfig != null}`} {...props} />
+}
+
+function ProductPurchase({
+  product,
+  buyConfig = null,
+  sizeSystem = 'US',
+  children,
+}: ProductActionsProps) {
   const storeLive = buyConfig != null
   const [commerce, setCommerce] = useState<CommerceProduct | null>(null)
   const [commerceError, setCommerceError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
+  const [selectedColor, setSelectedColor] = useState<string | null>(null)
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const colorSelection = useOptionalProductColorSelection()
+  const focusImage = colorSelection?.focusImage
+
   useEffect(() => {
     if (storeLive) return
     let active = true
-    commerceRequest(`catalog/products/${product.handle}`, parseCommerceProduct)
+    let timedOut = false
+    const controller = new AbortController()
+    const timeout = setTimeout(() => {
+      timedOut = true
+      controller.abort()
+    }, CATALOG_TIMEOUT_MS)
+    commerceRequest(
+      `catalog/products/${encodeURIComponent(product.handle)}`,
+      parseCommerceProduct,
+      {
+        signal: controller.signal,
+      },
+    )
       .then((data) => {
-        if (active) setCommerce(data)
+        if (!active) return
+        const color = data.variants[0]?.color ?? null
+        setCommerce(data)
+        setSelectedColor(color)
       })
-      .catch((e: Error) => {
-        if (active) setCommerceError(e.message)
+      .catch((error: unknown) => {
+        if (!active) return
+        setCommerceError(
+          timedOut
+            ? 'Checking availability timed out. Please try again.'
+            : error instanceof Error && error.name !== 'AbortError'
+              ? error.message
+              : 'Could not check availability. Please try again.',
+        )
       })
+      .finally(() => clearTimeout(timeout))
     return () => {
       active = false
+      clearTimeout(timeout)
+      controller.abort()
     }
-  }, [product.handle, storeLive])
-  const colors = product.colors ?? []
-  // 「我的尺码」快照：demo 分支 Select-size 命中高亮（产品在库才显形，天然自然）。
+  }, [product.handle, storeLive, attempt])
+
+  const selectedMedia = commerce?.media.find((entry) => entry.color === selectedColor)
+  const imageUrl =
+    selectedMedia && product.images?.includes(selectedMedia.url) ? selectedMedia.url : null
+  useEffect(() => {
+    if (!storeLive) focusImage?.(imageUrl)
+  }, [imageUrl, selectedColor, attempt, storeLive, focusImage])
+
   const myMm = useSyncExternalStore(mySize.subscribe, mySize.getSnapshot, mySize.getServerSnapshot)
   const myCanonical = myMm != null ? footMmToEU(myMm) : null
-  // 页面 Provider 存在时与图库共享色号；孤立渲染（测试/复用）时保留本地状态。
-  const colorSelection = useOptionalProductColorSelection()
-  const [localColorIdx, setLocalColorIdx] = useState(0)
-  const colorIdx = colorSelection?.colorIndex ?? localColorIdx
-  const setColorIdx = colorSelection?.setColorIndex ?? setLocalColorIdx
-  const [selected, setSelected] = useState<CanonicalSize | null>(null)
-  // 面板打开 + 预置 size-fit 上下文由 AssistantProvider 处理；context 为空（Provider 未挂载的孤立渲染）时静默。
   const assistant = useAssistant()
-  const selectedLabel = product.sizeOptions.find((o) => o.value === selected)?.label ?? null
-  const colorName =
-    colors.length > 0 ? (colors[Math.min(colorIdx, colors.length - 1)]?.name ?? null) : null
+  const variants = commerce?.variants ?? []
+  const colors = [
+    ...new Map(variants.map((variant) => [variant.color, variant.color_hex])).entries(),
+  ]
+  const variant = variants.find((entry) => entry.id === selectedVariantId) ?? null
+  const selected = variant?.size ?? null
+  const sizeOptions = variants
+    .filter((entry) => entry.color === selectedColor)
+    .map((entry) => ({ value: entry.size, label: sizeLabel(entry.size, sizeSystem) }))
+    .sort((a, b) => a.value - b.value)
+  const loading = !commerce && !commerceError
 
-  // Find my size（AI 尺码咨询，商店直购形态下保留 —— 决策：只隐藏选择器与 demo 购买条）
+  function chooseColor(color: string) {
+    if (busy || loading || commerceError) return
+    setSelectedColor(color)
+    setSelectedVariantId(
+      variants.find((entry) => entry.color === color && entry.size === selected)?.id ?? null,
+    )
+  }
+
+  function chooseSize(size: CanonicalSize) {
+    if (busy || loading || commerceError) return
+    setSelectedVariantId(
+      variants.find((entry) => entry.color === selectedColor && entry.size === size)?.id ?? null,
+    )
+  }
+
+  function recheck() {
+    if (busy || loading) return
+    setCommerce(null)
+    setCommerceError(null)
+    setSelectedColor(null)
+    setSelectedVariantId(null)
+    focusImage?.(null)
+    setAttempt((value) => value + 1)
+  }
+
   const findMySize = (
     <div className={storeLive ? '' : '-mt-3'}>
       <button
@@ -83,7 +145,6 @@ export function ProductActions({ product, buyConfig = null, children }: ProductA
     </div>
   )
 
-  // 商店直购形态：隐藏本站颜色/尺码选择器与 demo 购买条，以 Buy Button 全接管变体选择与结算。
   if (storeLive) {
     return (
       <div className="flex flex-col gap-5">
@@ -97,25 +158,28 @@ export function ProductActions({ product, buyConfig = null, children }: ProductA
   return (
     <div className="flex flex-col gap-5">
       {colors.length > 1 ? (
-        <fieldset className="flex flex-col gap-2.5">
+        <fieldset className="flex flex-col gap-2.5" disabled={busy || loading || !!commerceError}>
           <legend className="text-sm font-medium text-ink">
             Color
-            {colorName ? (
-              <span className="ml-1.5 font-normal text-neutral-500">{colorName}</span>
+            {selectedColor ? (
+              <span className="ml-1.5 font-normal text-neutral-500">{selectedColor}</span>
             ) : null}
           </legend>
           <div className="flex flex-wrap gap-2.5">
-            {colors.map((c, i) => {
-              const active = i === colorIdx
+            {colors.map(([color, hex]) => {
+              const active = color === selectedColor
               return (
-                <label key={`${c.hex}-${c.name}`} className="group cursor-pointer">
+                <label key={color} className="group cursor-pointer">
                   <input
                     type="radio"
                     name="colors"
-                    value={c.name}
+                    value={color}
                     checked={active}
-                    aria-label={c.name}
-                    onChange={() => setColorIdx(i)}
+                    aria-label={color}
+                    onChange={() => chooseColor(color)}
+                    onClick={() => {
+                      if (active && !busy && !loading && !commerceError) focusImage?.(imageUrl)
+                    }}
                     className="peer sr-only"
                   />
                   <span
@@ -124,7 +188,7 @@ export function ProductActions({ product, buyConfig = null, children }: ProductA
                         ? 'ring-2 ring-ink ring-offset-2 ring-offset-canvas'
                         : 'border-neutral-300'
                     }`}
-                    style={{ backgroundColor: c.hex }}
+                    style={{ backgroundColor: hex }}
                   />
                 </label>
               )
@@ -134,25 +198,24 @@ export function ProductActions({ product, buyConfig = null, children }: ProductA
         </fieldset>
       ) : null}
       <SizeSelector
-        sizeOptions={product.sizeOptions}
+        sizeOptions={sizeOptions}
         selected={selected}
-        onChange={setSelected}
+        onChange={chooseSize}
         match={myCanonical}
+        disabled={busy || loading || !!commerceError}
       />
-      {/** 尺码旁「My size」行（克制）：保存后全站高亮 + Find my size 预填。 */}
       <MySizeGuide />
       {findMySize}
       {children}
       <ProductBuyBar
-        variant={
-          commerce?.variants.find(
-            (v) => v.color === (colorName ?? 'Standard') && v.size === selected,
-          ) ?? null
-        }
-        loading={!commerce && !commerceError}
+        key={attempt}
+        variant={variant}
+        loading={loading}
         error={commerceError}
-        selectedLabel={selectedLabel}
-        colorName={colorName}
+        selectedLabel={selected == null ? null : sizeLabel(selected, sizeSystem)}
+        colorName={selectedColor}
+        onRecheck={recheck}
+        onBusyChange={setBusy}
       />
     </div>
   )

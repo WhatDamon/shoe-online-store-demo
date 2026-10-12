@@ -26,6 +26,7 @@ const order = {
 const variant = {
   id: 'variant-1',
   color: 'Ivory',
+  color_hex: '#f3ede2',
   size: 42,
   price: '59.00',
   currency: 'USD',
@@ -59,7 +60,10 @@ it('accepts null legacy deadlines and explicitly cancelled orders', () => {
   expect(
     parseOrderView({ ...order, status: 'cancelled', cancellation_reason: 'expired' }).status,
   ).toBe('cancelled')
-  expect(parseCommerceProduct({ variants: [variant] })).toEqual({ variants: [variant] })
+  expect(parseCommerceProduct({ variants: [variant], media: [] })).toEqual({
+    variants: [variant],
+    media: [],
+  })
 })
 
 it.each([true, false])('preserves explicit sellable=%s in cart and order responses', (sellable) => {
@@ -90,8 +94,25 @@ const invalidCases: [string, (value: unknown) => unknown, unknown][] = [
   ['null sellable', parseCartView, { ...cart, items: [{ ...line, sellable: null }] }],
   ['array sellable', parseCartView, { ...cart, items: [{ ...line, sellable: [] }] }],
   ['object sellable', parseOrderView, { ...order, items: [{ ...line, sellable: {} }] }],
-  ['invalid stock', parseCommerceProduct, { variants: [{ ...variant, available: -1 }] }],
-  ['numeric price', parseCommerceProduct, { variants: [{ ...variant, price: 59 }] }],
+  ['invalid stock', parseCommerceProduct, { variants: [{ ...variant, available: -1 }], media: [] }],
+  ['numeric price', parseCommerceProduct, { variants: [{ ...variant, price: 59 }], media: [] }],
+  [
+    'numeric color_hex',
+    parseCommerceProduct,
+    { variants: [{ ...variant, color_hex: 123 }], media: [] },
+  ],
+  ['missing media', parseCommerceProduct, { variants: [variant] }],
+  ['non-array media', parseCommerceProduct, { variants: [variant], media: {} }],
+  [
+    'invalid media color',
+    parseCommerceProduct,
+    { variants: [variant], media: [{ color: 1, url: '/photo.webp' }] },
+  ],
+  [
+    'invalid media url',
+    parseCommerceProduct,
+    { variants: [variant], media: [{ color: null, url: 1 }] },
+  ],
   ['paid order', parseOrderView, { ...order, status: 'paid' }],
   ['enabled payments', parseOrderView, { ...order, payment_enabled: true }],
   ['missing deadline', parseOrderView, { ...order, expires_at: undefined }],
