@@ -11,18 +11,22 @@ import { ProductGrid } from '@/components/shop/product-grid'
 import { GiftGallery } from '@/components/shop/gift-gallery'
 import { EmptyState } from './empty-state'
 import { pageMetadata } from '@/lib/seo'
-import { absoluteUrl } from '@/lib/seo'
 import { JsonLd } from '@/components/seo/json-ld'
 import { itemListSchema, webPageSchema } from '@/lib/structured-data'
+import { DEFAULT_LOCALE, isLocale } from '@/i18n/locales'
 
 export const dynamic = 'force-dynamic'
 
-export const metadata: Metadata = pageMetadata({
-  title: 'Shop',
-  description: 'Shop all styles — every pair is printed to order around your size.',
-  alternates: { canonical: '/shop' },
-  openGraph: { url: absoluteUrl('/shop'), type: 'website' },
-})
+export async function generateMetadata(props: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const { locale: raw } = await props.params
+  return pageMetadata(isLocale(raw) ? raw : DEFAULT_LOCALE, {
+    title: 'Shop',
+    description: 'Shop all styles — every pair is printed to order around your size.',
+    path: '/shop',
+  })
+}
 
 type ShopSearchParams = { [key: string]: string | string[] | undefined }
 

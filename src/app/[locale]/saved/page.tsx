@@ -1,4 +1,5 @@
 import { pageMetadata } from '@/lib/seo'
+import { DEFAULT_LOCALE, isLocale } from '@/i18n/locales'
 import type { Metadata } from 'next'
 import { SavedPairs } from '@/components/shop/saved-pairs'
 
@@ -6,11 +7,17 @@ import { SavedPairs } from '@/components/shop/saved-pairs'
 // RSC 壳只做 metadata + 头部；数据完全来自客户端 wishlist 快照 → 经只读
 // /api/catalog 拉摘要（DB/seed 在 server，客户端无目录副本）。收藏为空时
 // SavedPairs 自渲染空态（含去 /shop 逛的 CTA）。
-export const metadata: Metadata = pageMetadata({
-  title: 'Saved pairs',
-  description: 'Your saved pairs — pick up where you left off.',
-  robots: { index: false, follow: false },
-})
+export async function generateMetadata(props: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const { locale: raw } = await props.params
+  return pageMetadata(isLocale(raw) ? raw : DEFAULT_LOCALE, {
+    title: 'Saved pairs',
+    description: 'Your saved pairs — pick up where you left off.',
+    path: '/saved',
+    robots: { index: false, follow: false },
+  })
+}
 
 export default function SavedPage() {
   return (

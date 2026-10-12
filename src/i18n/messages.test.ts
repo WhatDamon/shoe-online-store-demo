@@ -34,6 +34,7 @@ describe('messages', () => {
 // 词典加键而这张表没跟上时，下面的运行时断言失败。两条守卫方向互补。
 const KEYS = [
   'nav.shop',
+  'og.title',
   'notFound.title',
   'notFound.description',
   'notFound.cta',

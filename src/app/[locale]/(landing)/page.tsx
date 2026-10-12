@@ -1,6 +1,7 @@
 import { Hero } from '@/components/marketing/hero'
 import type { Metadata } from 'next'
 import { pageMetadata } from '@/lib/seo'
+import { DEFAULT_LOCALE, isLocale } from '@/i18n/locales'
 import { PromiseStrip } from '@/components/marketing/promise-strip'
 import { CollectionCards } from '@/components/marketing/collection-cards'
 import { FeaturedGrid } from '@/components/marketing/featured-grid'
@@ -15,9 +16,15 @@ import { homepageFaq } from '@/lib/faq'
 // 因此这里只给裸文案，品牌后缀由 root 模板统一追加。
 // 警告：若未来移除 (landing) 组布局（回到 [root, page] 两段），Next 会跳过模板 ——
 // 届时必须改回显式后缀（“… — ${site.name}”）并同步 /shop、PDP 的标题测试。
-export const metadata: Metadata = pageMetadata({
-  title: 'Casual shoes, printed to order in your size',
-})
+export async function generateMetadata(props: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const { locale: raw } = await props.params
+  // 非法 locale 的用户可见行为由 root layout 的 notFound() 负责；页面层只用收窄后的值。
+  return pageMetadata(isLocale(raw) ? raw : DEFAULT_LOCALE, {
+    title: 'Casual shoes, printed to order in your size',
+  })
+}
 
 // Landing 内容（顺序）：Hero / PromiseStrip / CollectionCards / FeaturedGrid /
 // StorySection。外壳（AppBar 透明遮罩 + Footer）由 (landing)/layout.tsx 提供。

@@ -7,6 +7,7 @@ import remarkGfm from 'remark-gfm'
 import { LocaleLink } from '@/components/i18n/locale-link'
 import { getPost, listPosts } from '@/lib/blog'
 import { absoluteUrl, pageMetadata } from '@/lib/seo'
+import { DEFAULT_LOCALE, isLocale } from '@/i18n/locales'
 import { JsonLd } from '@/components/seo/json-ld'
 import { articleSchema, breadcrumbSchema } from '@/lib/structured-data'
 
@@ -16,23 +17,22 @@ export function generateStaticParams() {
   return listPosts().map((post) => ({ slug: post.slug }))
 }
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ slug: string }>
+export async function generateMetadata(props: {
+  params: Promise<{ locale: string; slug: string }>
 }): Promise<Metadata> {
-  const { slug } = await params
+  const { locale: raw, slug } = await props.params
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE
   const post = getPost(slug)
   if (!post) return {}
   const description = post.description ?? `An Evoloop Journal article: ${post.title}.`
-  return pageMetadata({
+  return pageMetadata(locale, {
     title: post.title,
     description,
-    alternates: { canonical: `/blog/${post.slug}` },
+    path: `/blog/${post.slug}`,
     openGraph: {
       type: 'article',
-      url: absoluteUrl(`/blog/${post.slug}`),
       description,
+      // 封面是静态资源（不经 [locale] 路由），不加前缀
       ...(post.cover ? { images: [{ url: absoluteUrl(post.cover), alt: post.title }] } : {}),
       publishedTime: `${post.date}T00:00:00Z`,
     },

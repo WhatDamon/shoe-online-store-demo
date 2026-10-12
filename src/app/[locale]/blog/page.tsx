@@ -2,16 +2,21 @@ import type { Metadata } from 'next'
 import Image from 'next/image'
 import { LocaleLink } from '@/components/i18n/locale-link'
 import { listPosts, type BlogPost } from '@/lib/blog'
-import { absoluteUrl, pageMetadata } from '@/lib/seo'
+import { pageMetadata } from '@/lib/seo'
+import { DEFAULT_LOCALE, isLocale } from '@/i18n/locales'
 import { JsonLd } from '@/components/seo/json-ld'
 import { webPageSchema } from '@/lib/structured-data'
 
-export const metadata: Metadata = pageMetadata({
-  title: 'Blog',
-  description: 'Stories, guides and notes from the Evoloop studio.',
-  alternates: { canonical: '/blog' },
-  openGraph: { url: absoluteUrl('/blog'), type: 'website' },
-})
+export async function generateMetadata(props: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const { locale: raw } = await props.params
+  return pageMetadata(isLocale(raw) ? raw : DEFAULT_LOCALE, {
+    title: 'Blog',
+    description: 'Stories, guides and notes from the Evoloop studio.',
+    path: '/blog',
+  })
+}
 
 // 封面占位：无封面文章的品牌渐变替图（克制：低饱和径向光晕 + 对角微光，跟随主题令牌）。
 function CoverPlaceholder({ label }: { label: string }) {

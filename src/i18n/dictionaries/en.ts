@@ -7,6 +7,9 @@
  */
 const en = {
   'nav.shop': 'Shop',
+  // OG 图的标题。`\n` 是排版换行（译者在词典里决定断行位置），不是句子边界：
+  // `src/app/og/route.tsx` 把它还原成 `<br/>`。
+  'og.title': 'Casual shoes, printed\nto order in your size.',
   'notFound.title': "We couldn't find that page",
   'notFound.description':
     'It may have moved, or the link may be out of date. The shop is still open, though.',

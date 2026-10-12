@@ -23,6 +23,7 @@ import {
 import { formatPrice } from '@/lib/format'
 import { pageMetadata } from '@/lib/seo'
 import { absoluteUrl } from '@/lib/seo'
+import { DEFAULT_LOCALE, isLocale } from '@/i18n/locales'
 import { JsonLd } from '@/components/seo/json-ld'
 import { breadcrumbSchema, productSchema } from '@/lib/structured-data'
 import { POLICY_PRODUCTION, POLICY_RETURNS } from '@/lib/store-policy'
@@ -32,24 +33,23 @@ export async function generateStaticParams() {
   return products.map((p) => ({ handle: p.handle }))
 }
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ handle: string }>
+export async function generateMetadata(props: {
+  params: Promise<{ locale: string; handle: string }>
 }): Promise<Metadata> {
-  const { handle } = await params
+  const { locale: raw, handle } = await props.params
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE
   const product = await getProductForMarket(handle)
   // 未知 handle：由页面级 notFound() 决定 404，元数据仅回退默认品牌态。
   if (!product) return {}
-  return pageMetadata({
+  return pageMetadata(locale, {
     title: product.title,
     description: product.description,
-    alternates: { canonical: `/product/${product.handle}` },
+    path: `/product/${product.handle}`,
     keywords: [product.title, product.productType, ...product.tags],
     openGraph: {
-      url: absoluteUrl(`/product/${product.handle}`),
       type: 'website',
       description: product.description,
+      // 商品图是静态资源（不经 [locale] 路由），不加前缀
       ...(product.images?.[0]
         ? { images: [{ url: absoluteUrl(product.images[0]), alt: product.title }] }
         : {}),

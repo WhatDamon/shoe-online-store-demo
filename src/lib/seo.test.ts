@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { site } from './site'
 
 const ENV_KEY = 'NEXT_PUBLIC_SITE_URL'
@@ -18,18 +18,19 @@ describe('seo metadata helpers', () => {
 
   it('pageMetadata keeps the brand title template when nothing overrides it', async () => {
     const { pageMetadata } = await import('./seo')
-    const merged = pageMetadata({})
+    const merged = pageMetadata('en', {})
     expect(typeof merged.title).toBe('object')
     expect(String((merged.title as { template?: string }).template)).toContain(site.name)
     expect(merged.openGraph).toMatchObject({
-      images: ['/og'],
+      // OG 图逐语言（裁决 R25）：`/og?locale=` 的生产消费者就是这里
+      images: ['/og?locale=en'],
       siteName: site.name,
     })
   })
 
   it('pageMetadata shallow-merges a page override onto the base', async () => {
     const { pageMetadata } = await import('./seo')
-    const merged = pageMetadata({
+    const merged = pageMetadata('en', {
       title: 'Shop',
       description: 'All styles, printed to order.',
     })
@@ -58,5 +59,88 @@ describe('seo metadata helpers', () => {
     vi.resetModules()
     const { baseMetadata: b4 } = await import('./seo')
     expect(String(b4.metadataBase)).toBe('http://localhost:3000/')
+  })
+})
+
+// 逐语言 metadata（规格 §8.5）。绝对 URL 的基址由 `absoluteUrl` 每次调用重读 env，
+// 因此这里显式钉到正式域：期望值才与部署形态一致，也才不会退化成「拿实现算期望值」。
+describe('alternatesFor', () => {
+  beforeEach(() => {
+    process.env[ENV_KEY] = site.url
+  })
+
+  it('canonical 指向自身的 locale 绝对 URL', async () => {
+    const { alternatesFor } = await import('./seo')
+    expect(alternatesFor('en', '/shop').canonical).toBe(`${site.url}/en/shop`)
+  })
+
+  it('输出成对 hreflang 与 x-default', async () => {
+    const { alternatesFor } = await import('./seo')
+    expect(alternatesFor('en', '/shop').languages).toEqual({
+      en: `${site.url}/en/shop`,
+      'x-default': `${site.url}/en/shop`,
+    })
+  })
+
+  it('availableLocales 为空时不输出 hreflang 对（回退内容的资格判定，规格 §8.2）', async () => {
+    const { alternatesFor } = await import('./seo')
+    expect(alternatesFor('en', '/blog/foo', []).languages).toBeUndefined()
+  })
+
+  it('canonical 只认自身语言，不随 availableLocales 漂移', async () => {
+    const { alternatesFor } = await import('./seo')
+    const { canonical, languages } = alternatesFor('en', '/shop', ['en'])
+    expect(canonical).toBe(`${site.url}/en/shop`)
+    expect(languages).toEqual({ en: `${site.url}/en/shop`, 'x-default': `${site.url}/en/shop` })
+  })
+})
+
+describe('pageMetadata 的逐语言输出', () => {
+  beforeEach(() => {
+    process.env[ENV_KEY] = site.url
+  })
+
+  it('canonical 是该语言的自指绝对 URL，不再是根路径', async () => {
+    const { pageMetadata } = await import('./seo')
+    expect(pageMetadata('en', { title: 'Shop', path: '/shop' }).alternates?.canonical).toBe(
+      `${site.url}/en/shop`,
+    )
+  })
+
+  it('path 缺省时退到该语言的站点根，而不是无前缀的 /', async () => {
+    const { pageMetadata } = await import('./seo')
+    expect(pageMetadata('en', { title: 'Shop' }).alternates?.canonical).toBe(`${site.url}/en`)
+  })
+
+  it('openGraph.locale 随 locale（OGP 用下划线形态）', async () => {
+    const { pageMetadata } = await import('./seo')
+    expect(pageMetadata('en', { title: 'Shop', path: '/shop' }).openGraph?.locale).toBe('en_US')
+  })
+
+  it('OG 图与 openGraph.url 都逐语言，且 url 与 canonical 同源', async () => {
+    const { pageMetadata } = await import('./seo')
+    const meta = pageMetadata('en', { title: 'Shop', path: '/shop' })
+    expect(meta.openGraph?.images).toEqual(['/og?locale=en'])
+    expect(meta.twitter?.images).toEqual(['/og?locale=en'])
+    expect(meta.openGraph?.url).toBe(`${site.url}/en/shop`)
+  })
+
+  it('页面自带 OG 图时不被默认的逐语言 OG 图顶掉', async () => {
+    const { pageMetadata } = await import('./seo')
+    const meta = pageMetadata('en', {
+      title: 'Shop',
+      path: '/shop',
+      openGraph: { images: ['/blog/covers/x.webp'] },
+    })
+    expect(meta.openGraph?.images).toEqual(['/blog/covers/x.webp'])
+    expect(meta.twitter?.images).toEqual(['/og?locale=en'])
+  })
+
+  it('品牌基座字段（metadataBase / description / openGraph 品牌项）不被逐语言逻辑改动', async () => {
+    const { pageMetadata } = await import('./seo')
+    const meta = pageMetadata('en', { title: 'Shop', path: '/shop' })
+    expect(meta.metadataBase).toBeDefined()
+    expect(meta.description).toContain('printed to order')
+    expect(meta.openGraph).toMatchObject({ siteName: site.name, type: 'website' })
   })
 })
