@@ -81,17 +81,16 @@ marketing 标题/副标题、描述、`price`、`sizes: CanonicalSize[]`、颜�
 ## CatalogAdapter
 
 **定义：** 目录读取契约（`src/server/catalog/adapter-contract.ts`）：
-`getProducts(filter?)` / `getProductByHandle(handle)` / `getCollections()` / `getBuyUrl(product)`。
-三种实现：`DbCatalogAdapter`（默认）、`SeedAdapter`（内存，测试用）、`shopifyStub`（占位）。
+`getProducts(filter?)` / `getProductByHandle(handle)` / `getCollections()`。
+两种实现：`DbCatalogAdapter`（默认）、`SeedAdapter`（内存，测试用）。
 
 #### 不变量
 
 - 运行时选择是**惰性**的：`adapter.ts` 的 `catalog()` 首次调用才读 `CATALOG_SOURCE` 并缓存实例
   （必须缓存：`DbCatalogAdapter` 内部持有「已灌种」promise）。
 - 筛选/排序语义**只有一处**：`catalog/filter.ts` 的 `filterProducts`，被 seed 与 db 两个适配器共用。
-- `getBuyUrl` 目前在所有实现中恒为 `null`：真实的购买通道是独立的 Shopify Buy Button
-  （`shopify-buy.ts`），**不经过本接口**。`SHOPIFY_DOMAIN` / `SHOPIFY_STOREFRONT_TOKEN` 一旦同配
-  会把目录源切到**会抛错**的 stub（刻意设计：预留位，见 README 与 `.env.example`）。
+- 来源选择的唯一开关是 `CATALOG_SOURCE`：`seed` → `SeedAdapter`，其余取值（含任何历史取值）
+  一律回落 `DbCatalogAdapter`，因此陈旧配置不会把目录切到失效实现。
 
 ---
 

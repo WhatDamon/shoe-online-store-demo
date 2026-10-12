@@ -11,7 +11,7 @@
 
 Python 至少覆盖：健康检查、目录列表/详情、购物车增改删、忽略伪造价格、库存不足、订单锁库、幂等重复请求、取消释放库存、Mock 支付不变更为 paid、所有权拒绝、迁移和过期扫描。
 
-TypeScript 至少覆盖：variant 选择、加入购物车、数量修改、订单未支付提示、Shopify 默认关闭、API 代理错误传播、原有关键页面无回归、边界检查、metadata/robots/sitemap（涉及 SEO 修改时）。
+TypeScript 至少覆盖：variant 选择、加入购物车、数量修改、订单未支付提示、API 代理错误传播、原有关键页面无回归、边界检查、metadata/robots/sitemap（涉及 SEO 修改时）。
 
 高风险改动还必须增加：
 

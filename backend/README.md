@@ -313,4 +313,4 @@ template and other copies intact. Run it with
 - Inventory quantities and supplier-derived demo prices are fixtures, not live stock.
 - Total is the item subtotal in USD; no shipping, tax, discounts or payment processing.
 - SQLite serializes writes; PostgreSQL should be load-tested before multi-instance use.
-- No real payment, Shopify sync, external webhook, login, refunds, logistics or queue.
+- No real payment, external webhook, login, refunds, logistics or queue.
