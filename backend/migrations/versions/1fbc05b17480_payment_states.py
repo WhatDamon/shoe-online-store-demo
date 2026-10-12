@@ -1,5 +1,7 @@
 """Add independent payment, fulfillment, and reservation states."""
 
+import re
+
 import sqlalchemy as sa
 from alembic import op
 
@@ -11,32 +13,51 @@ branch_labels = None
 depends_on = None
 
 _OLD_CHECK_NAMING = {"ck": "ck_%(table_name)s_%(column_0_name)s"}
+# The states each table's pre-existing status check allows, spelled once: upgrade drops
+# exactly this check and downgrade refuses to run while states outside it are stored.
+_LEGACY_STATUSES = {
+    "orders": ("pending_payment", "cancelled"),
+    "payments": ("disabled",),
+    "inventory_reservations": ("active", "released"),
+}
+_CHECK_LITERAL = re.compile(r"'([^']*)'")
 
 
-def _drop_legacy_status_check(table: str, legacy_values: tuple[str, ...]) -> None:
-    connection = op.get_bind()
-    if connection.dialect.name == "sqlite":
-        return
-    expected = {value.casefold() for value in legacy_values}
-    for constraint in sa.inspect(connection).get_check_constraints(table):
-        expression = constraint.get("sqltext", "").casefold()
-        if "status" in expression and all(value in expression for value in expected):
-            op.drop_constraint(constraint["name"], table, type_="check")
+def _drop_legacy_status_check(batch_op, table: str, dialect: str) -> None:
+    """Drop the table's pre-existing status check inside its batch alter.
+
+    SQLite rebuilds the table and omits only the reflected checks that have no name, so a
+    check named by an earlier downgrade would be copied onto the new table next to the
+    widened one and silently keep rejecting the new states.  Dropping it explicitly keeps
+    SQLite and PostgreSQL on the same path; PostgreSQL additionally has to find it.
+    """
+    expected = {value.casefold() for value in _LEGACY_STATUSES[table]}
+    for constraint in sa.inspect(op.get_bind()).get_check_constraints(table):
+        expression = (constraint.get("sqltext") or "").casefold()
+        name = constraint.get("name")
+        if not name or "status" not in expression:
+            continue
+        if {match.casefold() for match in _CHECK_LITERAL.findall(expression)} == expected:
+            batch_op.drop_constraint(name, type_="check")
             return
+    if dialect == "sqlite":
+        # A database that never ran the downgrade carries this check unnamed; the batch
+        # recreate drops it on its own.
+        return
     raise RuntimeError(f"Could not find legacy status check constraint on {table}")
 
 
 def upgrade() -> None:
-    _drop_legacy_status_check("orders", ("pending_payment", "cancelled"))
-    _drop_legacy_status_check("payments", ("disabled",))
-    _drop_legacy_status_check("inventory_reservations", ("active", "released"))
+    dialect = op.get_bind().dialect.name
 
     with op.batch_alter_table("orders") as batch_op:
+        _drop_legacy_status_check(batch_op, "orders", dialect)
         batch_op.create_check_constraint("ck_orders_order_status", sql_in("status", ORDER_STATUSES))
         batch_op.add_column(sa.Column("paid_at", sa.DateTime(timezone=True), nullable=True))
         batch_op.add_column(sa.Column("refunded_at", sa.DateTime(timezone=True), nullable=True))
 
     with op.batch_alter_table("payments") as batch_op:
+        _drop_legacy_status_check(batch_op, "payments", dialect)
         batch_op.create_check_constraint(
             "ck_payments_payment_status", sql_in("status", PAYMENT_STATUSES)
         )
@@ -56,6 +77,7 @@ def upgrade() -> None:
     )
 
     with op.batch_alter_table("inventory_reservations") as batch_op:
+        _drop_legacy_status_check(batch_op, "inventory_reservations", dialect)
         batch_op.create_check_constraint(
             "ck_inventory_reservations_reservation_status",
             sql_in("status", RESERVATION_STATUSES),
@@ -73,26 +95,13 @@ def upgrade() -> None:
 def downgrade() -> None:
     connection = op.get_bind()
     checks = (
-        (
-            "orders",
-            sql_in(
-                "status",
-                tuple(s for s in ORDER_STATUSES if s not in ("pending_payment", "cancelled")),
-            ),
-        ),
-        (
-            "payments",
-            sql_in("status", tuple(s for s in PAYMENT_STATUSES if s != "disabled")),
-        ),
-        (
-            "inventory_reservations",
-            sql_in(
-                "status",
-                tuple(s for s in RESERVATION_STATUSES if s != "active" and s != "released"),
-            ),
-        ),
+        ("orders", ORDER_STATUSES),
+        ("payments", PAYMENT_STATUSES),
+        ("inventory_reservations", RESERVATION_STATUSES),
     )
-    for table, condition in checks:
+    for table, statuses in checks:
+        added = tuple(status for status in statuses if status not in _LEGACY_STATUSES[table])
+        condition = sql_in("status", added)
         if connection.scalar(sa.text(f"SELECT 1 FROM {table} WHERE {condition} LIMIT 1")):
             raise RuntimeError(f"Cannot downgrade payment states while {table} has new state rows")
 

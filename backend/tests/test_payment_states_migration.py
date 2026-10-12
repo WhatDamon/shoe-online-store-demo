@@ -6,6 +6,13 @@ from alembic.config import Config
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import IntegrityError
 
+from tests.postgres_support import migration_config
+
+
+def _run_migration(engine, operation, revision):
+    with engine.connect() as connection:
+        operation(migration_config(connection), revision)
+
 
 def _insert_order(connection, status: str) -> str:
     cart_id = str(uuid4())
@@ -99,6 +106,34 @@ def test_downgrade_refuses_new_state_rows_without_deleting_them(commerce_engine)
         assert (
             connection.scalar(text("SELECT status FROM orders WHERE id = :id"), {"id": order_id})
             == "paid"
+        )
+
+
+def test_upgrade_after_downgrade_drops_the_named_legacy_status_checks(commerce_engine):
+    # downgrade recreates the old status checks *with names*; the next upgrade runs batch
+    # recreation on SQLite, which copies reflected named constraints, so those checks would
+    # survive next to the new ones and keep rejecting the new states.
+    _run_migration(commerce_engine, command.downgrade, "-1")
+    _run_migration(commerce_engine, command.upgrade, "head")
+
+    with commerce_engine.begin() as connection:
+        assert _insert_order(connection, "paid")
+        order_id = _insert_order(connection, "pending_payment")
+        connection.execute(
+            text(
+                "INSERT INTO payments (id, order_id, provider, status) "
+                "VALUES (:id, :order_id, 'mock', 'succeeded')"
+            ),
+            {"id": str(uuid4()), "order_id": order_id},
+        )
+        variant_id = connection.scalar(text("SELECT id FROM product_variants LIMIT 1"))
+        connection.execute(
+            text(
+                "INSERT INTO inventory_reservations "
+                "(id, order_id, variant_id, quantity, status) "
+                "VALUES (:id, :order_id, :variant_id, 1, 'consumed')"
+            ),
+            {"id": str(uuid4()), "order_id": order_id, "variant_id": variant_id},
         )
 
 
