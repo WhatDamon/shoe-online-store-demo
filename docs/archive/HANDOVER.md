@@ -1,3 +1,9 @@
+> ⚠️ **已归档（2026-10-12）。** 本文描述的分支与路径已不存在：本地没有
+> `sql-certificate-and-AI-stock` 分支，文中的 `F:\shoe-online-store-demo` 是 Windows 盘符。
+> 本文要求保留的未跟踪教学文档 `docs/从最小后端到交易闭环-图解教学-2026-09-30.md`
+> 经核验**已不存在**。当前有效状态请看 `AGENTS.md`、`docs/agents/`、`docs/implementation-report.md`；
+> **不要按本文的「当前状态」章节行动。**
+
 # 新 Agent 工作交接 — Evoloop
 
 > **提交与合并授权更新：2026-10-05。** 用户已明确要求主动发起合并和提交；下方检查点的“不提交、不 push”仅描述此前状态。本次提交仅包含已验收的 14 个文件，保留用户 `.gitignore` 与未跟踪教学文档。远端已核实存在上游 `WhatDamon/shoe-online-store-demo` 草稿 PR #14（`beifeng08:sql-certificate-and-AI-stock` → `main`）；提交前本地还有 26 个历史提交未推送。远端更新范围与关联自动部署副作用需明确后再推进，不强推、不部署、不操作业务数据库。局部测试通过不等于全仓阶段 C 或生产验收完成。
