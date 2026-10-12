@@ -24,6 +24,10 @@ const SRC = join(process.cwd(), 'src')
  * `#` 锚点、`mailto:` / `tel:`、绝对 URL、`//host` 前缀天然不以 `/` + 小写字母开头，不算命中；
  * `/#collections` 这类「根路径带锚点」的站内路径沿用同一口径也不命中（词法上无法与纯锚点区分）。
  *
+ * JSX 属性的初始化表达式会被下探（`onClick={() => router.push('/shop')}` 属命中）：只判定 `href` / `action`
+ * 会漏掉写在 JSX 内联回调里的命令式跳转。已整体判定的 `href` / `action` 初始化表达式不再重复下探，
+ * 避免同一字面量被报两次。
+ *
  * 已知检测面之外（与简报原正则相同，故不扩大守卫的假承诺）：经变量间接传递的字面量
  * （`const href = '/shop'` 后 `href={href}`）不在此处判定。
  */
@@ -89,8 +93,17 @@ function rawPaths(fileName: string, source: string): Finding[] {
         node.initializer !== undefined &&
         tagName !== LOCALIZED_ELEMENT
       ) {
+        // 属性值整体交给 collect（它会走完整棵初始化表达式）。已判定的这棵
+        // 子树不再下探：collect 对子树的记录与 visit 对导航调用的记录会给同一
+        // 字面量各报一次（`href={router.push('/shop')}` 型）。属性的另一个子
+        // 节点是标识符 name，不含路径。
         collect(node.initializer)
+        return
       }
+      // 其余属性（含 `onClick={() => router.push('/shop')}`、
+      // `onSubmit={() => redirect('/x')}` 这类 JSX 内联导航）仍要下探，否则
+      // 内联跳转完全逃出检测面。
+      node.forEachChild(visit)
       return
     }
     if (ts.isCallExpression(node) && isNavigationCall(node)) {
@@ -133,6 +146,17 @@ describe('站内路径已收口', () => {
     expect(probe("redirect('/shop')")).toEqual([RULE_RAW_PATH])
     // 同一文件里多处命中都要报，不能只报第一处
     expect(probe('<a href="/a">1</a><a href="/b">2</a>')).toEqual([RULE_RAW_PATH, RULE_RAW_PATH])
+    // JSX 内联导航：属性初始化表达式必须继续下探，否则 router.push / redirect
+    // 写在 JSX 回调里就完全逃出检测面
+    expect(probe('<button onClick={() => router.push("/shop")}>x</button>')).toEqual([
+      RULE_RAW_PATH,
+    ])
+    expect(probe('<form onSubmit={() => redirect("/shop")}>')).toEqual([RULE_RAW_PATH])
+    // 同一处字面量不得因「属性判定 + 内联导航判定」两条路径被报两次
+    expect(probe('<a href="/shop" onClick={() => router.push("/shop")}>x</a>')).toEqual([
+      RULE_RAW_PATH,
+      RULE_RAW_PATH,
+    ])
   })
 
   it('放行 LocaleLink 属性与 localePath 包裹，以及站外链接与纯锚点', () => {

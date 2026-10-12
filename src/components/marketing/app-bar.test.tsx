@@ -79,6 +79,26 @@ describe('AppBar', () => {
     expect(details).not.toHaveAttribute('open')
   })
 
+  it('submits both search forms to the localized shop path', () => {
+    const { container } = render(
+      <WishlistProvider>
+        <AppBar />
+      </WishlistProvider>,
+    )
+
+    // 两处搜索表单的原生 GET 目标是 localePath(locale, '/shop')（变量），AST 守卫
+    // 看不见它；原生表单不经 Router，前缀必须在渲染时补上，故在此钉住渲染值。
+    // 桌面内联框与 <lg 的 details 卡在 jsdom 都在可及树内（无 UA 隐藏），
+    // 故按 search 地标逐个取其中的 form。
+    const searches = screen.getAllByRole('search', { name: 'Search products' })
+    expect(searches).toHaveLength(2)
+    for (const search of searches) {
+      const form = search.tagName === 'FORM' ? search : search.querySelector('form')
+      expect(form).toHaveAttribute('action', '/en/shop')
+    }
+    expect(container.querySelectorAll('form')).toHaveLength(2)
+  })
+
   it('shows an updated wishlist count when an item is added', async () => {
     const user = userEvent.setup()
     render(
