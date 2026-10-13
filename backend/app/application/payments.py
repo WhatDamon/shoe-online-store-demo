@@ -12,7 +12,10 @@ stays a sale to fulfil. The invariant is that ``orders.status='paid'`` means the
 captured -- ``payments.status`` is one of ``succeeded``, ``refund_pending`` or ``refunded``
 -- and that every reservation of that order is ``consumed``. ``REFUNDABLE_PAYMENT_STATUSES``
 spells that set once, and every order view reports the money axis as ``payment_status``, so
-no client has to infer it from the fulfilment axis.
+no client has to infer it from the fulfilment axis. Which of the two refund states is
+written comes from Stripe's own answer: only a Refund reported as ``succeeded`` completes
+the refund, and every other status keeps the debt at ``refund_pending`` for the
+compensation pass to finish.
 
 All four ``payments/session`` codes are machine-readable HTTP 200 outcomes rather than
 errors: ``payment_disabled`` (Stripe is off), ``payment_ready``, ``order_not_payable`` and
@@ -83,6 +86,11 @@ REFUNDABLE_PAYMENT_STATUSES: tuple[str, ...] = ("succeeded", "refund_pending", "
 REFUND_FAILED_EVENT = "refund_failed"
 REFUND_SUCCEEDED_EVENT = "refund_succeeded"
 
+# The only refund status that has moved the money. Every other value Stripe can report
+# (``pending``, ``requires_action``, ``failed``, ``canceled``) means the money is still the
+# customer's, so the debt stays at ``refund_pending`` and stays a compensation candidate.
+REFUND_SETTLED_STATUS = "succeeded"
+
 
 def _log_event(level: int, event: str, **fields: str | int) -> None:
     try:
@@ -110,6 +118,19 @@ class CheckoutLineItem:
     name: str
     unit_amount: int
     quantity: int
+
+
+@dataclass(frozen=True)
+class RefundResult:
+    """The two fields of a Stripe Refund this store acts on.
+
+    ``status`` is Stripe's own lifecycle value (``pending``, ``requires_action``,
+    ``succeeded``, ``failed`` or ``canceled``) and it is what decides whether the money has
+    actually moved; the id is the reference a reconciliation reads back.
+    """
+
+    id: str
+    status: str
 
 
 @dataclass(frozen=True)
@@ -146,7 +167,7 @@ class StripeGateway(Protocol):
 
     def retrieve_checkout_session(self, session_id: str) -> CheckoutSession | None: ...
 
-    def refund(self, *, payment_intent: str, idempotency_key: str) -> str: ...
+    def refund(self, *, payment_intent: str, idempotency_key: str) -> RefundResult: ...
 
 
 def default_gateway() -> StripeGateway:
@@ -546,13 +567,34 @@ def _record_refund_success(
     audit(db, order.id, "refund_succeeded", status="refunded", refund_id=refund_reference)
 
 
-def _record_refund_failure(db: Session, order: Order, payment: Payment, *, reason: str) -> None:
-    """Keep the money flagged as owed and count the attempt, without any payment detail."""
+def _record_refund_failure(
+    db: Session,
+    order: Order,
+    payment: Payment,
+    *,
+    reason: str,
+    refund: RefundResult | None = None,
+) -> None:
+    """Keep the money flagged as owed and count the attempt, without any payment detail.
+
+    ``refund`` is the request Stripe did not settle: the audit carries its id and status,
+    which are identifiers, so a reconciliation can read the later status back.
+    """
     payment.status = "refund_pending"
     db.add(PaymentEvent(payment_id=payment.id, event=REFUND_FAILED_EVENT))
     db.flush()
     attempts = refund_attempts(db, payment.id)
-    audit(db, order.id, "refund_failed", status="refund_pending", reason=reason, attempts=attempts)
+    details: dict[str, object] = {
+        "status": "refund_pending",
+        "reason": reason,
+        "attempts": attempts,
+    }
+    if refund is not None:
+        # The exact Stripe refund that is still in flight, so a reconciliation can read its
+        # later status back instead of this store opening a second refund for the same debt.
+        details["refund_id"] = refund.id
+        details["refund_status"] = refund.status
+    audit(db, order.id, "refund_failed", **details)
     _log_event(logging.ERROR, "refund_failed", order_id=order.id, reason=reason, attempts=attempts)
 
 
@@ -569,14 +611,21 @@ def _attempt_refund(db: Session, order: Order, payment: Payment, gateway: Stripe
         _record_refund_failure(db, order, payment, reason="missing_payment_intent")
         return "refund_pending"
     try:
-        refund_reference = gateway.refund(
+        refund = gateway.refund(
             payment_intent=payment.payment_intent,
             idempotency_key=refund_idempotency_key(order.id),
         )
     except StripeGatewayError:
         _record_refund_failure(db, order, payment, reason="gateway_error")
         return "refund_pending"
-    _record_refund_success(db, order, payment, refund_reference)
+    if refund.status != REFUND_SETTLED_STATUS:
+        # Creating a Refund is a request, not a settlement. Writing ``refunded`` here would
+        # claim money the customer has not received, move the order off ``paid`` while it is
+        # still a sale to fulfil, and -- worst of all -- drop the debt off the rows the
+        # compensation pass selects, so nothing would ever finish it.
+        _record_refund_failure(db, order, payment, reason="refund_not_settled", refund=refund)
+        return "refund_pending"
+    _record_refund_success(db, order, payment, refund.id)
     return "refunded"
 
 

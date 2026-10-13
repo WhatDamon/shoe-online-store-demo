@@ -1,9 +1,10 @@
 """Refunds: captured money leaves through one idempotent path, or stays owed.
 
 The refund is the counterpart of the release guard, and it is the only path that moves a
-``succeeded`` payment to ``refunded``. One attempt either moves both axes together
-(``payments.status='refunded'`` and ``orders.status='refunded'``) or leaves the money at
-``refund_pending`` with the attempt recorded; stock never goes back on sale either way.
+``succeeded`` payment to ``refunded`` -- and only when Stripe itself reports the Refund as
+``succeeded``. One attempt either moves both axes together (``payments.status='refunded'``
+and ``orders.status='refunded'``) or leaves the money at ``refund_pending`` with the attempt
+recorded; stock never goes back on sale either way.
 Every attempt reaches Stripe through the same deterministic idempotency key, so re-running
 the request or the compensation command cannot refund twice.
 
@@ -280,6 +281,52 @@ def test_refund_is_idempotent_on_repeat_delivery(commerce, paid_order, stripe_ch
     assert event_names(engine, paid_order["id"]).count("refund_succeeded") == 1
     assert audit_actions(engine, paid_order["id"]).count("refund_succeeded") == 1
     assert order_state(engine, paid_order["id"])["refunded_at"] == refunded_at
+
+
+@pytest.mark.parametrize("refund_status", ["pending", "failed"])
+def test_a_refund_stripe_has_not_completed_leaves_the_money_owed(
+    commerce, variant, paid_order, stripe_checkout, refund_status
+):
+    """A Refund object is a request, not a settlement: only ``succeeded`` moves the money.
+
+    ``pending``, ``requires_action``, ``failed`` and ``canceled`` all mean the money is
+    still the customer's, so writing ``refunded`` here would both claim a refund nobody
+    received and drop the debt off the compensation candidates.
+    """
+    client, engine = commerce
+    stripe_checkout.refund_status = refund_status
+
+    response = refund(client, paid_order["id"])
+
+    assert response.status_code == 409
+    assert response.json() == {"code": "refund_failed", "detail": REFUND_FAILED}
+    money = money_state(engine, paid_order["id"])
+    assert (money["status"], money["refunded_at"]) == ("refund_pending", None)
+    # The order is untouched: it stays a sale to fulfil while the money is owed back.
+    state = order_state(engine, paid_order["id"])
+    assert (state["status"], state["refunded_at"]) == ("paid", None)
+    assert stock_levels(engine, variant["id"]) == (SEEDED_AVAILABLE - 1, 0)
+    assert reservation_statuses(engine, paid_order["id"]) == ["consumed"]
+    assert event_names(engine, paid_order["id"]).count("refund_succeeded") == 0
+    # The reference and the status Stripe reported are recorded, so a reconciliation can
+    # read the later status back instead of opening a second refund.
+    details = audit_details(engine, paid_order["id"], "refund_failed")
+    assert [(d["reason"], d["refund_id"], d["refund_status"]) for d in details] == [
+        ("refund_not_settled", "re_test_fake", refund_status)
+    ]
+    assert attempts_of(engine, paid_order["id"]) == 1
+
+    # Still a compensation candidate: when Stripe settles that same refund, the pass picks
+    # the row up and is the only thing that finally writes ``refunded``.
+    stripe_checkout.refund_status = "succeeded"
+    assert run_compensation_pass(engine, stripe_checkout) == 1
+
+    assert money_state(engine, paid_order["id"])["status"] == "refunded"
+    assert order_state(engine, paid_order["id"])["status"] == "refunded"
+    assert [call["idempotency_key"] for call in stripe_checkout.refunds] == [
+        f"refund:{paid_order['id']}",
+        f"refund:{paid_order['id']}",
+    ]
 
 
 def test_refund_gateway_failure_keeps_the_money_pending_as_a_business_error(

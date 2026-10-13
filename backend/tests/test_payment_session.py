@@ -5,6 +5,8 @@ assertion below compares the whole response body. Every outbound call goes to th
 gateway defined in ``conftest.py``: no test in this file performs network access.
 """
 
+import json
+import logging
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
@@ -16,7 +18,12 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.application import payments
-from app.application.payments import MIN_CHECKOUT_WINDOW, checkout_expires_at
+from app.application.payments import (
+    MIN_CHECKOUT_WINDOW,
+    CheckoutLineItem,
+    StripeGatewayError,
+    checkout_expires_at,
+)
 from app.config import Settings, settings
 from app.domain.models import Inventory, Order, OrderItem, Payment, PaymentEvent, Reservation
 from app.infrastructure.stripe_gateway import SdkStripeGateway
@@ -257,6 +264,7 @@ def test_the_default_reservation_window_can_be_paid_end_to_end(
             "payment_intent": "pi_test_default_window",
             "amount_total": total_minor,
             "currency": "usd",
+            "payment_status": "paid",
         },
     )
 
@@ -381,6 +389,94 @@ def test_sdk_gateway_reads_key_and_timeout_from_settings(monkeypatch):
     assert stripe.api_key == "sk_test_gateway"
     assert stripe.default_http_client is not None
     assert stripe.default_http_client._timeout == 7
+
+
+class CannedErrorHttpClient:
+    """An HTTP client that answers one request with a provider error and no network.
+
+    Duck-typed on the two members the SDK reads off ``stripe.default_http_client``:
+    ``name`` for the user agent and ``request_with_retries`` for the call itself. It keeps
+    the URL and the encoded body, so a test can read back what the SDK would have sent.
+    """
+
+    name = "canned"
+
+    def __init__(self, body: str) -> None:
+        self.body = body
+        self.urls: list[str] = []
+        self.posts: list[str] = []
+
+    def request_with_retries(
+        self,
+        method: str,
+        url: str,
+        headers: object,
+        post_data: str = "",
+        max_network_retries: int | None = None,
+        *,
+        _usage: object = None,
+    ) -> tuple[str, int, dict[str, str]]:
+        self.urls.append(url)
+        self.posts.append(post_data)
+        return self.body, 400, {}
+
+
+def test_the_gateway_asks_stripe_for_card_only_payment_methods(monkeypatch):
+    """Only methods that settle at completion may be offered.
+
+    Leaving the list out accepts whatever the Stripe account has enabled, including methods
+    that report ``unpaid`` at ``checkout.session.completed``. The request body is read back
+    from the wire shape the SDK builds, not from a mocked SDK call.
+    """
+    client = CannedErrorHttpClient('{"error": {"type": "api_error"}}')
+    monkeypatch.setattr(settings, "stripe_secret_key", "sk_test_gateway")
+    gateway = SdkStripeGateway()
+    monkeypatch.setattr(stripe, "default_http_client", client)
+
+    with pytest.raises(StripeGatewayError):
+        gateway.create_checkout_session(
+            order_id=str(uuid4()),
+            currency="USD",
+            line_items=[CheckoutLineItem(name="Runner", unit_amount=12900, quantity=1)],
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+            success_url="https://shop.test/orders/done",
+            cancel_url="https://shop.test/orders/cancelled",
+            idempotency_key="checkout-session:card-only",
+        )
+
+    assert client.urls == ["https://api.stripe.com/v1/checkout/sessions"]
+    # The name the API version this SDK targets accepts: ``allowed_payment_method_types``
+    # filters the eligible set down to cards.
+    assert "allowed_payment_method_types[0]=card" in client.posts[0]
+
+
+def test_the_sdk_logger_never_writes_request_details_into_the_application_log(monkeypatch, caplog):
+    """The SDK logs request URLs and response bodies through its own logger.
+
+    A retrieved session id appears in the request URL and the provider's own error text in
+    the response body, so leaving that logger at its default level would put both into the
+    application log -- exactly the detail the rest of the backend is built to keep out.
+    """
+    session_id = "cs_test_session_reference"
+    vendor_error = f"No such checkout session: {session_id}"
+    client = CannedErrorHttpClient(
+        json.dumps({"error": {"message": vendor_error, "type": "invalid_request_error"}})
+    )
+    monkeypatch.setattr(settings, "stripe_secret_key", "sk_test_gateway")
+    gateway = SdkStripeGateway()
+    monkeypatch.setattr(stripe, "default_http_client", client)
+
+    # The root logger at DEBUG: the SDK's own records would be captured here at every level
+    # it ever logs at, so an empty capture is the statement that it created none.
+    with caplog.at_level(logging.DEBUG):
+        assert gateway.retrieve_checkout_session(session_id) is None
+
+    # The call really left through the SDK: silencing the logger did not silence the request.
+    assert client.urls == [f"https://api.stripe.com/v1/checkout/sessions/{session_id}"]
+    assert session_id not in caplog.text
+    assert vendor_error not in caplog.text
+    assert "Request to Stripe api" not in caplog.text
+    assert "API response body" not in caplog.text
 
 
 def test_checkout_expiry_clamps_both_ends():

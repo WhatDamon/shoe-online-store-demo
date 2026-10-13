@@ -12,6 +12,10 @@ this module acts on. Two rules shape everything below:
 * **A failed delivery is never reported as success.** Money this store could not record has
   to be redelivered by Stripe, so this is the only module whose failure is passed through as
   a non-2xx instead of being folded into the proxy's ``backend_unavailable``.
+* **A completed session is not settled money.** The projection carries the session's
+  ``payment_status`` and only ``paid`` confirms the order: an asynchronous method completes
+  the session before the money moves, so an ``unpaid`` completion is recorded, logged and
+  acknowledged, and Stripe's own later outcome event decides what happens.
 
 The business action runs inside a savepoint and the event's own status is written outside
 it, so a business action that stopped halfway leaves no writes behind while the failed
@@ -38,6 +42,11 @@ from app.schemas.commerce import StripeEventProjection
 PROVIDER = "stripe"
 COMPLETED_EVENT = "checkout.session.completed"
 EXPIRED_EVENT = "checkout.session.expired"
+
+# The one ``payment_status`` that means the money was captured. ``unpaid`` is what an
+# asynchronous method (a bank debit, for instance) reports when the customer finished the
+# session before the money moved, and ``no_payment_required`` means nothing was owed.
+PAID_PAYMENT_STATUS = "paid"
 
 # An event id is finished once it reaches one of these. ``received`` and ``failed`` are the
 # opposite: the first says an earlier delivery never got to write its decision, the second
@@ -145,6 +154,23 @@ def _decide(db: Session, projection: StripeEventProjection) -> tuple[str, str | 
 
 
 def _confirm(db: Session, projection: StripeEventProjection) -> tuple[str, str | None]:
+    if projection.payment_status != PAID_PAYMENT_STATUS:
+        # ``completed`` says the customer finished, not that money arrived. Settling on it
+        # would consume the hold and report a sale nobody has paid for, and the later
+        # ``checkout.session.async_payment_succeeded``/``...failed`` would find an order it
+        # can no longer correct. The event is recorded for audit and answered with a 2xx:
+        # a 5xx would make Stripe redeliver a delivery this store handled correctly, and
+        # ``failed`` would claim a failure that never happened. The log line is what tells an
+        # operator a checkout finished without the money; it carries no state and no detail
+        # beyond the event's own identifiers.
+        _log_event(
+            logging.WARNING,
+            "webhook_checkout_unpaid",
+            event_id=projection.id,
+            type=projection.type,
+            payment_status=projection.payment_status,
+        )
+        return "ignored", None
     named = _named_payment(db, projection)
     if named is None:
         # A session this store never opened, or a replay from another environment. An

@@ -17,6 +17,7 @@ from app.application import payments
 from app.application.payments import (
     CheckoutLineItem,
     CheckoutSession,
+    RefundResult,
     StripeGatewayError,
     confirm_payment,
 )
@@ -159,7 +160,9 @@ class FakeStripeGateway:
     """Recording StripeGateway double: fixed results, no network access.
 
     Tests drive Stripe behaviour through this fake, so the whole payment flow is provable
-    offline. ``missing`` makes a retrieved session look gone.
+    offline. ``missing`` makes a retrieved session look gone, and ``refund_status`` is the
+    lifecycle state the next refund reports: Stripe settles an asynchronous refund later, so
+    a test can move it from ``pending`` to ``succeeded`` between attempts.
     """
 
     def __init__(
@@ -168,10 +171,12 @@ class FakeStripeGateway:
         session_id: str = "cs_test_fake",
         url: str | None = "https://checkout.stripe.com/c/pay/cs_test_fake",
         status: str = "open",
+        refund_status: str = "succeeded",
     ) -> None:
         self.session_id = session_id
         self.url = url
         self.status = status
+        self.refund_status = refund_status
         self.missing = False
         self.created: list[dict] = []
         self.retrieved: list[str] = []
@@ -207,9 +212,9 @@ class FakeStripeGateway:
             return None
         return CheckoutSession(id=session_id, url=self.url, status=self.status)
 
-    def refund(self, *, payment_intent: str, idempotency_key: str) -> str:
+    def refund(self, *, payment_intent: str, idempotency_key: str) -> RefundResult:
         self.refunds.append(dict(payment_intent=payment_intent, idempotency_key=idempotency_key))
-        return "re_test_fake"
+        return RefundResult(id="re_test_fake", status=self.refund_status)
 
 
 class FailingStripeGateway:
@@ -226,7 +231,7 @@ class FailingStripeGateway:
         self.calls.append("retrieve_checkout_session")
         raise StripeGatewayError("simulated Stripe failure")
 
-    def refund(self, *, payment_intent: str, idempotency_key: str) -> str:
+    def refund(self, *, payment_intent: str, idempotency_key: str) -> RefundResult:
         self.calls.append("refund")
         raise StripeGatewayError("simulated Stripe failure")
 

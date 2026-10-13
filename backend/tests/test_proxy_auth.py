@@ -23,7 +23,11 @@ from app.domain.models import Order, Payment, WebhookEvent
 
 PROXY_SECRET = "abcdefghijklmnopqrstuvwxyz123456"
 FORBIDDEN = {"code": "forbidden", "detail": "Request not allowed"}
-FORGED_EVENT = {"id": "evt_forged", "type": "checkout.session.completed"}
+FORGED_EVENT = {
+    "id": "evt_forged",
+    "type": "checkout.session.completed",
+    "payment_status": "paid",
+}
 
 
 def test_production_settings_require_proxy_secret():

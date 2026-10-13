@@ -4,7 +4,9 @@ The Next public route verifies Stripe's signature and forwards a *projection* of
 these tests pin what Python does with it:
 
 1. ``checkout.session.completed`` confirms the payment and consumes the reservation exactly
-   once, however many times Stripe delivers the same event id;
+   once, however many times Stripe delivers the same event id -- but only for the session
+   whose ``payment_status`` is ``paid``: an unsettled completion is acknowledged, recorded
+   and logged without touching the order, the hold or the stock;
 2. an event naming no local order or session is acknowledged as ``ignored``, never answered
    with a 5xx, because Stripe retries anything that is not a 2xx;
 3. ``checkout.session.expired`` records the event and releases nothing, so a hold still
@@ -50,6 +52,7 @@ PROJECTION_FIELDS = {
     "payment_intent",
     "amount_total",
     "currency",
+    "payment_status",
 }
 
 
@@ -73,6 +76,12 @@ def order_total_minor(client, order_id):
 
 
 def completed_payload(client, order_id, session_id, event_id, **extra):
+    """One completed session whose money did arrive; ``payment_status`` is overridable.
+
+    ``paid`` is the default because it is the only value Stripe sends once the money is
+    captured, and every other value is a test that deliberately asks for the unsettled
+    case.
+    """
     payload = {
         "id": event_id,
         "type": COMPLETED_EVENT,
@@ -81,6 +90,7 @@ def completed_payload(client, order_id, session_id, event_id, **extra):
         "payment_intent": "pi_test_webhook",
         "amount_total": order_total_minor(client, order_id),
         "currency": "usd",
+        "payment_status": "paid",
     }
     payload.update(extra)
     return payload
@@ -165,6 +175,8 @@ def test_completed_event_confirms_the_payment_and_consumes_the_reservation(
     payload = completed_payload(
         client, payable_order["id"], stripe_checkout.session_id, "evt_completed"
     )
+    # Only the value Stripe sends once the money is captured settles the order.
+    assert payload["payment_status"] == "paid"
 
     response = webhook(client, payload)
 
@@ -194,6 +206,73 @@ def test_completed_event_confirms_the_payment_and_consumes_the_reservation(
     )
     assert recorded["received_at"] is not None and recorded["processed_at"] is not None
     assert recorded["payload"] == payload
+
+
+@pytest.mark.parametrize("payment_status", ["unpaid", "no_payment_required"])
+def test_a_completed_checkout_that_did_not_settle_money_never_marks_the_order_paid(
+    commerce, variant, payable_order, stripe_checkout, caplog, payment_status
+):
+    """``completed`` says the customer finished the session, not that money arrived.
+
+    An asynchronous method (a bank debit, for instance) completes the session while
+    ``payment_status`` is still ``unpaid``, and ``checkout.session.async_payment_succeeded``
+    or ``...failed`` decides the outcome afterwards. Settling here would consume the hold and
+    report a sale nobody has paid for, so the event is acknowledged, recorded and logged.
+    """
+    client, engine = commerce
+    assert session_post(client, payable_order["id"]).json()["code"] == "payment_ready"
+    before = stock_levels(engine, variant["id"])
+    assert before == (SEEDED_AVAILABLE - 1, 1)
+    payload = completed_payload(
+        client,
+        payable_order["id"],
+        stripe_checkout.session_id,
+        f"evt_{payment_status}",
+        payment_status=payment_status,
+    )
+
+    with caplog.at_level("INFO", logger="commerce"):
+        response = webhook(client, payload)
+
+    # A 2xx: a 5xx would make Stripe redeliver an event this store handled correctly, and
+    # ``failed`` would claim the store could not process something it decided not to act on.
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "ignored",
+        "event_id": f"evt_{payment_status}",
+        "order_id": None,
+    }
+    state = order_state(engine, payable_order["id"])
+    assert (state["status"], state["paid_at"]) == ("pending_payment", None)
+    # The reservation deadline is still the sweep's business, and the hold is untouched.
+    assert state["expires_at"] is not None
+    assert reservation_statuses(engine, payable_order["id"]) == ["active"]
+    assert stock_levels(engine, variant["id"]) == before
+    assert money_state(engine, payable_order["id"])["status"] == "requires_payment"
+    assert "payment_confirmed" not in audit_actions(engine, payable_order["id"])
+    recorded = event_state(engine, f"evt_{payment_status}")
+    # Recorded for audit and never marked as a delivered action: ``processed_at`` marks when
+    # the store stopped owing an answer, and this event never had one.
+    assert (recorded["status"], recorded["processed_at"], recorded["attempts"]) == (
+        "ignored",
+        None,
+        0,
+    )
+    assert recorded["payload"] == payload
+    # The operator can see that a checkout finished without the money, and which value said so.
+    hints = [
+        json.loads(record.message)
+        for record in caplog.records
+        if record.name == "commerce.webhooks"
+    ]
+    assert hints == [
+        {
+            "event": "webhook_checkout_unpaid",
+            "event_id": f"evt_{payment_status}",
+            "type": COMPLETED_EVENT,
+            "payment_status": payment_status,
+        }
+    ]
 
 
 def test_a_repeated_delivery_of_one_event_changes_nothing(
@@ -243,6 +322,7 @@ def test_events_naming_nothing_local_are_acknowledged_as_ignored(commerce):
             "payment_intent": "pi_test_unknown",
             "amount_total": 12900,
             "currency": "usd",
+            "payment_status": "paid",
         },
     )
     unknown_order = webhook(
@@ -254,6 +334,7 @@ def test_events_naming_nothing_local_are_acknowledged_as_ignored(commerce):
             "checkout_session_id": "cs_test_never_opened",
             "amount_total": 12900,
             "currency": "usd",
+            "payment_status": "paid",
         },
     )
 
@@ -285,6 +366,9 @@ def test_expired_event_is_recorded_without_releasing_the_hold(
             "order_id": payable_order["id"],
             "checkout_session_id": stripe_checkout.session_id,
             "currency": "usd",
+            # An expired session is usually still unpaid; the type alone is what makes this
+            # an ignore, whatever the money state says.
+            "payment_status": "unpaid",
         },
     )
 
@@ -397,6 +481,9 @@ def test_an_unsupported_event_type_is_recorded_and_ignored(commerce):
             "payment_intent": "pi_test_intent",
             "amount_total": 12900,
             "currency": "usd",
+            # The money state is required on every forwarded event, session or not, and a
+            # succeeded PaymentIntent is a settled one.
+            "payment_status": "paid",
         },
     )
 
@@ -409,19 +496,66 @@ def test_an_unsupported_event_type_is_recorded_and_ignored(commerce):
 @pytest.mark.parametrize(
     "payload",
     [
-        pytest.param({"type": COMPLETED_EVENT}, id="missing-id"),
-        pytest.param({"id": "", "type": COMPLETED_EVENT}, id="empty-id"),
-        pytest.param({"id": "evt_" + "x" * 200, "type": COMPLETED_EVENT}, id="oversized-id"),
-        pytest.param({"id": "evt_boundary", "type": "t" * 81}, id="oversized-type"),
-        pytest.param({"id": "evt_boundary"}, id="missing-type"),
-        pytest.param({"id": "evt_boundary", "type": COMPLETED_EVENT, "order_id": "not-a-uuid"}),
-        pytest.param({"id": "evt_boundary", "type": COMPLETED_EVENT, "currency": "USD"}),
-        pytest.param({"id": "evt_boundary", "type": COMPLETED_EVENT, "currency": "us"}),
-        pytest.param({"id": "evt_boundary", "type": COMPLETED_EVENT, "amount_total": "one"}),
+        pytest.param({"type": COMPLETED_EVENT, "payment_status": "paid"}, id="missing-id"),
+        pytest.param({"id": "", "type": COMPLETED_EVENT, "payment_status": "paid"}, id="empty-id"),
+        pytest.param(
+            {"id": "evt_" + "x" * 200, "type": COMPLETED_EVENT, "payment_status": "paid"},
+            id="oversized-id",
+        ),
+        pytest.param(
+            {"id": "evt_boundary", "type": "t" * 81, "payment_status": "paid"},
+            id="oversized-type",
+        ),
+        pytest.param({"id": "evt_boundary", "payment_status": "paid"}, id="missing-type"),
+        # The money state is part of the contract: the Next route has to forward it, and a
+        # payload that leaves it out would make a completion whose money never arrived look
+        # exactly like one whose money did.
+        pytest.param({"id": "evt_boundary", "type": COMPLETED_EVENT}, id="missing-payment-status"),
         pytest.param(
             {
                 "id": "evt_boundary",
                 "type": COMPLETED_EVENT,
+                "payment_status": "settled",
+            },
+            id="unknown-payment-status",
+        ),
+        pytest.param(
+            {
+                "id": "evt_boundary",
+                "type": COMPLETED_EVENT,
+                "payment_status": "paid",
+                "order_id": "not-a-uuid",
+            }
+        ),
+        pytest.param(
+            {
+                "id": "evt_boundary",
+                "type": COMPLETED_EVENT,
+                "payment_status": "paid",
+                "currency": "USD",
+            }
+        ),
+        pytest.param(
+            {
+                "id": "evt_boundary",
+                "type": COMPLETED_EVENT,
+                "payment_status": "paid",
+                "currency": "us",
+            }
+        ),
+        pytest.param(
+            {
+                "id": "evt_boundary",
+                "type": COMPLETED_EVENT,
+                "payment_status": "paid",
+                "amount_total": "one",
+            }
+        ),
+        pytest.param(
+            {
+                "id": "evt_boundary",
+                "type": COMPLETED_EVENT,
+                "payment_status": "paid",
                 "checkout_session_id": "cs_" + "x" * 200,
             }
         ),
@@ -440,7 +574,12 @@ def test_a_malformed_projection_is_rejected_without_recording_anything(commerce,
 def test_the_webhook_endpoint_requires_the_internal_proxy_credential(commerce, monkeypatch):
     client, engine = commerce
     monkeypatch.setattr(settings, "app_env", "production")
-    payload = {"id": "evt_proxy", "type": COMPLETED_EVENT, "checkout_session_id": "cs_test_absent"}
+    payload = {
+        "id": "evt_proxy",
+        "type": COMPLETED_EVENT,
+        "checkout_session_id": "cs_test_absent",
+        "payment_status": "paid",
+    }
 
     # No credential at all: this test's own client presents one by default, so it sends a
     # request the way a stranger reaching the Python origin does.
@@ -466,7 +605,9 @@ def test_the_webhook_endpoint_is_unavailable_without_a_configured_credential(com
     monkeypatch.setattr(settings, "app_env", "production")
     monkeypatch.setattr(settings, "commerce_proxy_secret", "")
 
-    response = webhook(client, {"id": "evt_proxy", "type": COMPLETED_EVENT})
+    response = webhook(
+        client, {"id": "evt_proxy", "type": COMPLETED_EVENT, "payment_status": "paid"}
+    )
 
     assert response.status_code == 503
     assert row_count(engine, WebhookEvent) == 0
