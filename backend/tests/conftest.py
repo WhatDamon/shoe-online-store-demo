@@ -10,15 +10,19 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
+from app.application import payments
 from app.application.payments import (
     CheckoutLineItem,
     CheckoutSession,
     StripeGatewayError,
+    confirm_payment,
 )
 from app.config import settings
 from app.dependencies import database
+from app.domain.models import Order
 from app.infrastructure.database import make_engine
 from app.main import app
 from app.seed import seed
@@ -111,6 +115,26 @@ def variant(commerce):
     return client.get("/api/v1/catalog/products/dc-1001").json()["variants"][0]
 
 
+def place_order(client, variant, key=None, quantity=1):
+    """Add one line to the cart and create the order a test works on."""
+    client.post("/api/v1/cart/items", json={"variant_id": variant["id"], "quantity": quantity})
+    response = client.post(
+        "/api/v1/checkout/create-order", headers={"Idempotency-Key": key or str(uuid4())}
+    )
+    assert response.status_code == 200
+    return response.json()
+
+
+def session_post(client, order_id, **kwargs):
+    return client.post("/api/v1/payments/session", json={"order_id": order_id}, **kwargs)
+
+
+def update_order(engine, order_id, **values):
+    """Force a column value the HTTP flow cannot reach on its own."""
+    with Session(engine) as db, db.begin():
+        db.execute(update(Order).where(Order.id == order_id).values(**values))
+
+
 class FakeStripeGateway:
     """Recording StripeGateway double: fixed results, no network access.
 
@@ -195,3 +219,53 @@ def fake_gateway() -> FakeStripeGateway:
 @pytest.fixture
 def failing_gateway() -> FailingStripeGateway:
     return FailingStripeGateway()
+
+
+@pytest.fixture
+def payable_order(commerce, variant, monkeypatch):
+    """An order whose reservation outlives Stripe's 30-minute minimum window."""
+    client, _ = commerce
+    monkeypatch.setattr(settings, "reservation_ttl_seconds", 3600)
+    return place_order(client, variant)
+
+
+@pytest.fixture
+def stripe_checkout(monkeypatch, fake_gateway):
+    """Enable Stripe and route the outbound seam to the recording fake gateway."""
+    monkeypatch.setattr(settings, "stripe_enabled", True)
+    monkeypatch.setattr(settings, "stripe_secret_key", "sk_test_payment_boundary")
+    monkeypatch.setattr(payments, "default_gateway", lambda: fake_gateway)
+    return fake_gateway
+
+
+@pytest.fixture
+def paid_order(commerce, payable_order, stripe_checkout):
+    """An order paid through the real path: hosted session first, then its confirmation."""
+    client, engine = commerce
+    assert session_post(client, payable_order["id"]).json()["code"] == "payment_ready"
+    with Session(engine) as db, db.begin():
+        outcome = confirm_payment(
+            db,
+            order_id=payable_order["id"],
+            provider_reference=stripe_checkout.session_id,
+            payment_intent="pi_test_paid",
+        )
+        assert outcome.status == "paid"
+    return payable_order
+
+
+@pytest.fixture
+def refund_pending_order(commerce, payable_order, stripe_checkout):
+    """Money captured after the reservation was released: the refund signal."""
+    client, engine = commerce
+    assert session_post(client, payable_order["id"]).json()["code"] == "payment_ready"
+    assert client.post(f"/api/v1/orders/{payable_order['id']}/cancel").status_code == 200
+    with Session(engine) as db, db.begin():
+        outcome = confirm_payment(
+            db,
+            order_id=payable_order["id"],
+            provider_reference=stripe_checkout.session_id,
+            payment_intent="pi_test_late",
+        )
+        assert outcome.status == "refund_pending"
+    return payable_order

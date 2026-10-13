@@ -1,3 +1,5 @@
+import json
+import logging
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
@@ -14,7 +16,7 @@ from app.application.errors import (
     OrderNotFound,
     VariantUnavailable,
 )
-from app.application.payments import MockPaymentProvider
+from app.application.payments import SETTLED_PAYMENT_STATUSES, MockPaymentProvider
 from app.config import settings
 from app.domain.models import (
     Cart,
@@ -22,6 +24,7 @@ from app.domain.models import (
     Inventory,
     Order,
     OrderItem,
+    Payment,
     Product,
     Reservation,
     Variant,
@@ -41,6 +44,17 @@ __all__ = [
     "owned_order",
     "release_order",
 ]
+
+logger = logging.getLogger("commerce.orders")
+
+
+def _log_event(level: int, event: str, **fields: str | int) -> None:
+    try:
+        logger.log(level, json.dumps(dict(event=event, **fields)))
+    except Exception:
+        # Observability is best-effort: a broken handler/filter must not change
+        # transaction outcomes, nor replace the refusal the caller must see.
+        pass
 
 
 def lock_cart(db: Session, session_id: str) -> Cart:
@@ -204,6 +218,20 @@ def as_utc(value: datetime) -> datetime:
 
 def release_order(db: Session, order: Order, reason: str) -> None:
     """Caller must hold the cart write lock before reading the order."""
+    # Guard before the first write, and on the money row rather than on ``order.status``:
+    # the state this refuses is an order still reading ``pending_payment`` while its payment
+    # already settled, which is exactly the one that would put captured stock back on sale.
+    # Raising rolls the caller's whole transaction back, and both the expiry sweep and the
+    # customer cancellation path come through here. No payment detail goes into the event:
+    # the session reference and the payment intent are not needed to explain a refusal.
+    settled = db.scalar(
+        select(Payment.id).where(
+            Payment.order_id == order.id, Payment.status.in_(SETTLED_PAYMENT_STATUSES)
+        )
+    )
+    if settled is not None:
+        _log_event(logging.ERROR, "inventory_release_refused", order_id=order.id, reason=reason)
+        raise RuntimeError("Inventory release refused for an order with a settled payment")
     if order.status != "pending_payment":
         return
     reservations = db.scalars(

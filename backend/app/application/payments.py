@@ -16,12 +16,19 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.application.audit import audit
 from app.config import settings
-from app.domain.models import Order, OrderItem, Payment, PaymentEvent
+from app.domain.models import (
+    Inventory,
+    Order,
+    OrderItem,
+    Payment,
+    PaymentEvent,
+    Reservation,
+)
 from app.domain.money import (
     MINIMUM_CHARGE_MINOR,
     SUPPORTED_CURRENCIES,
@@ -41,6 +48,11 @@ DISABLED_MESSAGE = "Payments are not available yet."
 READY_MESSAGE = "Complete your payment to confirm this order."
 NOT_PAYABLE_MESSAGE = "This order can no longer be paid. Please start a new order."
 CURRENCY_MESSAGE = "This store cannot charge in this currency."
+
+# Money that has already left the customer. The stock of such an order may never go back on
+# sale, whatever path reaches a release, so the confirmation and the release guard both
+# read this one set instead of spelling the states out twice.
+SETTLED_PAYMENT_STATUSES: tuple[str, ...] = ("succeeded", "refund_pending")
 
 
 @dataclass(frozen=True)
@@ -295,3 +307,161 @@ def create_payment_session(
         deadline=as_utc(order.expires_at) if order.expires_at else None,
         now=datetime.now(UTC),
     )
+
+
+@dataclass(frozen=True)
+class ConfirmOutcome:
+    """Machine-readable result of one completed Checkout Session."""
+
+    status: str  # 'paid' | 'refund_pending' | 'already_paid' | 'ignored'
+    order_id: str
+
+
+def confirm_payment(
+    db: Session, *, order_id: str, provider_reference: str, payment_intent: str | None
+) -> ConfirmOutcome:
+    """Record captured money for an order and consume the reservation it bought.
+
+    Runs in the caller's transaction under the same cart lock that checkout, customer
+    cancellation and the expiry sweep take, and re-reads the order only after acquiring it,
+    so a concurrent release can at worst be observed as an already-committed ``cancelled``
+    order. No branch here can make a released order fulfilable again: money that arrived
+    after the stock was released becomes ``refund_pending``, which is the only signal in
+    the system that this customer is owed money.
+    """
+    # Imported inside the function: commerce re-exports from this module (circular).
+    from app.application.commerce import lock_cart
+
+    order = db.scalar(select(Order).where(Order.id == order_id))
+    if order is None:
+        # A session this store never opened, or a replay from another environment.
+        return ConfirmOutcome(status="ignored", order_id=order_id)
+    lock_cart(db, order.cart_id)
+    # Every branch below is decided on this read, taken inside the lock. The instance was
+    # loaded before the lock, so it is reloaded from the database rather than trusted.
+    db.refresh(order)
+    owner = db.scalar(
+        select(Payment.order_id).where(Payment.provider_reference == provider_reference)
+    )
+    if owner is not None and owner != order_id:
+        # This session's money belongs to another order: confirming it here would both
+        # mislabel someone else's payment and break the unique session reference.
+        return ConfirmOutcome(status="ignored", order_id=order_id)
+    payment = db.scalar(select(Payment).where(Payment.order_id == order_id))
+    if order.status == "paid":
+        # Stripe redelivers, and the money is already recorded: nothing may change.
+        return ConfirmOutcome(status="already_paid", order_id=order_id)
+    if order.status == "cancelled":
+        return _payment_after_release(db, order, payment, provider_reference, payment_intent)
+    if order.status != "pending_payment":
+        # ``refunded`` is terminal, and a refunded order must never be resurrected.
+        return ConfirmOutcome(status="ignored", order_id=order_id)
+    # An order can still be ``pending_payment`` while ``expires_at`` has passed: the sweep
+    # has not won the cart lock yet, so its reservation is still ``active`` and the stock
+    # was never put back on sale. Confirming it is the fulfil side of the documented
+    # ``checkout.session.completed`` vs. release race, and it is the only side that leaves a
+    # consistent state: turning it into a refund would strand a reservation the sweep can no
+    # longer clean up, because the release guard refuses to touch a settled payment.
+    return _consume_and_confirm(db, order, payment, provider_reference, payment_intent)
+
+
+def _record_captured_payment(
+    db: Session,
+    order: Order,
+    payment: Payment | None,
+    provider_reference: str,
+    payment_intent: str | None,
+) -> Payment:
+    """Freeze the reference that actually paid onto the order's single money row."""
+    if payment is None:
+        # Money arrived without a recorded session: record it instead of losing the fact
+        # that it was captured.
+        payment = Payment(order_id=order.id)
+        db.add(payment)
+    payment.provider = "stripe"
+    payment.provider_reference = provider_reference
+    if payment_intent is not None:
+        payment.payment_intent = payment_intent
+    # The amount was frozen when the session was created; only fill a missing one.
+    if payment.amount is None:
+        payment.amount = order.total
+    if payment.currency is None:
+        payment.currency = (order.currency or "").upper()
+    return payment
+
+
+def _consume_and_confirm(
+    db: Session,
+    order: Order,
+    payment: Payment | None,
+    provider_reference: str,
+    payment_intent: str | None,
+) -> ConfirmOutcome:
+    """Turn the active holds into sales, then mark the order paid."""
+    reservations = db.scalars(
+        select(Reservation)
+        .where(Reservation.order_id == order.id, Reservation.status == "active")
+        .order_by(Reservation.variant_id)
+    ).all()
+    lines = db.scalar(
+        select(func.count()).select_from(OrderItem).where(OrderItem.order_id == order.id)
+    )
+    if len(reservations) != lines:
+        # Every line must still be held; a mismatch means the stock cannot be certified as
+        # sold, so the caller's transaction rolls back instead of marking the order paid.
+        raise RuntimeError("Payment confirmation could not consume every reservation")
+    now = datetime.now(UTC)
+    for reservation in reservations:
+        changed = db.execute(
+            update(Inventory)
+            .where(
+                Inventory.variant_id == reservation.variant_id,
+                Inventory.reserved >= reservation.quantity,
+            )
+            # The quantity left ``available`` when the order was created; confirming only
+            # drops the hold, so ``available`` must stay untouched.
+            .values(reserved=Inventory.reserved - reservation.quantity)
+        )
+        if changed.rowcount != 1:  # type: ignore[attr-defined]
+            raise RuntimeError("Payment confirmation could not consume every reservation")
+        reservation.status = "consumed"
+        audit(
+            db,
+            reservation.variant_id,
+            "inventory_consumed",
+            order_id=order.id,
+            quantity=reservation.quantity,
+        )
+    payment = _record_captured_payment(db, order, payment, provider_reference, payment_intent)
+    payment.status = "succeeded"
+    payment.succeeded_at = now
+    db.flush()
+    db.add(PaymentEvent(payment_id=payment.id, event="payment_succeeded"))
+    order.status = "paid"
+    order.paid_at = now
+    # A paid order has no reservation deadline left to sweep.
+    order.expires_at = None
+    db.flush()
+    audit(db, order.id, "payment_confirmed", status="paid", total=str(order.total))
+    return ConfirmOutcome(status="paid", order_id=order.id)
+
+
+def _payment_after_release(
+    db: Session,
+    order: Order,
+    payment: Payment | None,
+    provider_reference: str,
+    payment_intent: str | None,
+) -> ConfirmOutcome:
+    """Money captured for an order whose reservation was already released.
+
+    The order stays ``cancelled``: it must never become fulfilable again, and the money is
+    marked as owed back, which is the signal the refund path and the compensation command
+    read.
+    """
+    payment = _record_captured_payment(db, order, payment, provider_reference, payment_intent)
+    payment.status = "refund_pending"
+    db.flush()
+    db.add(PaymentEvent(payment_id=payment.id, event="payment_after_release"))
+    audit(db, order.id, "payment_after_release", status=order.status)
+    return ConfirmOutcome(status="refund_pending", order_id=order.id)

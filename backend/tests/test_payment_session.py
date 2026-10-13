@@ -19,27 +19,12 @@ from app.application.payments import checkout_expires_at
 from app.config import settings
 from app.domain.models import Order, OrderItem, Payment, PaymentEvent
 from app.infrastructure.stripe_gateway import SdkStripeGateway
+from tests.conftest import place_order, session_post, update_order
 
 DISABLED_MESSAGE = "Payments are not available yet."
 READY_MESSAGE = "Complete your payment to confirm this order."
 NOT_PAYABLE_MESSAGE = "This order can no longer be paid. Please start a new order."
 CURRENCY_MESSAGE = "This store cannot charge in this currency."
-
-
-def place_order(client, variant, key="payments-session", quantity=1):
-    client.post("/api/v1/cart/items", json={"variant_id": variant["id"], "quantity": quantity})
-    response = client.post("/api/v1/checkout/create-order", headers={"Idempotency-Key": key})
-    assert response.status_code == 200
-    return response.json()
-
-
-def session_post(client, order_id, **kwargs):
-    return client.post("/api/v1/payments/session", json={"order_id": order_id}, **kwargs)
-
-
-def update_order(engine, order_id, **values):
-    with Session(engine) as db, db.begin():
-        db.execute(update(Order).where(Order.id == order_id).values(**values))
 
 
 def update_items(engine, order_id, **values):
@@ -62,23 +47,6 @@ def assert_no_payment_rows(engine, order_id):
 def assert_no_gateway_calls(fake_gateway):
     assert fake_gateway.created == []
     assert fake_gateway.retrieved == []
-
-
-@pytest.fixture
-def payable_order(commerce, variant, monkeypatch):
-    """An order whose reservation outlives Stripe's 30-minute minimum window."""
-    client, _ = commerce
-    monkeypatch.setattr(settings, "reservation_ttl_seconds", 3600)
-    return place_order(client, variant)
-
-
-@pytest.fixture
-def stripe_checkout(monkeypatch, fake_gateway):
-    """Enable Stripe and route the outbound seam to the recording fake gateway."""
-    monkeypatch.setattr(settings, "stripe_enabled", True)
-    monkeypatch.setattr(settings, "stripe_secret_key", "sk_test_payment_session")
-    monkeypatch.setattr(payments, "default_gateway", lambda: fake_gateway)
-    return fake_gateway
 
 
 def test_disabled_provider_keeps_machine_readable_disabled_result(commerce, variant):
