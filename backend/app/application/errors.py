@@ -64,3 +64,31 @@ class OwnershipDenied(CommerceError):
 class CartItemNotFound(OwnershipDenied):
     def __init__(self) -> None:
         super().__init__("item")
+
+
+class PaymentNotRefundable(CommerceError):
+    """No captured money is refundable here: nothing was charged, or it is already back.
+
+    A business refusal, not a failure: the caller must not retry the same request.
+    """
+
+    def __init__(self) -> None:
+        super().__init__("payment_not_refundable", 409, "This payment cannot be refunded")
+
+
+class RefundFailed(CommerceError):
+    """Stripe did not complete the refund. The money stays marked as owed back.
+
+    Deliberately not a 5xx: the customer must read a stable business code instead of the
+    Next proxy's ``backend_unavailable``, and the compensation pass keeps the retry.
+    """
+
+    def __init__(self) -> None:
+        super().__init__("refund_failed", 409, "The refund could not be completed")
+
+
+class OrderNotCancellable(CommerceError):
+    """A settled order cannot be cancelled; its money leaves through the refund path."""
+
+    def __init__(self) -> None:
+        super().__init__("order_not_cancellable", 409, "This order can no longer be cancelled")

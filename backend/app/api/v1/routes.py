@@ -20,7 +20,7 @@ from app.application.errors import (
     ProductNotFound,
     QuantityLimitExceeded,
 )
-from app.application.payments import create_payment_session
+from app.application.payments import create_payment_session, refund_order
 from app.dependencies import anonymous_session, database, internal_proxy
 from app.domain.models import CartItem, Inventory, Media, Product, Variant
 from app.schemas.commerce import AddItem, PaymentRequest, Quantity
@@ -181,6 +181,12 @@ def get_order(order_id: str, db: DB, sid: SessionID) -> dict:
 @router.post("/orders/{order_id}/cancel", response_model=OrderResponse)
 def cancel(order_id: str, db: DB, sid: SessionID) -> dict:
     return cancel_order(db, sid, order_id)
+
+
+@router.post("/orders/{order_id}/refund", response_model=OrderResponse)
+def refund(order_id: str, db: DB, sid: SessionID) -> dict:
+    # Same ownership contract as cancel: another session's order is a plain 404.
+    return refund_order(db, sid, order_id)
 
 
 @router.post("/payments/session", response_model=PaymentResponse)

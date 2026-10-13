@@ -228,6 +228,38 @@ def test_confirmation_after_release_moves_payment_to_refund_pending(
     assert "payment_after_release" in audit_actions(engine, payable_order["id"])
 
 
+def test_confirmation_after_release_does_not_rewrite_its_event_on_redelivery(
+    commerce, payable_order, stripe_checkout
+):
+    """Stripe redelivers: the second delivery of already-refund-pending money writes nothing."""
+    client, engine = commerce
+    session_post(client, payable_order["id"])
+    client.post(f"/api/v1/orders/{payable_order['id']}/cancel")
+    first = confirm(
+        engine,
+        payable_order["id"],
+        provider_reference=stripe_checkout.session_id,
+        payment_intent="pi_test_late",
+    )
+
+    second = confirm(
+        engine,
+        payable_order["id"],
+        provider_reference=stripe_checkout.session_id,
+        payment_intent="pi_test_late",
+    )
+
+    # The owed refund is unchanged, so it is reported once and recorded once.
+    assert first.status == second.status == "refund_pending"
+    assert event_names(engine, payable_order["id"]) == [
+        "payment_after_release",
+        "payment_session_created",
+    ]
+    assert audit_actions(engine, payable_order["id"]).count("payment_after_release") == 1
+    assert money_state(engine, payable_order["id"])["status"] == "refund_pending"
+    assert order_state(engine, payable_order["id"])["status"] == "cancelled"
+
+
 def test_confirmation_after_release_never_restores_buyable_order(
     commerce, variant, payable_order, stripe_checkout
 ):

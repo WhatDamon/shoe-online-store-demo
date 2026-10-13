@@ -12,6 +12,8 @@ errors: ``payment_disabled`` (Stripe is off), ``payment_ready``, ``order_not_pay
 one.
 """
 
+import json
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
@@ -20,6 +22,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.application.audit import audit
+from app.application.errors import PaymentNotRefundable, RefundFailed
 from app.config import settings
 from app.domain.models import (
     Inventory,
@@ -37,6 +40,8 @@ from app.domain.money import (
     to_minor_units,
 )
 
+logger = logging.getLogger("commerce.payments")
+
 # Stripe only accepts a Checkout Session expiry between 30 minutes and 24 hours from
 # creation. The local reservation is the shorter of the two, so Stripe must never be given
 # a window that outlives it: a customer who can still pay after the stock was released is
@@ -53,6 +58,25 @@ CURRENCY_MESSAGE = "This store cannot charge in this currency."
 # sale, whatever path reaches a release, so the confirmation and the release guard both
 # read this one set instead of spelling the states out twice.
 SETTLED_PAYMENT_STATUSES: tuple[str, ...] = ("succeeded", "refund_pending")
+
+# The money states a refund can act on. Nothing else has captured money to give back:
+# ``disabled`` and ``requires_payment`` never charged anyone, so they have no refund.
+REFUNDABLE_PAYMENT_STATUSES: tuple[str, ...] = ("succeeded", "refund_pending", "refunded")
+
+# A failed refund attempt writes one of each: the rows themselves are the attempt record, so
+# ``refund_attempts`` counts them without a counter column on ``payments``.
+REFUND_FAILED_EVENT = "refund_failed"
+REFUND_SUCCEEDED_EVENT = "refund_succeeded"
+
+
+def _log_event(level: int, event: str, **fields: str | int) -> None:
+    try:
+        logger.log(level, json.dumps(dict(event=event, **fields)))
+    except Exception:
+        # Observability is best-effort: a broken handler or filter must not change the
+        # outcome of a refund or replace the refusal the caller must see. No key, session
+        # reference, payment intent or amount reaches this line by construction.
+        pass
 
 
 @dataclass(frozen=True)
@@ -459,9 +483,163 @@ def _payment_after_release(
     marked as owed back, which is the signal the refund path and the compensation command
     read.
     """
+    if payment is not None and payment.status == "refund_pending":
+        # Stripe redelivers, and this money is already flagged as owed: like the ``paid``
+        # branch above, a repeat delivery must change nothing, event and audit included.
+        return ConfirmOutcome(status="refund_pending", order_id=order.id)
     payment = _record_captured_payment(db, order, payment, provider_reference, payment_intent)
     payment.status = "refund_pending"
     db.flush()
     db.add(PaymentEvent(payment_id=payment.id, event="payment_after_release"))
     audit(db, order.id, "payment_after_release", status=order.status)
     return ConfirmOutcome(status="refund_pending", order_id=order.id)
+
+
+def refund_idempotency_key(order_id: str) -> str:
+    """Derived from the order alone: every retry of one refund reaches Stripe under one key."""
+    return f"refund:{order_id}"
+
+
+def refund_attempts(db: Session, payment_id: str) -> int:
+    """Count the recorded attempts for one payment, read from the attempt rows themselves."""
+    return (
+        db.scalar(
+            select(func.count())
+            .select_from(PaymentEvent)
+            .where(
+                PaymentEvent.payment_id == payment_id,
+                PaymentEvent.event == REFUND_FAILED_EVENT,
+            )
+        )
+        or 0
+    )
+
+
+def _record_refund_success(db: Session, order: Order, payment: Payment) -> None:
+    now = datetime.now(UTC)
+    payment.status = "refunded"
+    payment.refunded_at = now
+    # The two axes move together: money that is back is no longer a sale to fulfil.
+    order.status = "refunded"
+    order.refunded_at = now
+    db.flush()
+    db.add(PaymentEvent(payment_id=payment.id, event=REFUND_SUCCEEDED_EVENT))
+    audit(db, order.id, "refund_succeeded", status="refunded")
+
+
+def _record_refund_failure(db: Session, order: Order, payment: Payment, *, reason: str) -> None:
+    """Keep the money flagged as owed and count the attempt, without any payment detail."""
+    payment.status = "refund_pending"
+    db.add(PaymentEvent(payment_id=payment.id, event=REFUND_FAILED_EVENT))
+    db.flush()
+    attempts = refund_attempts(db, payment.id)
+    audit(db, order.id, "refund_failed", status="refund_pending", reason=reason, attempts=attempts)
+    _log_event(logging.ERROR, "refund_failed", order_id=order.id, reason=reason, attempts=attempts)
+
+
+def _attempt_refund(db: Session, order: Order, payment: Payment, gateway: StripeGateway) -> str:
+    """Make one refund call through the gateway and record what happened to the money.
+
+    A gateway fault is expected input, never an exception: it is recorded and reported as
+    the resulting payment status, so the caller decides how to surface it. Returns the
+    payment status after the attempt (``refunded`` or ``refund_pending``).
+    """
+    if payment.payment_intent is None:
+        # Money captured without an intent cannot be handed to the gateway; recording the
+        # failure keeps the debt visible instead of raising a TypeError into a 500.
+        _record_refund_failure(db, order, payment, reason="missing_payment_intent")
+        return "refund_pending"
+    try:
+        gateway.refund(
+            payment_intent=payment.payment_intent,
+            idempotency_key=refund_idempotency_key(order.id),
+        )
+    except StripeGatewayError:
+        _record_refund_failure(db, order, payment, reason="gateway_error")
+        return "refund_pending"
+    _record_refund_success(db, order, payment)
+    return "refunded"
+
+
+def refund_order(
+    db: Session, session_id: str, order_id: str, *, gateway: StripeGateway | None = None
+) -> dict:
+    """Refund the captured money of one owned order.
+
+    Runs under the cart lock that every other order state change takes, and re-reads the
+    order only after acquiring it. Ownership failures reuse the existing 404 so another
+    session's order stays indistinguishable from an unknown one.
+
+    A completed refund is idempotent. A refund that Stripe did not complete is the one
+    outcome that must outlive the error it reports: this store still owes the money, so the
+    attempt is committed before ``RefundFailed`` unwinds the requester's transaction. The
+    retry itself belongs to the compensation pass, so this endpoint never opens a second
+    Stripe refund for money it has already flagged as owed.
+    """
+    # Imported inside the function: commerce re-exports from this module (circular).
+    from app.application.commerce import lock_cart, order_view, owned_order
+
+    lock_cart(db, session_id)
+    order = owned_order(db, session_id, order_id)
+    payment = db.scalar(select(Payment).where(Payment.order_id == order.id))
+    if payment is None or payment.status not in REFUNDABLE_PAYMENT_STATUSES:
+        raise PaymentNotRefundable()
+    if payment.status == "refunded":
+        # Terminal money state: repeating the request reports the view it already produced.
+        return order_view(db, order)
+    if payment.status == "refund_pending":
+        # Already owed and already recorded: a third party never opens a second refund, and
+        # reporting success here would claim money that has not moved.
+        raise RefundFailed()
+    if not settings.stripe_ready:
+        # Refunds leave through the same channel as payments; with it switched off there is
+        # no gateway to build and nothing may be sent with an unconfigured key.
+        raise PaymentNotRefundable()
+    refunds = gateway if gateway is not None else default_gateway()
+    if _attempt_refund(db, order, payment, refunds) != "refunded":
+        db.commit()
+        raise RefundFailed()
+    return order_view(db, order)
+
+
+def refund_pending_payments(
+    db: Session, *, limit: int = 100, gateway: StripeGateway | None = None
+) -> int:
+    """One bounded compensation pass over money Stripe still owes back.
+
+    Entry three of the refund design: a table plus a repeatable command, no worker fleet.
+    Each attempt reuses the same per-order idempotency key, so a replay after a crash can
+    never refund twice, and money that reached ``refunded`` is no longer a candidate.
+    Candidates run in payment-id order, so a ``limit`` below the backlog still makes
+    progress instead of retrying the same rows forever.
+
+    The pass owns its transaction boundary for the same reason a single refund does: a
+    failed attempt must stay recorded even though the caller is told the pass failed.
+    """
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
+        raise ValueError("Refund batch size must be an integer from 1 to 1000")
+    if not settings.stripe_ready:
+        # Nothing can leave through a switched-off channel; the owed rows stay for an
+        # operator to replay once a key is configured. No order detail goes into the log.
+        _log_event(logging.WARNING, "refund_pass_disabled")
+        return 0
+    refunds = gateway if gateway is not None else default_gateway()
+    candidates = db.execute(
+        select(Payment, Order)
+        .join(Order, Payment.order_id == Order.id)
+        .where(Payment.status == "refund_pending")
+        .order_by(Payment.id)
+        .limit(limit)
+    ).all()
+    refunded = 0
+    failed = 0
+    for payment, order in candidates:
+        if _attempt_refund(db, order, payment, refunds) == "refunded":
+            refunded += 1
+        else:
+            failed += 1
+    if failed:
+        # Preserve the CLI failure signal only after the attempts are safe to keep.
+        db.commit()
+        raise RuntimeError(f"Refund pass failed for {failed} payments") from None
+    return refunded

@@ -47,6 +47,9 @@ def assert_no_payment_rows(engine, order_id):
 def assert_no_gateway_calls(fake_gateway):
     assert fake_gateway.created == []
     assert fake_gateway.retrieved == []
+    # A refund is the other outbound call this suite can trigger; leaving it unchecked
+    # would let a refund-path test pass while Stripe was actually reached.
+    assert fake_gateway.refunds == []
 
 
 def test_disabled_provider_keeps_machine_readable_disabled_result(commerce, variant):

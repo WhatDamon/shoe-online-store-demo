@@ -13,6 +13,7 @@ from app.application.catalog import lock_products
 from app.application.errors import (
     EmptyCart,
     InsufficientStock,
+    OrderNotCancellable,
     OrderNotFound,
     VariantUnavailable,
 )
@@ -289,8 +290,22 @@ def expire_if_due(db: Session, order: Order, *, now: datetime | None = None) -> 
 
 
 def cancel_order(db: Session, session_id: str, order_id: str) -> dict:
+    """Cancel an owned order, or say why it cannot be cancelled.
+
+    Cancellation answers on the fulfilment axis, so it has exactly three outcomes: a held
+    reservation is released, an already released order is a no-op, and a settled order is
+    refused with a stable code that routes the customer to the refund path. Without the
+    refusal, a settled order would reach the release guard and be reported as an
+    infrastructure failure the caller is told to retry.
+    """
     lock_cart(db, session_id)
     order = owned_order(db, session_id, order_id)
+    if order.status == "cancelled":
+        # Released already, by this customer, by expiry, or because money arrived after the
+        # stock went back on sale: a repeat releases nothing a second time.
+        return order_view(db, order)
+    if order.status in ("paid", "refunded"):
+        raise OrderNotCancellable()
     if not expire_if_due(db, order):
         release_order(db, order, "customer_cancelled")
     return order_view(db, order)

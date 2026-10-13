@@ -32,6 +32,7 @@ def test_openapi_describes_every_success_response(commerce):
         ("/api/v1/checkout/create-order", "post", "OrderResponse"),
         ("/api/v1/orders/{order_id}", "get", "OrderResponse"),
         ("/api/v1/orders/{order_id}/cancel", "post", "OrderResponse"),
+        ("/api/v1/orders/{order_id}/refund", "post", "OrderResponse"),
         ("/api/v1/payments/session", "post", "PaymentResponse"),
     ]
     for path, method, model in expected:
