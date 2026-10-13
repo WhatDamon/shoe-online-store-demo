@@ -1,5 +1,10 @@
-// @vitest-environment node
+// 本文件是 `.ts`（无 JSX），但最后一个 describe 要渲染真实结果卡（量词的单数路径）——
+// 用 `createElement` 调用 `render`：环境仍是仓库默认的 jsdom，不需要改文件名。
+import { createElement } from 'react'
 import { describe, expect, it } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import { ProductResultCard } from '@/components/assistant/product-result-card'
+import type { ProductCard as ProductCardEvent } from '@/domain/chat-events'
 import type { Messages } from '@/i18n/messages'
 import { messages } from '@/i18n/messages'
 import { DEFAULT_LOCALE } from '@/i18n/locales'
@@ -89,6 +94,49 @@ describe('mock 分派信号与提示词同构', () => {
       `${t['assistant.mock.outfitStyleLead']} Urban Bloom ${t['assistant.mock.outfitStyleTail']} ` +
         `${t['assistant.mock.outfitLayer']} ${t['assistant.mock.outfitDress']}`,
     )
+  })
+})
+
+describe('整句文案的字面量（期望值写死，改词典任何一个字符即红）', () => {
+  it('assistant.redirect 是离题时那句重定向（REDIRECT_TEXT 的取值）', () => {
+    expect(REDIRECT_TEXT).toBe(
+      "I'm here to help with shoes and finding your next pair — want to tell me what you're looking for?",
+    )
+  })
+
+  it('assistant.networkError 是网络失败时展示的那句', () => {
+    expect(t['assistant.networkError']).toBe('Something went wrong on our end — please try again.')
+  })
+})
+
+describe('结果卡量词走真实组件渲染（单数路径此前无人钉）', () => {
+  const card = (over: Partial<ProductCardEvent>): ProductCardEvent => ({
+    handle: 'dc-1001',
+    title: 'Urban Bloom',
+    subtitle: 'Everyday · 5 colors',
+    image: null,
+    imageKind: 'svg',
+    photoCount: 3,
+    sizeRange: 'US 4.5–9.5',
+    colorCount: 5,
+    palette: ['#111111', '#0f766e'],
+    ...over,
+  })
+
+  it('colorCount 为 1 时走单数键：1 color，而不是 1 colors', () => {
+    render(createElement(ProductResultCard, { item: card({ colorCount: 1, photoCount: 1 }) }))
+    expect(screen.getByText('US 4.5–9.5 · 1 color')).toBeInTheDocument()
+    expect(screen.queryByText(/1 colors/)).not.toBeInTheDocument()
+  })
+
+  it('photoCount 为 1 时不渲染照片段（阈值是 > 1），复数时是 3 photos', () => {
+    const { unmount } = render(
+      createElement(ProductResultCard, { item: card({ colorCount: 1, photoCount: 1 }) }),
+    )
+    expect(screen.queryByText(/photo/)).not.toBeInTheDocument()
+    unmount()
+    render(createElement(ProductResultCard, { item: card({}) }))
+    expect(screen.getByText('US 4.5–9.5 · 5 colors · 3 photos')).toBeInTheDocument()
   })
 })
 
