@@ -1,5 +1,6 @@
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { parseCartView, parseCommerceProduct, parseOrderView } from '@/domain/commerce-response'
+import { messages } from '@/i18n/messages'
 import { commerceRequest } from './commerce-client'
 
 const line = {
@@ -145,3 +146,42 @@ it.each([{ detail: 'variant_unavailable' }, { code: 'variant_unavailable', messa
     )
   },
 )
+
+// 错误码是 snake_case（跨语言机器契约，不改名），词典键的叶子不允许下划线
+// （`src/i18n/messages.test.ts` 的键名守卫），故两者由 `commerce-client.ts` 的显式映射连接。
+// 这里逐条钉住映射两侧，再用真实请求路径证明每个码真的取到了它自己的文案——映射少一条就会
+// 落到 generic 兜底串，第二条断言即红（不会静默渲染出 `undefined`）。
+const localizedErrors = [
+  ['variant_unavailable', 'errors.variantUnavailable'],
+  ['insufficient_stock', 'errors.insufficientStock'],
+  ['empty_cart', 'errors.emptyCart'],
+  ['order_not_found', 'errors.orderNotFound'],
+  ['backend_unavailable', 'errors.backendUnavailable'],
+] as const
+
+describe('commerce 错误文案本地化', () => {
+  it.each(localizedErrors)('%s 在词典里有文案', (_code, key) => {
+    expect(typeof messages('en')[key]).toBe('string')
+  })
+
+  it.each(localizedErrors)('%s 的响应带着该文案报错', async (code, key) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, json: async () => ({ code }) }))
+    await expect(commerceRequest('cart', parseCartView)).rejects.toThrowError(
+      new Error(messages('en')[key]),
+    )
+  })
+
+  // `invalid_origin`（Route Handler 对跨站 POST 的 403）**本轮刻意不覆盖**：给它加键等于新增
+  // 一句抽取前不存在的用户可见英文，而阶段 1 的验收线建立在「输出与改造前等价」上。这条断言
+  // 把「今天走通用兜底串」这个事实钉住，阶段 2 给它专门文案时它会（也应当）变红——变更可见，
+  // 不是被绕过。移交项见 `.superpowers/sdd/2026-10-13-i18n-phase1-locale-routing/task-8-report.md`。
+  it('invalid_origin 今天仍走通用兜底串（阶段 2 补专门文案）', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, json: async () => ({ code: 'invalid_origin' }) }),
+    )
+    await expect(commerceRequest('cart', parseCartView)).rejects.toThrowError(
+      new Error(messages('en')['errors.unknown']),
+    )
+  })
+})

@@ -1,14 +1,21 @@
+import { en } from '@/i18n/messages'
+
 // 店务事实单源（AI support 客服 + PDP 静态文案共用）。
 // 改动此处 = 两处同步：AI system 注入（prompts.ts）与 PDP「Shipping & returns」
 // 手风琴渲染（product/[handle]/page.tsx）读同一常量，禁止在页面里再写一遍。
 // 口径必须与产品现状一致（定制印刷不可退、护理见 POLICY_CARE 真实内容），不得编造
 // 物流时效/订单状态等本站不存在的系统能力。
+//
+// 句子级文案在词典里（`pdp.policy.*`），这里保留**导出名与单源关系**：改名或新增常量才会
+// 影响消费点，改文案只改词典一处。
+//
+// 形状说明（阶段 1 只有一种语言，故直接取英文词典；不要改成函数或按 locale 分支）：
+// 这两个常量同时喂给服务端 AI prompt 与页面渲染，改成需要 locale 入参的函数会逼着
+// `prompts.test.ts` / `print-spec-sheet.test.tsx` 的既有断言跟着改。阶段 2 需要按语言取值时
+// 再连同那两个消费点一起改，那是阶段 2 自己的测试面。
+export const POLICY_PRODUCTION = en['pdp.policy.production']
 
-export const POLICY_PRODUCTION =
-  'Every pair is printed to order in our studio, so nothing sits in a warehouse — we only print what you buy.'
-
-export const POLICY_RETURNS =
-  "Because each pair is made to your order, custom-printed items can't be returned or refunded. If your pair arrives faulty or the fit is not as promised, message us within 30 days and we'll sort it out."
+export const POLICY_RETURNS = en['pdp.policy.returns']
 
 /**
  * 护理指引 —— 内容逐条来自 ProductCareInstructions 护理海报（OCR 提取，

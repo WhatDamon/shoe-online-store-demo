@@ -1,4 +1,6 @@
 import type { ReactElement } from 'react'
+import { DEFAULT_LOCALE, type Locale } from '@/i18n/locales'
+import { messages } from '@/i18n/messages'
 import type { Product } from '@/domain/product'
 
 // 参数化 inline-SVG 商品视觉（本地程序化 SVG，无图片文件/零网络请求）。
@@ -15,6 +17,13 @@ export interface ProductVisualProps {
   construction?: Product['construction']
   /** 实例盐：同一 DOM 内出现多份相同输入的实例（如 PDP 主图 + 同 view 缩略图）时消除重复 pattern id。 */
   idSalt?: string
+  /**
+   * 本组件同时被服务端组件（落地页 `collection-cards.tsx`）与客户端组件渲染，取不到 Provider，
+   * 故用可选 `locale` 而非 `useMessages()`（同 `print-spec-sheet.tsx` 的策略，裁定 R4）。
+   * 缺省是默认语言：客户端调用点（商品卡/图库/收藏清单/助手结果卡）在阶段 1 与显式传入等价，
+   * 阶段 2 需要按语言取时把 `useLocale()` 接进这些调用点。
+   */
+  locale?: Locale
 }
 
 const VIEW_BOX: Record<ProductVisualView, string> = {
@@ -133,7 +142,9 @@ export function ProductVisual({
   className,
   construction,
   idSalt,
+  locale = DEFAULT_LOCALE,
 }: ProductVisualProps) {
+  const t = messages(locale)
   const pattern = construction?.pattern ?? 'lattice'
   const density = construction?.density ?? 0.75
   const base = view === 'detail' ? 16 : 13
@@ -150,7 +161,7 @@ export function ProductVisual({
       data-view={view}
       data-pattern={pattern}
       role="img"
-      aria-label={`${name} — printed shoe`}
+      aria-label={`${name} ${t['shop.visual.printedShoe']}`}
       viewBox={VIEW_BOX[view]}
       className={className}
       focusable={false}

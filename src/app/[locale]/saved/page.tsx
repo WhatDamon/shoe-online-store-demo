@@ -1,5 +1,6 @@
 import { pageMetadata } from '@/lib/seo'
 import { DEFAULT_LOCALE, isLocale } from '@/i18n/locales'
+import { messages } from '@/i18n/messages'
 import type { Metadata } from 'next'
 import { SavedPairs } from '@/components/shop/saved-pairs'
 
@@ -11,22 +12,27 @@ export async function generateMetadata(props: {
   params: Promise<{ locale: string }>
 }): Promise<Metadata> {
   const { locale: raw } = await props.params
-  return pageMetadata(isLocale(raw) ? raw : DEFAULT_LOCALE, {
-    title: 'Saved pairs',
-    description: 'Your saved pairs — pick up where you left off.',
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE
+  const t = messages(locale)
+  return pageMetadata(locale, {
+    title: t['shop.saved.title'],
+    description: t['shop.saved.metaDescription'],
     path: '/saved',
     robots: { index: false, follow: false },
   })
 }
 
-export default function SavedPage() {
+export default async function SavedPage(props: { params: Promise<{ locale: string }> }) {
+  const { locale: raw } = await props.params
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE
+  const t = messages(locale)
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-10">
       <header className="mb-6">
-        <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Saved pairs</h1>
-        <p className="mt-1 text-sm text-neutral-500">
-          Pairs you marked while browsing or in the assistant — saved on this device.
-        </p>
+        <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">
+          {t['shop.saved.title']}
+        </h1>
+        <p className="mt-1 text-sm text-neutral-500">{t['shop.saved.subtitle']}</p>
       </header>
       <SavedPairs />
     </div>

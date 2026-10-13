@@ -1,6 +1,7 @@
 'use client'
 
 import { Printer } from 'lucide-react'
+import { useMessages } from '@/components/i18n/locale-provider'
 
 /**
  * 「Print / Save as PDF」触发（决策：PDP 内打印规格，浏览器原生打印/存 PDF）。
@@ -10,12 +11,13 @@ import { Printer } from 'lucide-react'
  * 不依赖任何环境/路由：无 key 也可用（真数据 + 打印）。
  */
 export function PrintSpecSheetButton() {
+  const t = useMessages()
   return (
     <button
       type="button"
       onClick={() => window.print()}
-      aria-label="Print / Save as PDF"
-      title="Print / Save as PDF"
+      aria-label={t['pdp.print.trigger']}
+      title={t['pdp.print.trigger']}
       className="inline-flex items-center justify-center rounded-full p-2 text-neutral-600 transition-colors hover:text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
     >
       <Printer aria-hidden="true" className="size-5" strokeWidth={1.5} />

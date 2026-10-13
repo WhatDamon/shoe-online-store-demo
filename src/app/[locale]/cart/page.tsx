@@ -3,14 +3,17 @@ import { CommercePanel } from '@/components/shop/commerce-panel'
 import { SiteShell } from '@/components/marketing/site-shell'
 import { pageMetadata } from '@/lib/seo'
 import { DEFAULT_LOCALE, isLocale } from '@/i18n/locales'
+import { messages } from '@/i18n/messages'
 
 export async function generateMetadata(props: {
   params: Promise<{ locale: string }>
 }): Promise<Metadata> {
   const { locale: raw } = await props.params
-  return pageMetadata(isLocale(raw) ? raw : DEFAULT_LOCALE, {
-    title: 'Cart',
-    description: 'Review your saved Evoloop selections.',
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE
+  const t = messages(locale)
+  return pageMetadata(locale, {
+    title: t['cart.title'],
+    description: t['cart.meta.description'],
     path: '/cart',
     robots: { index: false, follow: false },
   })

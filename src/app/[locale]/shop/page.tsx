@@ -14,6 +14,7 @@ import { pageMetadata } from '@/lib/seo'
 import { JsonLd } from '@/components/seo/json-ld'
 import { itemListSchema, webPageSchema } from '@/lib/structured-data'
 import { DEFAULT_LOCALE, isLocale } from '@/i18n/locales'
+import { messages } from '@/i18n/messages'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,9 +22,12 @@ export async function generateMetadata(props: {
   params: Promise<{ locale: string }>
 }): Promise<Metadata> {
   const { locale: raw } = await props.params
-  return pageMetadata(isLocale(raw) ? raw : DEFAULT_LOCALE, {
-    title: 'Shop',
-    description: 'Shop all styles — every pair is printed to order around your size.',
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE
+  const t = messages(locale)
+  return pageMetadata(locale, {
+    // 页面名与导航里的 `Shop` 是同一个表面名，故共用 `nav.shop`（同值同语境，不另建键）。
+    title: t['nav.shop'],
+    description: t['shop.meta.description'],
     path: '/shop',
   })
 }
@@ -39,6 +43,7 @@ export default async function ShopPage({
 }) {
   const { locale: rawLocale } = await params
   const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE
+  const t = messages(locale)
   const raw = (await searchParams) ?? {}
   const sp = new URLSearchParams()
   for (const [key, value] of Object.entries(raw)) {
@@ -62,33 +67,36 @@ export default async function ShopPage({
     <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-10">
       <JsonLd
         data={webPageSchema(locale, {
-          name: 'Shop Evoloop shoes',
-          description: 'Browse Evoloop casual shoe styles and their available size ranges.',
+          name: t['shop.schema.name'],
+          description: t['shop.schema.description'],
           path: '/shop',
           type: 'CollectionPage',
         })}
       />
       <JsonLd data={itemListSchema(locale, products)} />
       <header className="mb-6">
-        <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Shop</h1>
-        <p className="mt-1 text-sm text-neutral-500">
-          Every pair is printed to order around your size — no warehouses, no waste.
-        </p>
+        <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">{t['nav.shop']}</h1>
+        <p className="mt-1 text-sm text-neutral-500">{t['shop.subtitle']}</p>
       </header>
 
-      {/* 赠品活动条：满 $50 赠一；软文案呈现 */}
+      {/* 赠品活动条：满 $50 赠一；软文案呈现。门槛/赠品名/材质来自 gift-offer 单源。 */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-neutral-200 bg-surface px-4 py-3">
         <p className="text-sm text-neutral-700">
-          <span className="font-medium text-ink">{`Spend $${GIFT_OFFER.thresholdUsd}, get a free gift.`}</span>{' '}
+          <span className="font-medium text-ink">
+            {t['shop.gift.bannerLead']}
+            {GIFT_OFFER.thresholdUsd}
+            {t['shop.gift.bannerTail']}
+          </span>{' '}
           <span className="text-neutral-500">
-            {giftItems.length} {GIFT_OFFER.plural} to choose from, made from {GIFT_OFFER.material}.
+            {giftItems.length} {GIFT_OFFER.plural} {t['shop.gift.chooseLead']} {GIFT_OFFER.material}
+            .
           </span>
         </p>
         <a
           href="#free-gifts"
           className="text-sm font-medium text-brand underline-offset-4 transition-colors hover:underline"
         >
-          See the gifts
+          {t['shop.gift.seeGifts']}
         </a>
       </div>
 
@@ -99,18 +107,19 @@ export default async function ShopPage({
       />
 
       <p role="status" className="mt-6 text-sm text-neutral-500">
-        {products.length === 1 ? '1 style' : `${products.length} styles`}
+        {products.length}{' '}
+        {products.length === 1 ? t['shop.styleCount.one'] : t['shop.styleCount.many']}
       </p>
 
       {products.length > 0 ? (
         <div className="mt-4">
           {/* 结果区分区标题（读屏）：商品卡 h3 需要一个 h2 祖先，避免 h1 → h3 跳级。 */}
-          <h2 className="sr-only">All styles</h2>
+          <h2 className="sr-only">{t['shop.allStyles']}</h2>
           <ProductGrid products={products} />
         </div>
       ) : (
         <div className="mt-6">
-          <EmptyState />
+          <EmptyState locale={locale} />
         </div>
       )}
 

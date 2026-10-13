@@ -3,6 +3,8 @@ import { site } from '@/lib/site'
 import { POLICY_PRODUCTION, POLICY_RETURNS } from '@/lib/store-policy'
 import type { ProductView } from '@/domain/product'
 import type { CanonicalSize } from '@/domain/product'
+import { DEFAULT_LOCALE, type Locale } from '@/i18n/locales'
+import { messages } from '@/i18n/messages'
 
 const SYSTEMS = ['US', 'EU', 'UK', 'JP', 'CN'] as const
 
@@ -21,11 +23,22 @@ function systemRow(eu: CanonicalSize): { label: string; value: string }[] {
  * 真实数据原则：只印实有字段——货号、真实色数、尺码换算行（表内换算）；不印 demo
  * 价格（§AI 不带价原则延伸：价格只在店铺实时呈现），不印虚构工艺词。护理内容与
  * PDP 详情区同源（store-policy 常量）。尺码为演示换算口径。
+ *
+ * `locale` 可选并缺省默认语言（与 `promise-strip.tsx` 同一策略，裁定 R4）：本组件是服务端组件
+ * （拿不到 Provider），而 `print-spec-sheet.test.tsx` 直接合成渲染 `<PrintSpecSheet product={…} />`
+ * ——必填会让那个既有用例无法渲染。生产里的渲染点（PDP）总是显式传入 URL 语言。
  */
-export function PrintSpecSheet({ product }: { product: ProductView }) {
+export function PrintSpecSheet({
+  product,
+  locale = DEFAULT_LOCALE,
+}: {
+  product: ProductView
+  locale?: Locale
+}) {
+  const t = messages(locale)
   const colors = product.colors ?? []
   return (
-    <section aria-label="Print specification" className="print-spec-sheet">
+    <section aria-label={t['pdp.print.sheetLabel']} className="print-spec-sheet">
       <header className="print-sheet-header">
         <p className="print-brand">{site.name}</p>
         <p className="print-tagline">{site.tagline}</p>
@@ -38,7 +51,7 @@ export function PrintSpecSheet({ product }: { product: ProductView }) {
 
       {product.features.length > 0 ? (
         <section className="print-block">
-          <h2>Details</h2>
+          <h2>{t['pdp.print.details']}</h2>
           <ul>
             {product.features.map((f) => (
               <li key={f}>{f}</li>
@@ -49,14 +62,14 @@ export function PrintSpecSheet({ product }: { product: ProductView }) {
 
       {colors.length > 0 ? (
         <section className="print-block">
-          <h2>Colourways</h2>
+          <h2>{t['pdp.print.colourways']}</h2>
           <p>{colors.map((c) => c.name).join(', ')}</p>
         </section>
       ) : null}
 
       {product.sizes.length > 0 ? (
         <section className="print-block">
-          <h2>Size conversion</h2>
+          <h2>{t['pdp.print.sizeConversion']}</h2>
           <table className="print-table">
             <thead>
               <tr>
@@ -75,15 +88,12 @@ export function PrintSpecSheet({ product }: { product: ProductView }) {
               ))}
             </tbody>
           </table>
-          <p className="print-note">
-            Sizes in each system convert from the same mm-anchored reference. The reference table is
-            demo data — confirm the current size guide before ordering.
-          </p>
+          <p className="print-note">{t['pdp.print.note']}</p>
         </section>
       ) : null}
 
       <section className="print-block">
-        <h2>Made-to-order &amp; returns</h2>
+        <h2>{t['pdp.print.policy']}</h2>
         <p>{POLICY_PRODUCTION}</p>
         <p>{POLICY_RETURNS}</p>
       </section>

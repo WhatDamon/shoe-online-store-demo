@@ -24,6 +24,7 @@ import { formatPrice } from '@/lib/format'
 import { pageMetadata } from '@/lib/seo'
 import { absoluteUrl } from '@/lib/seo'
 import { DEFAULT_LOCALE, isLocale } from '@/i18n/locales'
+import { messages } from '@/i18n/messages'
 import { JsonLd } from '@/components/seo/json-ld'
 import { breadcrumbSchema, productSchema } from '@/lib/structured-data'
 import { POLICY_PRODUCTION, POLICY_RETURNS } from '@/lib/store-policy'
@@ -65,6 +66,7 @@ export default async function ProductPage(props: {
 }) {
   const { locale: raw, handle } = await props.params
   const locale = isLocale(raw) ? raw : DEFAULT_LOCALE
+  const t = messages(locale)
   const product = await getProductForMarket(handle)
   if (!product) notFound()
 
@@ -80,8 +82,8 @@ export default async function ProductPage(props: {
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:py-8">
       <JsonLd
         data={breadcrumbSchema(locale, [
-          { name: 'Home', path: '/' },
-          { name: 'Shop', path: '/shop' },
+          { name: t['nav.home'], path: '/' },
+          { name: t['nav.shop'], path: '/shop' },
           { name: product.title, path: `/product/${product.handle}` },
         ])}
       />
@@ -95,7 +97,7 @@ export default async function ProductPage(props: {
           className="inline-flex items-center gap-1.5 text-sm text-neutral-500 transition-colors hover:text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
         >
           <ArrowLeft aria-hidden="true" className="size-4 shrink-0" />
-          All shoes
+          {t['pdp.backToShop']}
         </LocaleLink>
 
         {/* 网格基础列显式 minmax(0,1fr)：无 lg 双列时若省略列模板，隐式 auto 轨道会按内容
@@ -139,10 +141,10 @@ export default async function ProductPage(props: {
                 <div className="flex flex-col gap-3">
                   {/* 详情手风琴分区标题：base-ui AccordionHeader 固定渲染 h3，
                   需 h2 祖先承接 h1 → h3 的标题层级（heading-order 修复）。 */}
-                  <h2 className="sr-only">Product details</h2>
+                  <h2 className="sr-only">{t['pdp.details.hidden']}</h2>
                   <Accordion className="border-t border-neutral-200">
                     <AccordionItem value="materials-fit">
-                      <AccordionTrigger>Materials &amp; fit</AccordionTrigger>
+                      <AccordionTrigger>{t['pdp.accordion.materials']}</AccordionTrigger>
                       <AccordionContent>
                         <ul className="mb-4 list-disc space-y-1 pl-4 text-neutral-600">
                           {product.features.map((feature) => (
@@ -153,7 +155,7 @@ export default async function ProductPage(props: {
                       </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="shipping">
-                      <AccordionTrigger>Shipping &amp; returns</AccordionTrigger>
+                      <AccordionTrigger>{t['pdp.accordion.shipping']}</AccordionTrigger>
                       <AccordionContent>
                         {/* 文案单源（store-policy.ts）：与 AI support 客服注入同一份，禁止在此另写。 */}
                         <p className="mb-3 text-neutral-600">{POLICY_PRODUCTION}</p>
@@ -175,7 +177,7 @@ export default async function ProductPage(props: {
               id="related-heading"
               className="font-heading text-2xl font-semibold tracking-tight text-ink"
             >
-              You may also like
+              {t['pdp.related']}
             </h2>
             <div className="mt-5">
               <ProductGrid products={related} />
@@ -185,7 +187,7 @@ export default async function ProductPage(props: {
       </div>
 
       {/* 打印规格（决策：PDP 内打印区块）：屏幕上隐藏，@media print 只显示此 sheet。 */}
-      <PrintSpecSheet product={product} />
+      <PrintSpecSheet product={product} locale={locale} />
     </div>
   )
 }

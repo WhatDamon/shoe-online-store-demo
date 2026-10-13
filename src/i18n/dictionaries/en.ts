@@ -7,7 +7,8 @@
  *
  * 键族的划分：`nav.*` 是站内导航链接的文案（单源在 `src/lib/site.ts`，头部与页脚共用同一批键）；
  * `marketing.<area>.*` 是 `src/components/marketing/**` 各区块自己的文案；`faq.*` 是首页 FAQ 的
- * 问答对（`src/lib/faq.ts` 按 `faq.qN` 成对取用）。页面级文案（shop/pdp/cart/errors…）由后续批次交付。
+ * 问答对（`src/lib/faq.ts` 按 `faq.qN` 成对取用）。页面级键族（`shop.*` / `pdp.*` / `cart.*` /
+ * `checkout.*` / `orders.*` / `errors.*`）见文件末尾的批次 B 注释。
  */
 const en = {
   // 站内导航链接。键在这里、href 在 `src/lib/site.ts`：两处都靠这份键取值，改文案只改这里。
@@ -15,6 +16,8 @@ const en = {
   'nav.collections': 'Collections',
   'nav.ourStory': 'Our Story',
   'nav.blog': 'Blog',
+  // PDP 面包屑的结构化数据里回指首页的 crumb（不渲染成导航链接，故与上面四条分开）。
+  'nav.home': 'Home',
 
   // 固定头部（`app-bar.tsx`）。'item'/'items' 是愿望单计数的量词片段，与上方 `wishlist`
   // 拼成 `Wishlist, 1 item`；拆开是因为复数形随语言变化（阶段 2 加语言时改为按语言的复数规则组合）。
@@ -114,6 +117,240 @@ const en = {
   'notFound.description':
     'It may have moved, or the link may be out of date. The shop is still open, though.',
   'notFound.cta': 'Browse the shop',
+
+  // ── 批次 B：shop / 商品详情 / 商务错误 ────────────────────────────────────────
+  // 表面归属：`shop.*` = /shop 列表页、它的筛选条、空态、赠品活动，以及 /saved 清单页与
+  // 两处共用的收藏心形按钮；`pdp.*` = 商品详情页及其客户端组件；`cart.*` / `checkout.*` /
+  // `orders.*` = `CommercePanel` 的三个模式；`errors.*` = commerce 客户端的错误码文案与其
+  // 它系统反馈。页面元信息（`meta.*`）与结构化数据（`schema.*`）也归各自表面：它们是该页的
+  // SEO 文案。品牌名与 Slogan（`src/lib/site.ts`）仍不本地化（阶段 2 决策）。
+  //
+  // **事实与数值一律不进词典**：尺码体系名（US/EU/…）、赠品门槛与材质（`src/lib/gift-offer.ts`）、
+  // 价格分档的边界、色名与货号都留在原模块；带数据的句子在这里只以「句子片段 + 原模块数据」
+  // 拼回（片段存在的原因就是句子中间夹了数据）。
+  'shop.meta.description': 'Shop all styles — every pair is printed to order around your size.',
+  'shop.schema.name': 'Shop Evoloop shoes',
+  'shop.schema.description': 'Browse Evoloop casual shoe styles and their available size ranges.',
+  // 列表页副标题；`shop.allStyles` 同时是筛选条的「全部」选项与结果区的 sr-only 标题。
+  'shop.subtitle': 'Every pair is printed to order around your size — no warehouses, no waste.',
+  'shop.allStyles': 'All styles',
+  // 结果计数（`{n} style` / `{n} styles`）：数字是数据，只有量词进词典。
+  'shop.styleCount.one': 'style',
+  'shop.styleCount.many': 'styles',
+
+  // 筛选条（`product-filter-bar.tsx`）。价格分档的标签含美元金额：金额是市场事实（ADR 0008
+  // 决策 6），翻译时保留 USD 金额，不得按语言改币种。排序选项的键在组件里按 `ShopFilter['sort']`
+  // 取值（`SORT_OPTIONS` 是键表，与 `src/lib/site.ts` 的 nav 同款）。
+  'shop.filter.label': 'Shop filters',
+  'shop.filter.searchLabel': 'Search within results',
+  'shop.filter.search': 'Search',
+  'shop.filter.searchPlaceholder': 'Search styles',
+  'shop.filter.collection': 'Collection',
+  'shop.filter.price': 'Price',
+  'shop.filter.anyPrice': 'Any price',
+  'shop.filter.priceUnder100': 'Under $100',
+  'shop.filter.price100To150': '$100 – $150',
+  'shop.filter.priceOver150': 'Over $150',
+  'shop.filter.sort': 'Sort',
+  'shop.filter.sortFeatured': 'Featured',
+  'shop.filter.sortPriceAsc': 'Price: Low to High',
+  'shop.filter.sortPriceDesc': 'Price: High to Low',
+  'shop.filter.sortNewest': 'Newest',
+  'shop.filter.sizeLegend': 'Filter by size',
+  // 尺码 chip 的可及名后缀（`US 9 (your size)`）：尺码标签本身是领域事实，不进词典。
+  'shop.filter.yourSize': '(your size)',
+  'shop.filter.clearAll': 'Clear all',
+
+  // 无结果空态（`src/app/[locale]/shop/empty-state.tsx`）
+  'shop.empty.title': 'No styles match',
+  'shop.empty.body':
+    'Try removing a filter or two — every style is printed to order, so your size is usually available.',
+  'shop.empty.cta': 'Shop all styles',
+
+  // 赠品活动（`src/app/[locale]/shop/page.tsx` 的活动条 + `gift-gallery.tsx`）。门槛、赠品名与
+  // 材质是 `src/lib/gift-offer.ts` 的事实单源；这里的片段是它们周围的句子（`…Lead` 在数据前，
+  // `…Tail`/`…Mid` 在数据后）。
+  'shop.gift.kicker': 'Free gifts',
+  'shop.gift.headingLead': 'With any order over $',
+  'shop.gift.pickLead': 'Pick one of these',
+  'shop.gift.pickMid': '— pressed from',
+  'shop.gift.pickTail': ', so nothing goes to waste. Just add one when you check out.',
+  'shop.gift.bannerLead': 'Spend $',
+  'shop.gift.bannerTail': ', get a free gift.',
+  'shop.gift.chooseLead': 'to choose from, made from',
+  'shop.gift.seeGifts': 'See the gifts',
+  'shop.gift.viewPhotosLead': 'View',
+  'shop.gift.viewPhotosTail': 'photos',
+  'shop.gift.photo': 'photo',
+  'shop.gift.photos': 'photos',
+  'shop.gift.close': 'Close gallery',
+
+  // 收藏清单页（/saved）与其客户端清单（`saved-pairs.tsx`）。
+  'shop.saved.title': 'Saved pairs',
+  'shop.saved.subtitle':
+    'Pairs you marked while browsing or in the assistant — saved on this device.',
+  'shop.saved.metaDescription': 'Your saved pairs — pick up where you left off.',
+  'shop.saved.loadError':
+    "We couldn't load your saved pairs — check your connection and try again.",
+  'shop.saved.loading': 'Loading your saved pairs…',
+  'shop.saved.emptyTitle': 'Nothing saved yet',
+  'shop.saved.emptyBody':
+    'Tap the heart on any pair — in the shop or on a product page — and it will show up here.',
+  'shop.saved.emptyCta': 'Browse the shop',
+  // 无尺码款卡片角标的回退文案（真实区间来自 `src/lib/size-range.ts`，不进词典）。
+  'shop.saved.sizeToConfirm': 'Size to confirm',
+  'shop.saved.color': 'color',
+  'shop.saved.colors': 'colors',
+  'shop.saved.onStore': 'On the store',
+  'shop.saved.removeLead': 'Remove',
+  'shop.saved.removeTail': 'from saved',
+
+  // 收藏心形按钮（`wishlist-button.tsx`）：商品卡与 PDP 共用，故归 shop 表面。
+  'shop.wishlist.add': 'Add to wishlist',
+  'shop.wishlist.remove': 'Remove from wishlist',
+  // 参数化 SVG 商品图（`product-visual.tsx`）的无障碍名后缀：`{商品名} — printed shoe`。
+  // 同样是跨表面共用的组件（商品卡、PDP 图库、收藏清单、落地页集合卡、助手结果卡），
+  // 归 shop 表面与 `shop.wishlist.*` 同一口径。商品名本身是目录数据，不进词典。
+  'shop.visual.printedShoe': '— printed shoe',
+
+  // 商品详情页（`src/app/[locale]/product/[handle]/page.tsx`）。
+  'pdp.backToShop': 'All shoes',
+  'pdp.details.hidden': 'Product details',
+  'pdp.accordion.materials': 'Materials & fit',
+  'pdp.accordion.shipping': 'Shipping & returns',
+  'pdp.related': 'You may also like',
+  'pdp.findMySize': 'Find my size',
+  // 色号图例（`product-actions.tsx`）：色名来自目录数据。
+  'pdp.color.legend': 'Color',
+  'pdp.color.disclaimer': 'Colors may vary slightly on screen.',
+  // 尺码选择器（`size-selector.tsx`）。尺码标签本身来自 `sizeLabel`/市场体系，不进词典。
+  'pdp.size.legend': 'Select size',
+  'pdp.size.yourSize': 'Your size',
+  'pdp.size.yourSizeSuffix': '(your size)',
+  // 图库（`product-gallery.tsx`）：缩略图的可及名含色名/序号（数据），故片段化。
+  'pdp.gallery.show': 'Show',
+  'pdp.gallery.photo': 'photo',
+  'pdp.gallery.in': 'in',
+  'pdp.gallery.views': 'views',
+  'pdp.gallery.viewSide': 'Show side view',
+  'pdp.gallery.viewSole': 'Show sole view',
+  'pdp.gallery.viewDetail': 'Show detail view',
+  // 购买条（`product-buy-bar.tsx`）。
+  'pdp.buy.available': 'available',
+  'pdp.buy.adding': 'Adding...',
+  'pdp.buy.addToCart': 'Add to cart',
+  'pdp.buy.loading': 'Loading available options...',
+  'pdp.buy.chooseOptions': 'Choose a color and size.',
+  'pdp.buy.unavailable': 'This color and size are unavailable.',
+  'pdp.buy.selected': 'selected',
+  'pdp.buy.added': 'Added to cart.',
+  'pdp.buy.addFailed': 'Could not add this item to your cart.',
+  'pdp.buy.viewCart': 'View cart',
+  // Shopify Buy Button（`shopify-buy-button.tsx`）：SDK 加载期间/失败后留在原地的禁用占位按钮。
+  // 与上面 `pdp.buy.*` 分开：那条是本站 demo 购买条，这条是兼容入口（`SHOPIFY_ENABLED`）的兜底。
+  'pdp.shopify.buyNow': 'Buy now',
+  // 「My size」行（`my-size-guide.tsx`）。脚长 mm 与五个体系名是领域事实，不进词典；
+  // `outOfRange` 两侧的片段夹着的 `US 4.5–12.5` 同理留在组件里（尺码体系不得因语言漂移，
+  // ADR 0008 决策 6）。
+  'pdp.mySize.trigger': 'My size',
+  'pdp.mySize.saved': 'My size:',
+  'pdp.mySize.change': 'Change or remove',
+  'pdp.mySize.guidance': 'Get size-matched guidance',
+  'pdp.mySize.measureAlt':
+    'How to measure: stand, place your heel at the wall, and measure to your longest toe',
+  'pdp.mySize.measureCopy':
+    'Measure from your heel to your longest toe, standing. Pick the longer foot.',
+  'pdp.mySize.footLength': 'Foot length',
+  'pdp.mySize.outsideAdult': '— outside adult sizes',
+  'pdp.mySize.footLengthAria': 'Foot length in millimetres',
+  'pdp.mySize.footLengthNumberAria': 'Foot length in millimetres (number)',
+  'pdp.mySize.outOfRangeLead': 'That foot length is outside our current size range (',
+  'pdp.mySize.outOfRangeTail': '). Pick a size in the range to get matched guidance.',
+  'pdp.mySize.save': 'Save my size',
+  'pdp.mySize.update': 'Update my size',
+  'pdp.mySize.remove': 'Remove',
+  // 护理说明弹窗（`care-instructions.tsx`）。
+  'pdp.care.title': 'Care instructions',
+  'pdp.care.close': 'Close care instructions',
+  'pdp.care.posterAlt': 'How to care for your shoes',
+  // 打印规格（`print-spec-sheet-button.tsx` + `print-spec-sheet.tsx`）。
+  'pdp.print.trigger': 'Print / Save as PDF',
+  'pdp.print.sheetLabel': 'Print specification',
+  'pdp.print.details': 'Details',
+  'pdp.print.colourways': 'Colourways',
+  'pdp.print.sizeConversion': 'Size conversion',
+  'pdp.print.note':
+    'Sizes in each system convert from the same mm-anchored reference. The reference table is demo data — confirm the current size guide before ordering.',
+  'pdp.print.policy': 'Made-to-order & returns',
+  // 店务事实（`store-policy.ts`）的句子级文案：常量本身仍是导出名与单源，值来自这两条键，
+  // 因此 AI support 注入与 PDP 手风琴/规格单读到的是同一份句子。
+  'pdp.policy.production':
+    'Every pair is printed to order in our studio, so nothing sits in a warehouse — we only print what you buy.',
+  'pdp.policy.returns':
+    "Because each pair is made to your order, custom-printed items can't be returned or refunded. If your pair arrives faulty or the fit is not as promised, message us within 30 days and we'll sort it out.",
+
+  // 购物车（`CommercePanel` mode='cart'）。行内 `EU <n>` 的体系名是领域事实（ADR 0008
+  // 决策 6）：语言不改变尺码显示体系。
+  'cart.title': 'Cart',
+  'cart.meta.description': 'Review your saved Evoloop selections.',
+  'cart.reviewCheckout': 'Review checkout',
+  'cart.itemUnavailable': 'No longer available. Remove this item to continue.',
+  'cart.perPair': '/ pair',
+  // 可见标签大写、每行下拉的可及名后缀（`{title} quantity`）小写：两条键，避免对已译文本
+  // 做 `toLowerCase()`（部分语言会因此变形）。
+  'cart.quantityLabel': 'Quantity',
+  'cart.quantityAria': 'quantity',
+  'cart.remove': 'Remove',
+  'cart.quantitySummary': 'Quantity:',
+  'cart.total': 'Total:',
+  'cart.empty': 'Your cart is empty.',
+  'cart.continueShopping': 'Continue shopping',
+  'cart.backToCart': 'Back to cart',
+
+  // 结账（`CommercePanel` mode='checkout'）。支付未启用是硬事实（本 MVP 不接真实支付），
+  // 此处只承载它的说法，不承载支付结果。
+  'checkout.title': 'Review order',
+  'checkout.meta.title': 'Checkout',
+  'checkout.meta.description': 'Evoloop checkout demo.',
+  'checkout.note':
+    'Your total is recalculated when you place the order. This local demo does not add shipping or tax. Payments are not available yet.',
+  'checkout.creating': 'Creating...',
+  'checkout.retry': 'Retry order request',
+  'checkout.create': 'Create pending order',
+
+  // 订单（`CommercePanel` mode='order'）。订单状态是交易事实，只有它的**说法**在这里。
+  'orders.title': 'Order details',
+  'orders.meta.title': 'Order status',
+  'orders.meta.description': 'View an Evoloop order status.',
+  'orders.orderId': 'Order ID:',
+  'orders.status': 'Status:',
+  'orders.statusPendingPayment': 'Pending payment',
+  'orders.statusCancelled': 'Cancelled',
+  'orders.statusExpired': 'Expired',
+  'orders.paymentsDisabled': 'Payments are not available yet.',
+  'orders.releasedCopy':
+    'No payment has been taken. Inventory has been released. Add the item to your cart again to purchase.',
+  'orders.pendingCopy':
+    'No payment has been taken. Inventory will be released automatically when this order expires, or you can cancel it sooner.',
+  'orders.reservedUntil': 'Inventory reserved until:',
+  'orders.refresh': 'Refresh order status',
+  'orders.permanentLink': 'Permanent order link (available only in this shopping session)',
+  'orders.cancel': 'Cancel order and release inventory',
+
+  // 商务错误（`src/lib/commerce-client.ts`）与系统反馈。键的叶子是**错误码的驼峰形**，错误码
+  // 本身（snake_case）是跨语言机器契约，改名即破坏契约；映射在 `commerce-client.ts` 里显式
+  // 列出（`satisfies Record<ErrorCode, keyof Messages>`），后端新增码而词典没跟上 = `tsc` 报错。
+  'errors.variantUnavailable':
+    'This item is no longer available. Remove it from your cart to continue.',
+  'errors.insufficientStock': 'Not enough stock. Update the quantity in your cart.',
+  'errors.emptyCart': 'Your cart is empty. Choose a product first.',
+  'errors.orderNotFound': "We couldn't find this order for the current session.",
+  'errors.backendUnavailable': 'The shopping service is temporarily unavailable. Please try again.',
+  'errors.invalidResponse': 'The shopping service returned an invalid response. Please try again.',
+  // 未识别的错误码（后端返回了词典里没有的 `code`）与 `CommercePanel` 的兜底：两条都在。
+  'errors.unknown': "We couldn't complete that action. Check the quantity and try again.",
+  'errors.unexpected': 'Something went wrong. Please try again.',
+  'errors.loading': 'Loading...',
 } as const
 
 export default en
