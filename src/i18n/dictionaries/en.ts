@@ -462,6 +462,58 @@ const en = {
   // 护栏拒绝（`guardrails/index.ts` 的 `GUARDRAIL_MESSAGE`，仍是 `export const`）：消费端措辞，
   // 绝不出现 "rate limited"（`GuardrailError.code` 才是机器契约）。
   'guardrail.cooldown': 'The assistant is taking a short break — try again in a moment.',
+
+  // ── 批次 D：landing / blog / 状态页与剩下的结构化数据文案 ──────────────────────────
+  // 表面归属：`marketing.landing.*` 是落地页（`src/app/[locale]/(landing)/page.tsx`）自己的
+  // 元信息与结构化数据（`marketing.<area>.*` 里的区块文案归各组件）；`blog.*` 是
+  // `src/app/[locale]/blog/**` 的界面外壳（**文章正文不进词典**：内容本地化是阶段 3）；
+  // `error.*` 是 `src/app/[locale]/error.tsx` 的错误边界；404 复用既有 `notFound.*`（同一条
+  // 文案，两个 404 出口）。结构化的**标签**（PropertyValue 的 name/value）也属于展示文案，
+  // 与 `shop.schema.*` 同一口径；`@type` 之类固定词表仍是代码里的协议常量。
+  //
+  // 与前几批相同：句子中间夹内容数据（文章标题）的地方按既有口径拆成片段，
+  // 空格与句末句号是句式骨架，留在拼装处。
+
+  // 落地页的元信息与结构化数据。这三条与 `marketing.hero.title` / `marketing.footer.pitch`
+  // 不是同一串：metadata 标题按惯例**不带**句末句号（视觉标题带），证明见本批次的逐字比对；
+  // 复用会把句号带进 <title>。故独立建键。
+  'marketing.landing.meta.title': 'Casual shoes, printed to order in your size',
+  'marketing.landing.schema.name': 'Evoloop — casual shoes made to order',
+  'marketing.landing.schema.description':
+    'Explore Evoloop casual shoes, millimetre-based sizing, digital manufacturing, and the studio story.',
+
+  // 博客索引与文章页（`src/app/[locale]/blog/**`）。索引页的 h1 与 metadata 标题共用
+  // `nav.blog`（与 /shop 共用 `nav.shop` 同一口径：同一个表面名，同值同语境，不另建键）。
+  'blog.meta.description': 'Stories, guides and notes from the Evoloop studio.',
+  'blog.schema.name': 'Evoloop Journal',
+  'blog.schema.description': 'Stories and practical guides from the Evoloop studio.',
+  // 这一节的名字：索引页的 kicker 与文章页面包屑里的祖先节点都用它（同值同语境）。
+  'blog.sectionName': 'Journal',
+  'blog.subtitle':
+    'Stories, guides and notes from the studio — from how we size shoes to what happens inside the workshop.',
+  'blog.empty': 'No articles yet — check back soon.',
+  'blog.allPosts': 'All posts',
+  // 无封面文章的替图可及名后缀：`{文章标题} cover`（标题是内容资产，不进词典）。
+  'blog.coverLabel': 'cover',
+  // 文章缺 description 时的元信息句首（`{这里} {标题}.`，标题与句号在拼装处）。
+  'blog.articleMetaLead': 'An Evoloop Journal article:',
+
+  // 错误边界（`src/app/[locale]/error.tsx`）。与 404 共用 `StatusShell`，但文案各自独立：
+  // 错误是「重试」，404 是「页面没了」（`notFound.*`）。
+  'error.title': 'Something went wrong on our end',
+  'error.description': 'Please give it one more try — most hiccups clear right up.',
+  'error.retry': 'Try again',
+  'error.cta': 'Browse the shop',
+
+  // 商品结构化数据的标签（`productSchema` 的 `additionalProperty`）。
+  // 值是「演示目录、结账未开放」这一事实的说法（与 `checkout.note` / `marketing.story.origin` 同口径），
+  // 不承载支付结果。
+  'pdp.schema.availableSizes': 'Available sizes',
+  'pdp.schema.fit': 'Fit',
+  'pdp.schema.salesStatus': 'Sales status',
+  'pdp.schema.salesStatusValue': 'Demo catalog; checkout is not live yet.',
+  // 列表结构化数据的名字（`{品牌名} shoe collection`）：品牌名不本地化（阶段 2 决策），只搬其余部分。
+  'shop.schema.itemListSuffix': 'shoe collection',
 } as const
 
 export default en

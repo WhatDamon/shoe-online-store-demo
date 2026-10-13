@@ -8,6 +8,7 @@ import { LocaleLink } from '@/components/i18n/locale-link'
 import { getPost, listPosts } from '@/lib/blog'
 import { absoluteUrl, pageMetadata } from '@/lib/seo'
 import { DEFAULT_LOCALE, isLocale } from '@/i18n/locales'
+import { messages } from '@/i18n/messages'
 import { JsonLd } from '@/components/seo/json-ld'
 import { articleSchema, breadcrumbSchema } from '@/lib/structured-data'
 
@@ -22,9 +23,10 @@ export async function generateMetadata(props: {
 }): Promise<Metadata> {
   const { locale: raw, slug } = await props.params
   const locale = isLocale(raw) ? raw : DEFAULT_LOCALE
+  const t = messages(locale)
   const post = getPost(slug)
   if (!post) return {}
-  const description = post.description ?? `An Evoloop Journal article: ${post.title}.`
+  const description = post.description ?? `${t['blog.articleMetaLead']} ${post.title}.`
   return pageMetadata(locale, {
     title: post.title,
     description,
@@ -45,6 +47,7 @@ export default async function BlogPostPage(props: {
 }) {
   const { locale: raw, slug } = await props.params
   const locale = isLocale(raw) ? raw : DEFAULT_LOCALE
+  const t = messages(locale)
   const post = getPost(slug)
   if (!post) notFound()
 
@@ -52,8 +55,8 @@ export default async function BlogPostPage(props: {
     <article className="mx-auto w-full max-w-3xl px-4 pb-16 pt-10 sm:pt-14">
       <JsonLd
         data={breadcrumbSchema(locale, [
-          { name: 'Home', path: '/' },
-          { name: 'Journal', path: '/blog' },
+          { name: t['nav.home'], path: '/' },
+          { name: t['blog.sectionName'], path: '/blog' },
           { name: post.title, path: `/blog/${post.slug}` },
         ])}
       />
@@ -61,7 +64,7 @@ export default async function BlogPostPage(props: {
         data={articleSchema(locale, {
           slug: post.slug,
           title: post.title,
-          description: post.description ?? `An Evoloop Journal article: ${post.title}.`,
+          description: post.description ?? `${t['blog.articleMetaLead']} ${post.title}.`,
           date: post.date,
           image: post.cover,
         })}
@@ -71,7 +74,7 @@ export default async function BlogPostPage(props: {
         className="inline-flex items-center gap-1.5 text-sm text-neutral-500 transition-colors hover:text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
       >
         <ArrowLeft aria-hidden="true" className="size-4 shrink-0" />
-        All posts
+        {t['blog.allPosts']}
       </LocaleLink>
 
       {post.cover ? (

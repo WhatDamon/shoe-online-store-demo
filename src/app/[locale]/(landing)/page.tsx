@@ -22,8 +22,10 @@ export async function generateMetadata(props: {
 }): Promise<Metadata> {
   const { locale: raw } = await props.params
   // 非法 locale 的用户可见行为由 root layout 的 notFound() 负责；页面层只用收窄后的值。
-  return pageMetadata(isLocale(raw) ? raw : DEFAULT_LOCALE, {
-    title: 'Casual shoes, printed to order in your size',
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE
+  const t = messages(locale)
+  return pageMetadata(locale, {
+    title: t['marketing.landing.meta.title'],
   })
 }
 
@@ -39,9 +41,8 @@ export default async function HomePage(props: { params: Promise<{ locale: string
     <>
       <JsonLd
         data={webPageSchema(locale, {
-          name: 'Evoloop — casual shoes made to order',
-          description:
-            'Explore Evoloop casual shoes, millimetre-based sizing, digital manufacturing, and the studio story.',
+          name: t['marketing.landing.schema.name'],
+          description: t['marketing.landing.schema.description'],
           path: '/',
         })}
       />

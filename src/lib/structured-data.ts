@@ -1,5 +1,6 @@
 import type { ProductView } from '@/domain/product'
 import { localePath, type Locale } from '@/i18n/locales'
+import { messages } from '@/i18n/messages'
 import { absoluteUrl } from './seo'
 import { site } from './site'
 
@@ -108,17 +109,20 @@ export const breadcrumbSchema = (
 export const productSchema = (locale: Locale, product: ProductView): JsonLdObject => {
   // 商品图是静态资源（不经 [locale] 路由），不加前缀。
   const images = (product.images ?? []).map((image) => absoluteUrl(image))
+  // `additionalProperty` 的 name/value 是**展示文案**（与页面元信息同一口径），进词典；
+  // `@type` 之类固定词表是协议常量，留在代码里。内容事实（尺码标签、fitNotes）仍是目录数据。
+  const t = messages(locale)
   const properties = [
     {
       '@type': 'PropertyValue',
-      name: 'Available sizes',
+      name: t['pdp.schema.availableSizes'],
       value: product.sizeOptions.map((s) => s.label).join(', '),
     },
-    { '@type': 'PropertyValue', name: 'Fit', value: product.fitNotes },
+    { '@type': 'PropertyValue', name: t['pdp.schema.fit'], value: product.fitNotes },
     {
       '@type': 'PropertyValue',
-      name: 'Sales status',
-      value: 'Demo catalog; checkout is not live yet.',
+      name: t['pdp.schema.salesStatus'],
+      value: t['pdp.schema.salesStatusValue'],
     },
   ]
 
@@ -143,7 +147,8 @@ export const productSchema = (locale: Locale, product: ProductView): JsonLdObjec
 export const itemListSchema = (locale: Locale, products: ProductView[]): JsonLdObject => ({
   '@context': 'https://schema.org',
   '@type': 'ItemList',
-  name: `${site.name} shoe collection`,
+  // 品牌名不本地化（阶段 2 决策），只有其余部分进词典。
+  name: `${site.name} ${messages(locale)['shop.schema.itemListSuffix']}`,
   numberOfItems: products.length,
   itemListElement: products.map((product, index) => ({
     '@type': 'ListItem',
