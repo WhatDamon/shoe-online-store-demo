@@ -21,9 +21,10 @@ from app.application.errors import (
     QuantityLimitExceeded,
 )
 from app.application.payments import RefundRefused, create_payment_session, refund_order
+from app.application.webhooks import ingest_event
 from app.dependencies import anonymous_session, database, internal_proxy
 from app.domain.models import CartItem, Inventory, Media, Product, Variant
-from app.schemas.commerce import AddItem, PaymentRequest, Quantity
+from app.schemas.commerce import AddItem, PaymentRequest, Quantity, StripeEventProjection
 from app.schemas.responses import CartResponse, OrderResponse, PaymentResponse, ProductResponse
 
 router = APIRouter(prefix="/api/v1", dependencies=[Depends(internal_proxy)])
@@ -203,3 +204,34 @@ def refund(order_id: str, db: DB, sid: SessionID, request: Request) -> Response 
 def payment(body: PaymentRequest, db: DB, sid: SessionID, response: Response) -> dict:
     response.status_code = 200  # Machine-readable outcome, never a payment success.
     return asdict(create_payment_session(db, sid, str(body.order_id)))
+
+
+@router.post("/webhooks/stripe", response_model=None)
+def stripe_webhook(projection: StripeEventProjection, db: DB, request: Request) -> Response | dict:
+    """Ingest one projected Stripe event forwarded by the Next public route.
+
+    The signature was verified there, against ``STRIPE_WEBHOOK_SECRET``, and the body is
+    already the projection this store acts on; the raw event never reaches Python. Like
+    every other ``/api/v1`` route this one is protected by the internal proxy credential,
+    because it only ever accepts this repository's own server as a caller.
+
+    A processing failure is deliberately answered with a non-2xx. Stripe retries a delivery
+    it could not acknowledge, and folding this failure into a 2xx would silently drop a
+    payment this store has already taken money for. That is why this route reports the
+    failure instead of raising it: raising would roll back the ``failed`` record the retry
+    needs, leaving nothing to explain the lost event.
+    """
+    result = ingest_event(db, projection)
+    if result.status == "failed":
+        # Imported here for the same reason as the refund route does it: ``app.main``
+        # imports this module to register the router.
+        from app.main import error_response
+
+        return error_response(
+            request, 500, "webhook_processing_failed", "The event could not be processed"
+        )
+    return {
+        "status": result.status,
+        "event_id": result.event_id,
+        "order_id": result.order_id,
+    }
