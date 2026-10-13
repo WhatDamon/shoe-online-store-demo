@@ -1,3 +1,4 @@
+from dataclasses import asdict
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, Response
@@ -6,7 +7,6 @@ from sqlalchemy.orm import Session
 
 from app.application.catalog import require_sellable
 from app.application.commerce import (
-    MockPaymentProvider,
     cancel_order,
     cart_view,
     create_order,
@@ -20,6 +20,7 @@ from app.application.errors import (
     ProductNotFound,
     QuantityLimitExceeded,
 )
+from app.application.payments import create_payment_session
 from app.dependencies import anonymous_session, database, internal_proxy
 from app.domain.models import CartItem, Inventory, Media, Product, Variant
 from app.schemas.commerce import AddItem, PaymentRequest, Quantity
@@ -184,8 +185,5 @@ def cancel(order_id: str, db: DB, sid: SessionID) -> dict:
 
 @router.post("/payments/session", response_model=PaymentResponse)
 def payment(body: PaymentRequest, db: DB, sid: SessionID, response: Response) -> dict:
-    lock_cart(db, sid)
-    order = owned_order(db, sid, str(body.order_id))
-    expire_if_due(db, order)
-    response.status_code = 200  # Machine-readable disabled result, never a payment success.
-    return MockPaymentProvider().create_session(db, order)
+    response.status_code = 200  # Machine-readable outcome, never a payment success.
+    return asdict(create_payment_session(db, sid, str(body.order_id)))

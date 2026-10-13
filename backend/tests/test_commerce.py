@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.application import commerce as service
+from app.config import settings
 from app.domain.models import AuditLog, Inventory, Order, OrderItem, Product, Reservation, Variant
 from app.seed import seed
 
@@ -273,6 +274,18 @@ def test_mock_never_charges_or_marks_paid(commerce, variant):
         ).status_code
         == 404
     )
+
+
+def test_order_view_reports_payment_enabled_from_stripe_ready(commerce, variant, monkeypatch):
+    client, _ = commerce
+    add(client, variant)
+    order = checkout(client).json()
+    assert order["payment_enabled"] is False
+    # /health is not reachable through the Next proxy, so the order response is the only
+    # signal the storefront has for whether a Pay button can work at all.
+    monkeypatch.setattr(settings, "stripe_enabled", True)
+    monkeypatch.setattr(settings, "stripe_secret_key", "sk_test_order_view")
+    assert client.get(f"/api/v1/orders/{order['id']}").json()["payment_enabled"] is True
 
 
 def test_concurrent_duplicate_checkout(commerce, variant):

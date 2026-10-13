@@ -14,6 +14,7 @@ from app.application.errors import (
     OrderNotFound,
     VariantUnavailable,
 )
+from app.application.payments import MockPaymentProvider
 from app.config import settings
 from app.domain.models import (
     Cart,
@@ -21,12 +22,25 @@ from app.domain.models import (
     Inventory,
     Order,
     OrderItem,
-    Payment,
-    PaymentEvent,
     Product,
     Reservation,
     Variant,
 )
+
+# The disabled payment provider lives in app.application.payments, which owns payment
+# orchestration; it is re-exported here so existing import sites keep working.
+__all__ = [
+    "MockPaymentProvider",
+    "as_utc",
+    "cancel_order",
+    "cart_view",
+    "create_order",
+    "expire_if_due",
+    "lock_cart",
+    "order_view",
+    "owned_order",
+    "release_order",
+]
 
 
 def lock_cart(db: Session, session_id: str) -> Cart:
@@ -94,7 +108,7 @@ def order_view(db: Session, order: Order) -> dict:
         cancellation_reason=order.cancellation_reason,
         total=str(order.total),
         currency=order.currency,
-        payment_enabled=False,
+        payment_enabled=settings.stripe_ready,
         message="Payments are not available yet.",
         items=[
             dict(
@@ -252,22 +266,3 @@ def cancel_order(db: Session, session_id: str, order_id: str) -> dict:
     if not expire_if_due(db, order):
         release_order(db, order, "customer_cancelled")
     return order_view(db, order)
-
-
-class MockPaymentProvider:
-    def create_session(self, db: Session, order: Order) -> dict:
-        payment = db.scalar(select(Payment).where(Payment.order_id == order.id))
-        if payment is None:
-            payment = Payment(order_id=order.id)
-            db.add(payment)
-            db.flush()
-            db.add(PaymentEvent(payment_id=payment.id, event="payment_disabled"))
-        return dict(
-            code="payment_disabled",
-            payment_enabled=False,
-            provider="mock",
-            charged=False,
-            order_id=order.id,
-            order_status=order.status,
-            message="Payments are not available yet.",
-        )
