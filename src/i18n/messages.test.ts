@@ -82,7 +82,7 @@ function sourceTexts(dir: string, out: string[] = []): string[] {
 
 describe('词典没有死键', () => {
   // 零命中断言只在检测面本身有效时才有意义：先钉住「该命中的命中、该放行的放行」。
-  it('检测面认可带引号的静态键访问，且不把裸词当引用', () => {
+  it('检测面认可带引号的静态键访问，且不把裸词当引用，并真的扫到了语料', () => {
     const probe = (keys: string[], sources: string[]) => deadKeys(keys, sources)
     expect(probe(['live.key'], ["const t = messages('en'); t['live.key']"])).toEqual([])
     expect(probe(['live.key'], ['t["live.key"]'])).toEqual([])
@@ -91,6 +91,14 @@ describe('词典没有死键', () => {
     expect(probe(['ghost.key'], ['const t = messages(locale)'])).toEqual(['ghost.key'])
     // 注释里出现裸键名不算引用（门禁不靠「文档提到过」
     expect(probe(['live.key'], ['// live.key 已被 nav 改名'])).toEqual(['live.key'])
+    // 上面的探针只钉住判定规则；判定规则再对，检测面本身坏了守卫仍会**静默永真**：
+    // `I18N_DIR` 一旦与任何目录都不相等，`src/i18n/**` 就落进检测面，而词典自己就是
+    // 全部键的「消费点」——零命中断言于是永远成立。故把语料也钉住：非空（能抓
+    // 「扫到 0 个文件」这类崩坏，50 只作余量下限，当前是两百多个 `.ts/.tsx`），
+    // 且不含被排除子树的文件内容（能抓「把 src/i18n/** 纳入检测面」）。
+    const corpus = sourceTexts(SRC)
+    expect(corpus.length).toBeGreaterThan(50)
+    expect(corpus).not.toContain(readFileSync(join(SRC, 'i18n', 'dictionaries', 'en.ts'), 'utf8'))
   })
 
   it('每个词典键都在 src/** 里被引用', () => {

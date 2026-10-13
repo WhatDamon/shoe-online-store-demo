@@ -40,7 +40,8 @@ const en = {
   'marketing.hero.explore': 'Explore the series',
   'marketing.hero.scrollLabel': 'Scroll to collections',
 
-  // 卖点条（`promise-strip.tsx`）。`label` 是 section 的可见标签（图中为 sr-only h2）。
+  // 卖点条（`promise-strip.tsx`）。`label` 是 section 的标签（同时用于 `aria-label`
+  // 与 sr-only h2——后者视觉隐藏，仅读屏可见）。
   'marketing.promise.label': 'Why Evoloop',
   'marketing.promise.fit.title': 'Sized to you',
   'marketing.promise.fit.copy':
