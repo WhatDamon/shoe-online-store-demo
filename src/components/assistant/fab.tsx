@@ -6,7 +6,7 @@ import { MessageCircleIcon } from 'lucide-react'
 import type { Mode } from '@/domain/chat-events'
 import type { ProductView } from '@/domain/product'
 import { getPageProductSnapshot, type PageProductRef } from '@/lib/page-product'
-import { useLocale } from '@/components/i18n/locale-provider'
+import { useLocale, useMessages } from '@/components/i18n/locale-provider'
 import { localePath } from '@/i18n/locales'
 
 // 由 AssistantProvider 注入的控制器（结构化契约：避免 provider↔fab 运行时/类型循环导入）。
@@ -18,6 +18,7 @@ export interface AssistantFabHandle {
 // 不在落地页出现（P1：Landing 零导购痕迹）；usePathname 消费点用 Suspense 包裹，
 // 保证静态页预渲染不受影响（fallback null，水合后才按路径决定显隐）。
 function AssistantFab({ assistant }: { assistant: AssistantFabHandle | null }) {
+  const t = useMessages()
   const pathname = usePathname()
   const locale = useLocale()
   // 落地页判定必须拿「当前语言下的落地页路径」比较，而不是字面量 '/'：locale 是 URL 的
@@ -31,11 +32,11 @@ function AssistantFab({ assistant }: { assistant: AssistantFabHandle | null }) {
     <button
       type="button"
       onClick={() => assistant.open('shopping', getPageProductSnapshot())}
-      aria-label="Open shopping assistant"
+      aria-label={t['assistant.fab.open']}
       className="fixed bottom-5 right-5 z-40 inline-flex h-12 items-center gap-2 rounded-full bg-ink px-4 text-sm font-medium text-canvas shadow-lg transition-transform hover:scale-[1.03] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
     >
       <MessageCircleIcon className="size-5" aria-hidden="true" />
-      <span className="hidden sm:inline">Need a hand?</span>
+      <span className="hidden sm:inline">{t['assistant.fab.label']}</span>
     </button>
   )
 }

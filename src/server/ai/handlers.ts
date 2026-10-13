@@ -4,16 +4,21 @@ import { createSizeFitEvent, type ChatEvent, type Mode } from '@/domain/chat-eve
 import { footMmToEU } from '@/domain/size'
 import type { ProductView } from '@/domain/product'
 import { getProductForMarket } from '@/server/catalog/service'
+import { DEFAULT_LOCALE } from '@/i18n/locales'
+import { messages } from '@/i18n/messages'
 import type { AiContext } from './provider'
 import { digestLines, productContextOf, toCard } from './context'
 import { systemFor } from './prompts'
 import { adviceFor } from './size-input'
 import type { ModeHandler, TurnContext } from './turn'
 
-const PRODUCT_REQUIRED_TEXT = 'Pick a product first, then I can help with that.'
+// 消费端文案取自词典。阶段 1 只有一种语言，故取默认语言；**阶段 2 必须把请求 locale 接进来**
+// （`/api/ai/chat` 请求体经 `isLocale` 校验后转交，见规格 §9「AI 回答语言」）。
+const t = messages(DEFAULT_LOCALE)
+
+const PRODUCT_REQUIRED_TEXT = t['assistant.productRequired']
 /** 消费端文案（导出供测试断言；克制措辞——不出现 "AI"）。 */
-export const NO_MATCH_TEXT =
-  "I couldn't find a style that matches that yet — try different words or browse the shop."
+export const NO_MATCH_TEXT = t['assistant.noMatch']
 
 /** size-fit / outfit 共用的前置：缺 handle 或 handle 查不到都回同一句软拒绝（无 done 帧）。 */
 async function* requireProduct(ctx: TurnContext): AsyncGenerator<ChatEvent, ProductView | null> {
@@ -58,7 +63,7 @@ const handleOutfit: ModeHandler = async function* (ctx) {
   const system = systemFor('outfit', { product: productContextOf(view) })
   const messages: AiContext['messages'] = [
     ...ctx.history,
-    { role: 'user', content: ctx.text || 'Give me outfit ideas.' },
+    { role: 'user', content: ctx.text || t['assistant.outfitPrompt'] },
   ]
   const reply = yield* ctx.stream(system, messages)
   // 记账用实际发给模型的那句：空文本会被替换成默认句。

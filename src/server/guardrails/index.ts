@@ -2,11 +2,15 @@ import type { BudgetRepository, BudgetUsage } from './budget-contract'
 import { tokenBucket } from './rate-limit'
 import { createSessionStore, type SessionMessage } from './session-state'
 import { dailyTokenCap, reservationStaleMs, underDailyBudget, today } from './budget'
+import { DEFAULT_LOCALE } from '@/i18n/locales'
+import { messages } from '@/i18n/messages'
 
 /** IP/会话双维内存令牌桶限流速率（默认 10 次/分）。 */
 export const RATE_PER_MIN = 10
-/** 护栏温和文案（消费端措辞，绝不暴露 "rate limited"）。 */
-export const GUARDRAIL_MESSAGE = 'The assistant is taking a short break — try again in a moment.'
+/** 护栏温和文案（消费端措辞，绝不暴露 "rate limited"）。
+ * 阶段 1 只有一种语言，故取默认语言；**阶段 2 必须把请求 locale 接进来**
+ * （`/api/ai/chat` 请求体经 `isLocale` 校验后转交，见规格 §9）。 */
+export const GUARDRAIL_MESSAGE = messages(DEFAULT_LOCALE)['guardrail.cooldown']
 
 export class GuardrailError extends Error {
   constructor(

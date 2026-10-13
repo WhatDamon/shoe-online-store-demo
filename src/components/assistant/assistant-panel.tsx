@@ -12,6 +12,7 @@ import type { ProductView } from '@/domain/product'
 import type { PageProductRef } from '@/lib/page-product'
 import { sizeLabel } from '@/domain/size'
 import { isSpeechSupported } from '@/lib/speech'
+import { useMessages } from '@/components/i18n/locale-provider'
 import { cn } from 'cn'
 import type { ChatMessage } from './use-chat-stream'
 import { MessageList } from './message-list'
@@ -54,6 +55,7 @@ export function AssistantPanel({
   speakOn,
   onToggleSpeak,
 }: AssistantPanelProps) {
+  const t = useMessages()
   const [draft, setDraft] = useState('')
   const trimmed = draft.trim()
 
@@ -72,6 +74,10 @@ export function AssistantPanel({
       : undefined) ?? sizeLabel(eu)
 
   const showWelcome = messages.length === 0 && !isStreaming
+  // 锚定欢迎语（`Hi — this is the {商品名}. …`）：商品名是目录数据，前后是两条词典片段。
+  const welcomeText = product
+    ? `${t['assistant.welcome.lead']} ${product.title}${t['assistant.welcome.tail']}`
+    : t['assistant.welcome.general']
 
   return (
     <Sheet
@@ -83,14 +89,14 @@ export function AssistantPanel({
       <SheetContent side="right" className="flex h-full flex-col gap-0 p-0">
         <SheetHeader className="shrink-0 border-b border-neutral-200 pr-12">
           <div className="flex items-center justify-between gap-2">
-            <SheetTitle>Need a hand?</SheetTitle>
+            <SheetTitle>{t['assistant.panel.title']}</SheetTitle>
             {isSpeechSupported() ? (
               <button
                 type="button"
                 onClick={() => onToggleSpeak(!speakOn)}
                 aria-pressed={speakOn}
-                aria-label="Read replies aloud"
-                title={speakOn ? 'Stop reading replies aloud' : 'Read replies aloud'}
+                aria-label={t['assistant.speak.read']}
+                title={speakOn ? t['assistant.speak.stop'] : t['assistant.speak.read']}
                 className={cn(
                   'inline-flex size-9 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400 hover:bg-neutral-100',
                   speakOn && 'bg-neutral-100',
@@ -100,24 +106,24 @@ export function AssistantPanel({
                   className={cn('size-4', speakOn ? 'text-brand' : 'text-neutral-500')}
                   aria-hidden="true"
                 />
-                <span className="sr-only">{speakOn ? 'On' : 'Off'}</span>
+                <span className="sr-only">
+                  {speakOn ? t['assistant.speak.on'] : t['assistant.speak.off']}
+                </span>
               </button>
             ) : null}
           </div>
-          <p className="text-xs text-neutral-500">
-            Ask about sizing, styles, shipping &amp; returns, or what&rsquo;s in the shop.
-          </p>
+          <p className="text-xs text-neutral-500">{t['assistant.panel.subtitle']}</p>
         </SheetHeader>
 
         {product ? (
           <div className="flex shrink-0 items-center gap-2 border-b border-neutral-200 bg-neutral-50 px-4 py-2">
             <span className="min-w-0 flex-1 truncate text-[13px] text-neutral-700">
-              Looking at: <span className="font-medium">{product.title}</span>
+              {t['assistant.panel.lookingAt']} <span className="font-medium">{product.title}</span>
             </span>
             <button
               type="button"
               onClick={onRemoveProduct}
-              aria-label={`Remove ${product.title}`}
+              aria-label={`${t['assistant.panel.removeProduct']} ${product.title}`}
               className="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-neutral-200 hover:text-neutral-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
             >
               <XIcon className="size-3.5" />
@@ -140,9 +146,7 @@ export function AssistantPanel({
               <div className="max-w-[85%] rounded-2xl rounded-bl-sm border border-neutral-200 bg-surface px-3.5 py-2.5 text-sm leading-6 text-neutral-800">
                 {/* 锚定欢迎语：FAB 在 PDP 打开 / 面板带商品上下文时认出当前鞋（设计：PDP
                   针对性介绍，克制——不自动发送、不消耗预算；移除商品后回通用开场）。 */}
-                {product
-                  ? `Hi — this is the ${product.title}. Ask me about it, find your size, or tell me what you're looking for.`
-                  : 'Hi — need a hand finding your pair?'}
+                {welcomeText}
               </div>
               {/* size-fit/outfit 需商品上下文；无商品时不渲染死路入口（服务端会回
                   "Pick a product first"）。welcome 与商品共存不可达，防御性取全量。 */}
@@ -167,9 +171,9 @@ export function AssistantPanel({
           className="flex shrink-0 items-center gap-2 border-t border-neutral-200 p-3"
         >
           <Input
-            aria-label="Message"
+            aria-label={t['assistant.composer.label']}
             aria-busy={isStreaming}
-            placeholder="Ask about a shoe, size, or style…"
+            placeholder={t['assistant.composer.placeholder']}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             className="h-10 flex-1"
@@ -178,7 +182,7 @@ export function AssistantPanel({
           <Button
             type="submit"
             size="icon"
-            aria-label="Send"
+            aria-label={t['assistant.composer.send']}
             disabled={isStreaming || !trimmed}
             className="size-10 shrink-0"
           >

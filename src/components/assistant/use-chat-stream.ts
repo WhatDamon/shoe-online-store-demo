@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { parseEvent } from '@/domain/chat-events'
 import type { ChatErrorCode, ChatEvent, Mode, ProductCard } from '@/domain/chat-events'
 import type { CanonicalSize } from '@/domain/product'
+import { useMessages } from '@/components/i18n/locale-provider'
 
 /** 发给服务端的最小商品引用（只需 handle + title）。 */
 interface ChatProductRef {
@@ -42,8 +43,6 @@ export interface ChatStream {
   /** 重发最近一次请求（error 后 "Try again"）。 */
   retry: () => void
 }
-
-const NETWORK_ERROR_TEXT = 'Something went wrong on our end — please try again.'
 
 /** 结果卡运行时 shape 守卫：parseEvent 对 productCards 只验 Array.isArray，坏 item
  *  （缺 handle/palette/字段类型错）会让渲染崩溃或兜底不可用，故在入口过滤，
@@ -140,6 +139,7 @@ export function applyEvent(message: ChatMessage, event: ChatEvent): ChatMessage 
 }
 
 export function useChatStream(): ChatStream {
+  const t = useMessages()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -223,9 +223,9 @@ export function useChatStream(): ChatStream {
           if (controller.signal.aborted) return
           const failure = {
             code: 'provider' as ChatErrorCode,
-            message: NETWORK_ERROR_TEXT,
+            message: t['assistant.networkError'],
           }
-          setError(NETWORK_ERROR_TEXT)
+          setError(t['assistant.networkError'])
           setErrorCode('provider')
           const id = assistantMessage.id
           setMessages((prev) =>
@@ -239,7 +239,7 @@ export function useChatStream(): ChatStream {
         }
       })()
     },
-    [],
+    [t],
   )
 
   const retry = useCallback(() => {

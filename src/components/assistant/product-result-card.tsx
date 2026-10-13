@@ -2,9 +2,11 @@
 
 import Image from 'next/image'
 import { LocaleLink } from '@/components/i18n/locale-link'
+import { useMessages } from '@/components/i18n/locale-provider'
 import { ProductVisual } from '@/components/shop/product-visual'
 import { useOptionalWishlist } from '@/components/shop/wishlist-provider'
 import { WishlistHeart } from '@/components/shop/wishlist-icon'
+import type { Messages } from '@/i18n/messages'
 import type { ProductCard as ProductCardEvent } from '@/domain/chat-events'
 
 // 会话内商品结果卡：展示真实首图 + 真实元数据（货号/码段/色卡数/照片数），
@@ -13,17 +15,22 @@ import type { ProductCard as ProductCardEvent } from '@/domain/chat-events'
 //
 // 收藏（Save pair）：心形是容器的绝对定位 sibling，绝不嵌套进主区 <LocaleLink>
 // （interactive-inside-interactive 反模式）；Provider 缺席（孤立渲染/测试）时不渲染。
-const metaOf = (item: ProductCardEvent): string | null => {
+// 量词取自词典（数字来自事件）；`·` 是元数据分隔符，不是句子。
+const metaOf = (item: ProductCardEvent, t: Messages): string | null => {
   const parts: string[] = []
   if (item.sizeRange) parts.push(item.sizeRange)
-  if (item.colorCount > 0) parts.push(`${item.colorCount} color${item.colorCount === 1 ? '' : 's'}`)
-  if (item.photoCount > 1) parts.push(`${item.photoCount} photos`)
+  if (item.colorCount > 0)
+    parts.push(
+      `${item.colorCount} ${t[item.colorCount === 1 ? 'assistant.card.color' : 'assistant.card.colors']}`,
+    )
+  if (item.photoCount > 1) parts.push(`${item.photoCount} ${t['assistant.card.photos']}`)
   return parts.length ? parts.join(' · ') : null
 }
 
 export function ProductResultCard({ item }: { item: ProductCardEvent }) {
+  const t = useMessages()
   const href = `/product/${item.handle}`
-  const meta = metaOf(item)
+  const meta = metaOf(item, t)
   const wishlist = useOptionalWishlist()
   const saved = wishlist?.items.includes(item.handle) ?? false
   const toggleSave = (e: React.MouseEvent) => {
@@ -71,7 +78,7 @@ export function ProductResultCard({ item }: { item: ProductCardEvent }) {
           type="button"
           onClick={toggleSave}
           aria-pressed={saved}
-          aria-label={saved ? 'Remove from wishlist' : 'Add to wishlist'}
+          aria-label={saved ? t['shop.wishlist.remove'] : t['shop.wishlist.add']}
           className="absolute right-1.5 top-1.5 inline-flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 transition-colors hover:text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
         >
           <WishlistHeart

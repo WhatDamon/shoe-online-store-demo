@@ -6,6 +6,8 @@ import type { SessionMessage } from '@/server/guardrails/session-state'
 import { estTokens, maxOutputTokens, truncateMessage } from '@/server/guardrails/text'
 import { today } from '@/server/guardrails/budget'
 import { envStr } from '@/config'
+import { DEFAULT_LOCALE } from '@/i18n/locales'
+import { messages } from '@/i18n/messages'
 import { createDefaultRepository } from '@/server/search/repository'
 import { EmbeddingDispatchBlockedError } from '@/server/search/embedder'
 import type { ChatEvent } from '@/domain/chat-events'
@@ -30,8 +32,10 @@ export interface ChatOptions {
   requestId?: string
 }
 
-/** 流内异常的统一文案；`/api/ai/chat` 的兜底 catch 也用它（单一来源）。 */
-export const FALLBACK_ERROR_TEXT = 'Something went wrong — please try again.'
+/** 流内异常的统一文案；`/api/ai/chat` 的兜底 catch 也用它（单一来源）。
+ * 阶段 1 只有一种语言，故取默认语言；**阶段 2 必须把请求 locale 接进来**
+ * （`/api/ai/chat` 请求体经 `isLocale` 校验后转交，见规格 §9）。 */
+export const FALLBACK_ERROR_TEXT = messages(DEFAULT_LOCALE)['assistant.fallbackError']
 
 const validUsage = (usage: AiUsage | undefined): AiUsage | undefined =>
   usage &&

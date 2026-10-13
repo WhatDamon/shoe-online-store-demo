@@ -1,9 +1,25 @@
 // 人设 + 各模式 system prompt（购物话题限定、克制、只基于注入上下文作答）。
 // 口径中性真实：真实货品为供应商实拍休闲鞋，故不自称 3D-printed brand（避免与实图矛盾）。
 // Mock 会匹配下方短语以产生确定性行为，真实模型遵循同一指令——两者输入输出同构。
+//
+// 提示词本身**不进词典**：它是模型面向的输入，用户看不到（规格 §9 的口径是阶段 2 给
+// `systemFor` 追加**语言指令**，而不是把指令本身翻掉）；维持英文并进 `check:i18n` 白名单。
 import type { Mode } from '@/domain/chat-events'
 import { GIFT_OFFER_FACT } from '@/lib/gift-offer'
 import { STORE_POLICY_FACTS } from '@/lib/store-policy'
+
+/**
+ * MockProvider 的分派信号（它读 system 里的这些短语决定确定性行为）。
+ *
+ * **与下方的 system 文本同源**：每个信号都以 `${MODE_SIGNALS.x}` 嵌在对应 mode 的句子里，
+ * 所以「改提示词、忘改 mock」不可能静默发生——两侧读的是同一个常量，而
+ * `copy-contract.test.ts` 另外钉住「该短语确实出现在 `systemFor(mode)` 的输出里」。
+ */
+export const MODE_SIGNALS = {
+  support: 'answering store policy questions',
+  findShoes: 'summarizing the matching styles',
+  outfit: 'suggest three pairings',
+} as const
 
 export const PERSONA =
   'You are a helpful in-store footwear guide for a casual footwear brand. Be warm, concise and grounded: only talk about products and details given to you. Never invent prices, availability or materials. If asked anything outside shoes and shopping, reply in at most two short sentences and steer back to the catalog. Use plain short sentences.'
@@ -28,14 +44,14 @@ export function systemFor(
       return `${base}The customer wants help picking shoes. Use only the product and catalog details given to you, and recommend one to three products by name with a short reason. Never mention products you were not given.\n\n${GIFT_OFFER_FACT}\n\n${GIFT_OFFER_RULES}\n\n${anchor}Catalog:\n${ctx.catalogDigest ?? ''}`
     }
     case 'find-shoes':
-      return `${base}The customer asked to browse the catalog and a grid of matching styles is already shown to them. Write a single short sentence summarizing the matching styles. Do not repeat prices or list every product.\n\nMatches:\n${ctx.catalogDigest ?? ''}`
+      return `${base}The customer asked to browse the catalog and a grid of matching styles is already shown to them. Write a single short sentence ${MODE_SIGNALS.findShoes}. Do not repeat prices or list every product.\n\nMatches:\n${ctx.catalogDigest ?? ''}`
     case 'outfit':
-      return `${base}The customer is viewing a product and wants outfit ideas built around it. Reference the product by name and suggest three pairings.\n\n${ctx.product ?? ''}`
+      return `${base}The customer is viewing a product and wants outfit ideas built around it. Reference the product by name and ${MODE_SIGNALS.outfit}.\n\n${ctx.product ?? ''}`
     case 'size-fit':
       return `${base}Help the customer find their size in the product below. Only use the product facts given.\n\n${ctx.product ?? ''}`
     case 'support':
       // 店务客服（克制 P1）：只答注入的店务事实，不编造物流/订单能力。
-      // mock 以 'answering store policy questions' 特征短语分派确定性回复。
-      return `${base}The customer is asking a store service question (shipping, returns or care). You are answering store policy questions — reply using ONLY the facts below. Never invent shipping times, order statuses, stock or contact details. If the question is outside these facts, say you're not sure and steer back to the shoes or the product page.\n\n${STORE_POLICY_FACTS.join('\n')}`
+      // mock 以 `MODE_SIGNALS.support` 特征短语分派确定性回复（同一个常量）。
+      return `${base}The customer is asking a store service question (shipping, returns or care). You are ${MODE_SIGNALS.support} — reply using ONLY the facts below. Never invent shipping times, order statuses, stock or contact details. If the question is outside these facts, say you're not sure and steer back to the shoes or the product page.\n\n${STORE_POLICY_FACTS.join('\n')}`
   }
 }

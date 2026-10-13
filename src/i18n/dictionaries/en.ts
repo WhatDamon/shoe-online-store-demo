@@ -353,6 +353,115 @@ const en = {
   'errors.unknown': "We couldn't complete that action. Check the quantity and try again.",
   'errors.unexpected': 'Something went wrong. Please try again.',
   'errors.loading': 'Loading...',
+
+  // ── 批次 C：助手（`src/components/assistant/**`）与服务端 AI / 护栏的消费端文案 ─────────
+  // 表面归属：`assistant.*` 同时承载**助手浮层的界面文案**与**产出会话正文的服务端模块**
+  // （`src/server/ai/{mock,handlers,chat,size-input}.ts`）——两者是同一句对话的两端，拆成两族
+  // 会让同一句话在词典里出现两次。`guardrail.*` 是护栏拒绝时显示的温和文案。
+  //
+  // **提示词不进词典**：`src/server/ai/prompts.ts` 的 system 指令是**模型面向的输入**，用户看不到，
+  // 按 CONTEXT.md「服务端产出的消费端文案与开发者文案必须分开」留在原模块（规格 §9 的口径是
+  // 阶段 2 给 `systemFor` 追加**语言指令**，不是把指令本身翻掉）。mock 用来分派行为的特征短语由
+  // `MODE_SIGNALS` 单源提供给提示词与 mock 两侧，守卫见 `src/server/ai/copy-contract.test.ts`。
+  //
+  // 句子中间夹数据（商品名/尺码）的地方按既有口径拆成片段：片段不带首尾空格，空格与列表连接词
+  // 由 `mock.ts` 拼；变长列表末尾的句号是句式骨架的一部分，也留在拼装处。
+
+  // 确定性 mock 助手的可见回复（`mock.ts`）。`REDIRECT_TEXT` 仍是 `export const`，值取自这里。
+  'assistant.redirect':
+    "I'm here to help with shoes and finding your next pair — want to tell me what you're looking for?",
+  'assistant.mock.supportFallback':
+    'Happy to help with shipping, returns and care — what would you like to know?',
+  'assistant.mock.noStyles': 'No styles matched that search.',
+  'assistant.mock.matchOneLead': 'Here is your match: the',
+  'assistant.mock.matchTwoLead': 'Here are two matches: the',
+  'assistant.mock.matchTwoJoin': 'and the',
+  'assistant.mock.matchManyLead': 'Here are a few matches: the',
+  'assistant.mock.matchManyJoin': ', the',
+  'assistant.mock.matchManyLastJoin': ', and the',
+  // 没有商品上下文时 outfit 回复里的占位主语（`Style the {{这里}} with …`）。
+  'assistant.mock.theseShoes': 'these shoes',
+  'assistant.mock.outfitStyleLead': 'Style the',
+  'assistant.mock.outfitStyleTail':
+    'with relaxed chinos and a plain tee for an easy everyday outfit.',
+  'assistant.mock.outfitLayer':
+    'Layer a soft crew-neck sweater in a neutral tone over slim jeans on cooler days.',
+  'assistant.mock.outfitDress':
+    'Dress them up with tailored trousers and a tucked-in shirt for a smarter casual look.',
+  'assistant.mock.noCatalogMatch':
+    'I could not find a style matching that in the catalog just yet.',
+  'assistant.mock.startLead': 'I would start with the',
+  'assistant.mock.startOneTail': '— it reads as a strong match for what you described.',
+  'assistant.mock.startTwoJoin': 'and the',
+  'assistant.mock.startTwoTail': '— both read as strong matches for what you described.',
+  // 赠品行：门槛与赠品事实来自 `src/lib/gift-offer.ts`，这里只是它们周围的句子。
+  'assistant.mock.giftLead': 'And heads-up: orders over $',
+  'assistant.mock.giftMid': 'include one free',
+
+  // 会话内的失败与前置提示（`handlers.ts` / `chat.ts`），挂在助手消息上。
+  'assistant.productRequired': 'Pick a product first, then I can help with that.',
+  'assistant.noMatch':
+    "I couldn't find a style that matches that yet — try different words or browse the shop.",
+  'assistant.fallbackError': 'Something went wrong — please try again.',
+  'assistant.networkError': 'Something went wrong on our end — please try again.',
+  // outfit 空文本时合成的用户轮：它代表用户那句话（发给模型并记账），故与界面文案同族。
+  'assistant.outfitPrompt': 'Give me outfit ideas.',
+
+  // size-fit 的确定性建议（`size-input.ts`）。尺码体系名（`EU`）与换算值是领域事实，不进词典
+  // （ADR 0008 决策 6：语言不改变尺码显示体系），故 `(EU)` 留在拼装处。
+  'assistant.sizeFit.askForSize':
+    'Can you tell me the size you usually wear, or your foot length in cm?',
+  'assistant.sizeFit.outOfStock': 'This style is currently out of stock in nearby sizes.',
+  'assistant.sizeFit.runs': 'runs',
+  'assistant.sizeFit.basedOnUsualSize': 'Based on your usual size,',
+  'assistant.sizeFit.shouldFitBest': 'should fit best.',
+  // 尺码块的标签（`message-list.tsx`）：`Try US 9` / `Nearby sizes: US 8.5 · US 9`。
+  'assistant.sizeFit.try': 'Try',
+  'assistant.sizeFit.nearby': 'Nearby sizes:',
+
+  // 助手浮层的界面文案（`assistant-panel.tsx` / `fab.tsx` / `message-list.tsx`）。
+  // `fab.label` 与 `panel.title` 今天是同一句，但是两条独立键：入口按钮与面板标题各自演化
+  // （与 `marketing.hero.title` / `marketing.footer.pitch` 同一口径）。
+  'assistant.fab.label': 'Need a hand?',
+  'assistant.fab.open': 'Open shopping assistant',
+  'assistant.panel.title': 'Need a hand?',
+  'assistant.panel.subtitle':
+    'Ask about sizing, styles, shipping & returns, or what’s in the shop.',
+  'assistant.panel.lookingAt': 'Looking at:',
+  // `Remove {商品名}`：商品名是目录数据。
+  'assistant.panel.removeProduct': 'Remove',
+  'assistant.speak.read': 'Read replies aloud',
+  'assistant.speak.stop': 'Stop reading replies aloud',
+  'assistant.speak.on': 'On',
+  'assistant.speak.off': 'Off',
+  // 锚定欢迎语（`Hi — this is the {{商品名}}. …`）：商品名两侧拆成两条片段。
+  'assistant.welcome.lead': 'Hi — this is the',
+  'assistant.welcome.tail':
+    ". Ask me about it, find your size, or tell me what you're looking for.",
+  'assistant.welcome.general': 'Hi — need a hand finding your pair?',
+  'assistant.composer.label': 'Message',
+  'assistant.composer.placeholder': 'Ask about a shoe, size, or style…',
+  'assistant.composer.send': 'Send',
+  'assistant.conversation': 'Conversation',
+  'assistant.retry': 'Try again',
+
+  // 结果卡的元数据（`product-result-card.tsx`）：数字来自事件，只有量词进词典。
+  'assistant.card.color': 'color',
+  'assistant.card.colors': 'colors',
+  'assistant.card.photos': 'photos',
+
+  // 开场建议 chips（`suggestion-chips.tsx`）。label 既渲染成按钮文字，也作为该轮的用户消息
+  // 发给服务端（`onPick(mode, label)` → 请求体 `text`），故两者必须同源。
+  'assistant.chip.findMySize': 'Find my size',
+  'assistant.chip.styleItWith': 'Style it with',
+  'assistant.chip.helpMePick': 'Help me pick',
+  'assistant.chip.everydaySneakers': 'Everyday sneakers',
+  'assistant.chip.shippingReturns': 'Shipping & returns',
+  'assistant.chip.careGuide': 'Care guide',
+
+  // 护栏拒绝（`guardrails/index.ts` 的 `GUARDRAIL_MESSAGE`，仍是 `export const`）：消费端措辞，
+  // 绝不出现 "rate limited"（`GuardrailError.code` 才是机器契约）。
+  'guardrail.cooldown': 'The assistant is taking a short break — try again in a moment.',
 } as const
 
 export default en
