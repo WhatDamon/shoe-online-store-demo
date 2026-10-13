@@ -71,6 +71,21 @@ def commerce_engine(request, template, tmp_path, snapshot_database):
         engine.dispose()
 
 
+@pytest.fixture(autouse=True)
+def stripe_disabled(monkeypatch):
+    """Pin the only payment switch off unless a test turns Stripe on itself.
+
+    ``Settings`` reads the repository's root and backend ``.env`` files by design, so a
+    developer who enables Stripe there would otherwise push every disabled-path test onto
+    the live Stripe branch and make the suite red under a legal configuration. Tests that
+    need Stripe on patch ``stripe_enabled`` themselves: their patches are applied after
+    this fixture and therefore win.
+    """
+    monkeypatch.setattr(settings, "stripe_enabled", False)
+    monkeypatch.setattr(settings, "stripe_secret_key", "")
+    assert settings.stripe_ready is False
+
+
 @pytest.fixture
 def commerce(commerce_engine, monkeypatch):
     # API tests use isolated DBs; worker lifecycle has dedicated tests with its own DB.

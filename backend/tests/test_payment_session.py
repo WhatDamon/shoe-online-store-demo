@@ -291,6 +291,28 @@ def test_session_opens_a_new_session_when_the_stored_one_is_gone(
     assert len(stripe_checkout.created) == 2
 
 
+def test_session_gateway_failure_returns_500_without_persisting_payment(
+    commerce, payable_order, failing_gateway, monkeypatch
+):
+    client, engine = commerce
+    monkeypatch.setattr(settings, "stripe_enabled", True)
+    monkeypatch.setattr(settings, "stripe_secret_key", "sk_test_gateway_failure")
+    monkeypatch.setattr(payments, "default_gateway", lambda: failing_gateway)
+    response = session_post(client, payable_order["id"])
+    # A failing Stripe call is an infrastructure error, not a payment outcome: the Next
+    # proxy maps the 5xx onto backend_unavailable, and the attempt stays retryable.
+    assert response.status_code == 500
+    assert response.json() == {
+        "code": "internal_error",
+        "detail": "Request could not be completed",
+    }
+    assert failing_gateway.calls == ["create_checkout_session"]
+    # The payment row is written inside the request transaction, which rolls back here:
+    # no payment or event row may survive to look like a session Stripe never opened.
+    assert_no_payment_rows(engine, payable_order["id"])
+    assert row_count(engine, Payment) == 0
+
+
 def test_session_clamps_stripe_expiry_to_reservation_deadline(
     commerce, variant, stripe_checkout, monkeypatch
 ):
