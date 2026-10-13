@@ -428,6 +428,9 @@ const en = {
   'assistant.panel.subtitle':
     'Ask about sizing, styles, shipping & returns, or what’s in the shop.',
   'assistant.panel.lookingAt': 'Looking at:',
+  // 关闭按钮的**可及名**（`sheet.tsx` 的 sr-only 文案，读屏会念出来）：由面板传入，
+  // primitive 的默认值仍是同一个字符串（阶段 1 输出等价）。
+  'assistant.panel.close': 'Close',
   // `Remove {商品名}`：商品名是目录数据。
   'assistant.panel.removeProduct': 'Remove',
   'assistant.speak.read': 'Read replies aloud',

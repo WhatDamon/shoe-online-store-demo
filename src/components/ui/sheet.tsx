@@ -41,10 +41,14 @@ function SheetContent({
   children,
   side = 'right',
   showCloseButton = true,
+  closeLabel = 'Close',
   ...props
 }: SheetPrimitive.Popup.Props & {
   side?: 'top' | 'right' | 'bottom' | 'left'
   showCloseButton?: boolean
+  /** 关闭按钮的可及名（sr-only，读屏会念出来）。默认英文让 primitive 可独立使用，
+   * 本地化由消费端传词典取值（如 assistant-panel 的 `assistant.panel.close`）。 */
+  closeLabel?: string
 }) {
   return (
     <SheetPortal>
@@ -65,7 +69,7 @@ function SheetContent({
             render={<Button variant="ghost" className="absolute top-3 right-3" size="icon-sm" />}
           >
             <XIcon />
-            <span className="sr-only">Close</span>
+            <span className="sr-only">{closeLabel}</span>
           </SheetPrimitive.Close>
         )}
       </SheetPrimitive.Popup>

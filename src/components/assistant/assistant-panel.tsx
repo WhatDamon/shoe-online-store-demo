@@ -86,7 +86,11 @@ export function AssistantPanel({
         if (!next) onClose()
       }}
     >
-      <SheetContent side="right" className="flex h-full flex-col gap-0 p-0">
+      <SheetContent
+        side="right"
+        closeLabel={t['assistant.panel.close']}
+        className="flex h-full flex-col gap-0 p-0"
+      >
         <SheetHeader className="shrink-0 border-b border-neutral-200 pr-12">
           <div className="flex items-center justify-between gap-2">
             <SheetTitle>{t['assistant.panel.title']}</SheetTitle>
