@@ -1,5 +1,7 @@
 import Image from 'next/image'
 import { LocaleLink } from '@/components/i18n/locale-link'
+import type { Locale } from '@/i18n/locales'
+import { messages } from '@/i18n/messages'
 import { catalog } from '@/server/catalog/adapter'
 import { ProductVisual } from '@/components/shop/product-visual'
 
@@ -19,7 +21,8 @@ interface SeriesCard {
   } | null
 }
 
-export async function CollectionCards() {
+export async function CollectionCards({ locale }: { locale: Locale }) {
+  const t = messages(locale)
   const collections = await catalog().getCollections()
 
   const cards: SeriesCard[] = await Promise.all(
@@ -48,12 +51,14 @@ export async function CollectionCards() {
   return (
     <section id="collections" aria-labelledby="collections-heading" className="bg-surface">
       <div className="mx-auto w-full max-w-6xl px-4 py-20 md:py-28">
-        <p className="text-xs font-medium uppercase tracking-[0.18em] text-brand">Shop by series</p>
+        <p className="text-xs font-medium uppercase tracking-[0.18em] text-brand">
+          {t['marketing.collections.kicker']}
+        </p>
         <h2
           id="collections-heading"
           className="mt-3 font-heading text-3xl font-semibold tracking-tight text-ink sm:text-4xl"
         >
-          Find your everyday pair
+          {t['marketing.collections.title']}
         </h2>
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {cards.map((card) => (

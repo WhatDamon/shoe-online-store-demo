@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { HeartIcon, MenuIcon, SearchIcon, ShoppingBagIcon, XIcon } from 'lucide-react'
 import { site } from '@/lib/site'
 import { LocaleLink } from '@/components/i18n/locale-link'
-import { useLocale } from '@/components/i18n/locale-provider'
+import { useLocale, useMessages } from '@/components/i18n/locale-provider'
 import { useWishlist } from '@/components/shop/wishlist-provider'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -31,6 +31,7 @@ export function AppBar({
 } = {}) {
   const { items } = useWishlist()
   const count = items.length
+  const t = useMessages()
   // 搜索表单提交到 /shop：原生 GET 表单不经 Router，必须在渲染时带上 locale 前缀。
   const locale = useLocale()
   const shopPath = localePath(locale, '/shop')
@@ -57,7 +58,10 @@ export function AppBar({
   // 搜索行常驻桌面（lg+）；手机展开态只在 <lg 显示。
 
   const searchSolid = scrolled || tone === 'solid'
-  const wishlistLabel = `Wishlist, ${count} ${count === 1 ? 'item' : 'items'}`
+  // 计数与量词按语言的复数规则组合（本阶段只有 en，用词典里的 item/items 两形）。
+  const wishlistLabel = `${t['marketing.appBar.wishlist']}, ${count} ${
+    count === 1 ? t['marketing.appBar.wishlistItem'] : t['marketing.appBar.wishlistItems']
+  }`
   // 头部触控目标统一 ≥44px（Apple/Android 触控命中区规范下限）：真机手指出手偏
   // 离 36px 图标外沿即落空（表现为“点了没反应”），44px + 图标居中保证命中。
   const iconLinkClass =
@@ -75,7 +79,7 @@ export function AppBar({
       )}
     >
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4">
-        <LocaleLink href="/cart" aria-label="Cart" className={iconLinkClass}>
+        <LocaleLink href="/cart" aria-label={t['marketing.appBar.cart']} className={iconLinkClass}>
           <ShoppingBagIcon className="size-5" />
         </LocaleLink>
         {/* 左：移动菜单（md 隐藏）+ 品牌 */}
@@ -86,15 +90,15 @@ export function AppBar({
               JS 可用时额外提供：点击链接收起 + 打开态图标切换 Menu→✕（纯 CSS）。 */}
           <details ref={mobileMenuRef} className="group relative md:hidden">
             <summary
-              aria-label="Open menu"
+              aria-label={t['marketing.appBar.openMenu']}
               className="flex h-11 w-11 list-none cursor-pointer select-none items-center justify-center rounded-full text-current transition-opacity hover:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current [&::-webkit-details-marker]:hidden"
             >
               <MenuIcon className="size-5 group-open:hidden" />
               <XIcon className="hidden size-5 group-open:block" />
-              <span className="sr-only">Menu</span>
+              <span className="sr-only">{t['marketing.appBar.menu']}</span>
             </summary>
             <nav
-              aria-label="Mobile"
+              aria-label={t['marketing.appBar.mobileNav']}
               className="absolute left-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-ink/10 bg-popover text-popover-foreground shadow-lg"
             >
               {site.nav.map((item) => (
@@ -104,7 +108,7 @@ export function AppBar({
                   onClick={() => mobileMenuRef.current?.removeAttribute('open')}
                   className="block px-4 py-3 text-[15px] font-medium text-foreground transition-colors hover:bg-muted"
                 >
-                  {item.label}
+                  {t[item.key]}
                 </LocaleLink>
               ))}
             </nav>
@@ -118,14 +122,17 @@ export function AppBar({
         </div>
 
         {/* 中：桌面导航 */}
-        <nav aria-label="Main" className="hidden flex-1 justify-center gap-8 md:flex">
+        <nav
+          aria-label={t['marketing.appBar.mainNav']}
+          className="hidden flex-1 justify-center gap-8 md:flex"
+        >
           {site.nav.map((item) => (
             <LocaleLink
               key={item.href}
               href={item.href}
               className="text-sm font-medium text-current transition-opacity hover:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-current"
             >
-              {item.label}
+              {t[item.key]}
             </LocaleLink>
           ))}
         </nav>
@@ -137,7 +144,7 @@ export function AppBar({
           <form
             action={shopPath}
             role="search"
-            aria-label="Search products"
+            aria-label={t['marketing.appBar.searchProducts']}
             className="relative hidden items-center lg:flex"
           >
             <SearchIcon
@@ -147,8 +154,8 @@ export function AppBar({
             <Input
               name="q"
               type="search"
-              placeholder="Search"
-              aria-label="Search products"
+              placeholder={t['marketing.appBar.search']}
+              aria-label={t['marketing.appBar.searchProducts']}
               className={cn(
                 'h-9 w-44 rounded-full pl-10 text-sm transition-colors',
                 searchSolid
@@ -164,31 +171,31 @@ export function AppBar({
               生切换。JS 可用时点击链接/回车即提交（原生 form GET）。 */}
           <details className="group relative lg:hidden">
             <summary
-              aria-label="Search"
+              aria-label={t['marketing.appBar.search']}
               className="flex h-11 w-11 list-none cursor-pointer select-none items-center justify-center rounded-full text-current transition-opacity hover:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current [&::-webkit-details-marker]:hidden"
             >
               <SearchIcon className="size-5 group-open:hidden" />
               <XIcon className="hidden size-5 group-open:block" />
-              <span className="sr-only">Search</span>
+              <span className="sr-only">{t['marketing.appBar.search']}</span>
             </summary>
             <div
               role="search"
-              aria-label="Search products"
+              aria-label={t['marketing.appBar.searchProducts']}
               className="absolute right-0 top-full z-50 mt-2 w-[min(26rem,calc(100vw-3.5rem))] border border-ink/10 bg-canvas p-2 text-ink shadow-lg"
             >
               <form action={shopPath} className="flex items-center gap-2">
                 <Input
                   name="q"
                   type="search"
-                  placeholder="Search styles"
-                  aria-label="Search products"
+                  placeholder={t['marketing.appBar.searchStyles']}
+                  aria-label={t['marketing.appBar.searchProducts']}
                   className="h-10 min-w-0 flex-1 rounded-full border-neutral-300 bg-surface pl-4 text-ink placeholder:text-neutral-500"
                 />
                 <button
                   type="submit"
                   className="h-10 shrink-0 rounded-full bg-ink px-4 text-sm font-medium text-canvas transition-opacity hover:opacity-80"
                 >
-                  Search
+                  {t['marketing.appBar.search']}
                 </button>
               </form>
             </div>

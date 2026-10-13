@@ -2,6 +2,7 @@ import { Hero } from '@/components/marketing/hero'
 import type { Metadata } from 'next'
 import { pageMetadata } from '@/lib/seo'
 import { DEFAULT_LOCALE, isLocale } from '@/i18n/locales'
+import { messages } from '@/i18n/messages'
 import { PromiseStrip } from '@/components/marketing/promise-strip'
 import { CollectionCards } from '@/components/marketing/collection-cards'
 import { FeaturedGrid } from '@/components/marketing/featured-grid'
@@ -32,6 +33,7 @@ export async function generateMetadata(props: {
 export default async function HomePage(props: { params: Promise<{ locale: string }> }) {
   const { locale: raw } = await props.params
   const locale = isLocale(raw) ? raw : DEFAULT_LOCALE
+  const t = messages(locale)
 
   return (
     <>
@@ -43,13 +45,13 @@ export default async function HomePage(props: { params: Promise<{ locale: string
           path: '/',
         })}
       />
-      <Hero />
-      <PromiseStrip />
-      <CollectionCards />
-      <FeaturedGrid />
-      <StorySection />
-      <FaqSection />
-      <JsonLd data={faqSchema(locale, [...homepageFaq])} />
+      <Hero locale={locale} />
+      <PromiseStrip locale={locale} />
+      <CollectionCards locale={locale} />
+      <FeaturedGrid locale={locale} />
+      <StorySection locale={locale} />
+      <FaqSection locale={locale} />
+      <JsonLd data={faqSchema(locale, homepageFaq(t))} />
     </>
   )
 }

@@ -1,22 +1,15 @@
-export const homepageFaq = [
-  {
-    question: 'What is Evoloop?',
-    answer:
-      'Evoloop is an independent footwear project exploring casual shoes made to order with digital manufacturing and millimetre-based sizing.',
-  },
-  {
-    question: 'How do I find my Evoloop size?',
-    answer:
-      'Measure the longer foot in millimetres while standing, then use the size range on the product page. If you are between sizes, choose the larger size.',
-  },
-  {
-    question: 'Are Evoloop prices and checkout live?',
-    answer:
-      'The current catalog is a public demo. Product prices and checkout are shown for exploration, but orders are not live yet.',
-  },
-  {
-    question: 'Where can I learn about the materials and process?',
-    answer:
-      'The Evoloop journal explains digital footwear, sizing, commuting, and made-to-order production in plain language.',
-  },
-] as const
+import type { Messages } from '@/i18n/messages'
+
+/**
+ * 首页 FAQ 的问答对，文案在词典里（`faq.q1.*`…）。顺序即渲染顺序，页面区块
+ * （`src/components/marketing/faq-section.tsx`）与 FAQPage 结构化数据
+ * （`src/app/[locale]/(landing)/page.tsx`）共用这一份，避免两处顺序/内容漂移。
+ */
+export function homepageFaq(t: Messages): { question: string; answer: string }[] {
+  return [
+    { question: t['faq.q1.question'], answer: t['faq.q1.answer'] },
+    { question: t['faq.q2.question'], answer: t['faq.q2.answer'] },
+    { question: t['faq.q3.question'], answer: t['faq.q3.answer'] },
+    { question: t['faq.q4.question'], answer: t['faq.q4.answer'] },
+  ]
+}

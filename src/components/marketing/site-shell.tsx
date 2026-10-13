@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { cn } from 'cn'
+import { useMessages } from '@/components/i18n/locale-provider'
 import { AppBar } from './app-bar'
 import { Footer } from './footer'
 
@@ -21,6 +22,8 @@ export function SiteShell({
   tone?: 'overlay' | 'solid'
   children: ReactNode
 }) {
+  const t = useMessages()
+
   return (
     <div className="flex min-h-dvh flex-col bg-canvas text-ink">
       {/* 键盘/读屏跳转链接（WCAG 2.4.1）：Tab 首元素即达，跳过头部导航直达正文。 */}
@@ -28,7 +31,7 @@ export function SiteShell({
         href="#main"
         className="sr-only z-[60] rounded-md bg-ink px-4 py-2 text-sm font-medium text-canvas focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:outline-2 focus:outline-offset-2 focus:outline-brand"
       >
-        Skip to content
+        {t['marketing.shell.skipToContent']}
       </a>
       <AppBar tone={tone} />
       {/* id="main" 是 skip link 的落地锚点（tabIndex=-1 使旧版 Safari 也能接收焦点）。 */}
