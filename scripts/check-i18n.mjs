@@ -15,7 +15,8 @@
  * 3. `error-code` —— `backend/app/application/errors.py` 的码字面量与 Route Handler 的 `code`
  *    字面量，必须出现在前端的码联合里，否则要显式进白名单。任务 8 遗留 P2-1：前端的码联合是手写的，
  *    与 Python 常量表没有机械绑定，新增一个后端码不会让 `tsc` 报错，会静默落到 `errors.unknown`。
- * 4. `stale-allowlist` —— 白名单条目自身不许腐烂：路径要在、`text` 要在、登记的码还要在。
+ * 4. `stale-allowlist` —— 白名单条目自身不许腐烂：路径要在、`text` 要在、登记的码还要在，且扫描面内的
+ *    抑制项**必须仍在压制命中**（字面量还在文件里、但已不产出该规则的命中 = 惰性条目，会报出来）。
  *
  * 判据抓什么、不抓什么（如实登记，不要指望它覆盖更多）：
  * - 抓：JSX 文本节点；文案属性（aria-label / title / placeholder / alt / label / aria-description /
@@ -31,8 +32,8 @@
  *   属性；SVG 几何属性（d / points / viewBox / transform / strokeDasharray）；Tailwind/cva 样式串
  *   与内联样式值（全小写、逐 token 是工具类或尺寸值的串）。这些按判据放过，**不占白名单**。
  *
- * 判定逻辑集中在可测的纯函数（scanSource / unlistedErrorCodes / unreadableAllowlistEntries），
- * CLI 只是薄壳。
+ * 判定逻辑集中在可测的纯函数（scanSource / unlistedErrorCodes / unreadableAllowlistEntries /
+ * unusedAllowlistEntries），CLI 只是薄壳。
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -68,7 +69,21 @@ const TEST_FILE = /\.(test|spec)\.[cm]?[jt]sx?$/
  *
  * @type {Array<{ path?: string, rule: string, text?: string, count?: number, code?: string, reason: string }>}
  */
-export const ALLOWLIST = JSON.parse(readFileSync(path.join(REPO_ROOT, ALLOWLIST_FILE), 'utf8'))
+export const ALLOWLIST = readAllowlist()
+
+/**
+ * 读白名单。`REPO_ROOT` 依赖 `process.cwd()`，从非仓库根调用时这里必须**明确失败**，
+ * 不能让门禁因为读不到白名单而静默通过（CLI 入口判据见文件末尾）。
+ */
+function readAllowlist() {
+  const file = path.join(REPO_ROOT, ALLOWLIST_FILE)
+  if (!existsSync(file)) {
+    throw new Error(
+      `check:i18n 在 ${REPO_ROOT} 下找不到 ${ALLOWLIST_FILE}：当前目录不是仓库根。请在仓库根运行（npm run check:i18n）。`,
+    )
+  }
+  return JSON.parse(readFileSync(file, 'utf8'))
+}
 
 // ---------------------------------------------------------------------------
 // 散文判据
@@ -493,7 +508,7 @@ export function unreadableAllowlistEntries(allowlist, root) {
 // ---------------------------------------------------------------------------
 
 /** 列出要扫描的源文件（仓库相对路径，`/` 分隔）。 */
-function collectSources(root, roots) {
+export function collectSources(root, roots) {
   const collected = []
   const walk = (absolute, relative) => {
     for (const entry of readdirSync(absolute, { withFileTypes: true })) {
@@ -518,8 +533,9 @@ function uniqueSorted(values) {
   return [...new Set(values)].sort()
 }
 
-function allowlisted(file, finding, allowlist) {
-  return allowlist.some(
+/** 命中的白名单条目（同时用于统计抑制数、检测惰性条目）；没命中返回 `undefined`。 */
+function matchingAllowlistEntry(file, finding, allowlist) {
+  return allowlist.find(
     (entry) =>
       entry.path === file &&
       entry.rule === finding.rule &&
@@ -528,20 +544,51 @@ function allowlisted(file, finding, allowlist) {
   )
 }
 
-/** 扫描入口。返回 `{ findings, suppressed }`，findings 为空表示门禁通过。 */
-function analyze() {
+/** 扫描面内、靠 `text` 压制命中的规则：只有这些条目可能「腐烂成惰性条目」。 */
+const SUPPRESSIBLE_RULES = new Set(['prose-jsx-text', 'prose-attr', 'prose-literal', RULE_RAW_PATH])
+
+/**
+ * 惰性白名单条目：条目的字面量还在文件里（`unreadableAllowlistEntries` 会放过），但今天的扫描
+ * 没有任何命中用到它——被挪进注释、属性名变了、JSX 文本变成别的形态。此时条目是 no-op，门禁却全绿。
+ * 范围外/扫描面外的登记（`internal-copy` / `error-code`）本来就不压制命中，不参与本判据。
+ *
+ * @param {Array<{ path?: string, rule: string, text?: string }>} allowlist
+ * @param {Set<unknown>} used 实际压制过命中的条目
+ * @returns {Array<{ rule: string, file: string, line: number, text: string }>}
+ */
+export function unusedAllowlistEntries(allowlist, used) {
+  return allowlist
+    .filter(
+      (entry) => SUPPRESSIBLE_RULES.has(entry.rule) && entry.text !== undefined && !used.has(entry),
+    )
+    .map((entry) => ({
+      rule: 'stale-allowlist',
+      file: entry.path ?? '(未命名条目)',
+      line: 1,
+      text:
+        `白名单条目没有压制任何命中：字面量还在 ${entry.path} 里，` +
+        `但已不产出 ${entry.rule} 命中，条目成了 no-op——${String(entry.text).slice(0, 60)}`,
+    }))
+}
+
+/** 扫描入口（导出供测试直接钉住真实仓库的结果）。返回 `{ findings, suppressed }`，findings 为空表示门禁通过。 */
+export function analyze() {
   const findings = []
   let suppressed = 0
+  const usedEntries = new Set()
   for (const file of collectSources(REPO_ROOT, SCAN_ROOTS)) {
     const source = readFileSync(path.join(REPO_ROOT, file), 'utf8')
     for (const finding of scanSource(source, file)) {
-      if (allowlisted(file, finding, ALLOWLIST)) {
+      const entry = matchingAllowlistEntry(file, finding, ALLOWLIST)
+      if (entry !== undefined) {
         suppressed += 1
+        usedEntries.add(entry)
         continue
       }
       findings.push({ ...finding, file })
     }
   }
+  findings.push(...unusedAllowlistEntries(ALLOWLIST, usedEntries))
   findings.push(
     ...unlistedErrorCodes(
       readContractErrorCodes(REPO_ROOT),
@@ -584,6 +631,8 @@ function main() {
   return findings.length > 0 ? 1 : 0
 }
 
-if (path.resolve(process.argv[1] ?? '') === path.join(REPO_ROOT, 'scripts/check-i18n.mjs')) {
+// 入口判据按**文件名**，不按「路径等于 cwd 下的脚本」：后者依赖 cwd，用绝对路径从别处调用时会判成
+// 「不是 CLI 调用」，于是 `main()` 不跑、退出码 0 伪装成通过（实测复现见任务 11 修复报告）。
+if (path.basename(process.argv[1] ?? '') === 'check-i18n.mjs') {
   process.exit(main())
 }

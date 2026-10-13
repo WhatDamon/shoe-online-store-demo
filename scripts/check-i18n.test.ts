@@ -8,18 +8,25 @@
  * 的授权范围（只允许改 package.json 的 scripts），而「测试跑不起来」与「必须有负向对照」直接冲突，
  * 故按既有先例（`scripts/check-slop.test.ts`）用 `.test.ts`。
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   ALLOWLIST,
   REPO_ROOT,
+  analyze,
+  collectSources,
   readContractErrorCodes,
   readFrontendErrorCodes,
   scanSource,
   unlistedErrorCodes,
   unreadableAllowlistEntries,
+  unusedAllowlistEntries,
 } from './check-i18n.mjs'
 
 const probe = (source: string, fileName = 'probe.tsx') => scanSource(source, fileName)
+const rulesOf = (source: string, fileName = 'probe.tsx') =>
+  probe(source, fileName).map((finding) => finding.rule)
 
 /**
  * 负向对照是这套门禁唯一有意义的证据：`check:i18n` 今天的契约是「0 阻塞命中」，
@@ -27,12 +34,15 @@ const probe = (source: string, fileName = 'probe.tsx') => scanSource(source, fil
  */
 describe('check-i18n：散文判据', () => {
   it('识别 JSX 文本里的散文', () => {
-    expect(probe('export const A = () => <p>Hello there</p>')).toHaveLength(1)
+    expect(rulesOf('export const A = () => <p>Hello there</p>')).toEqual(['prose-jsx-text'])
   })
 
   it('识别文案属性', () => {
-    expect(probe('export const A = () => <img alt="Nice shoes" />')).toHaveLength(1)
-    expect(probe('export const A = () => <button aria-label="Close the panel" />')).toHaveLength(1)
+    // 按 rule 名断言（不是只数命中数）：命中数相同、规则张冠李戴时也要变红。
+    expect(rulesOf('export const A = () => <img alt="Nice shoes" />')).toEqual(['prose-attr'])
+    expect(rulesOf('export const A = () => <button aria-label="Close the panel" />')).toEqual([
+      'prose-attr',
+    ])
   })
 
   it('识别字符串里的散文，以及折叠空白后的多行 JSX 文本', () => {
@@ -84,20 +94,103 @@ describe('check-i18n：散文判据', () => {
   })
 })
 
-describe('check-i18n：裸路径判据（与 locale-path-coverage.test.ts 同一套语义）', () => {
-  it('识别字面量绝对路径', () => {
-    expect(
-      probe('export const A = () => <a href="/shop">x</a>').some((f) => f.rule === 'raw-path'),
-    ).toBe(true)
+describe('check-i18n：裸路径判据（逐条复刻 locale-path-coverage.test.ts 的 HIT/PASS 样本）', () => {
+  // 两个守卫是同一套语义的两份实现（`.mjs` 不能 import `.ts`，只能复制）；
+  // `src/components/i18n/locale-path-coverage.test.ts` 是这套语义的真值来源。下面把这组样本
+  // **成对复刻**进本文件：同一份样本必须给出同一个判定——任一侧改了语义而另一侧没跟上时会变红。
+  // 语义本身不改动（不新增、不放宽任何样本）。
+  const verdict = (source: string) => rulesOf(source)
+
+  it('HIT：字面量、JSX 表达式字面量、命令式跳转与内联导航都命中', () => {
+    expect(verdict('<Link href="/shop">x</Link>')).toEqual(['raw-path'])
+    expect(verdict("<Link href='/shop'>x</Link>")).toEqual(['raw-path'])
+    expect(verdict('<Link href={"/shop"}>x</Link>')).toEqual(['raw-path'])
+    expect(verdict("<Link href={'/shop'}>x</Link>")).toEqual(['raw-path'])
+    expect(verdict('<Link href={`/blog/${post.slug}`}>x</Link>')).toEqual(['raw-path'])
+    expect(verdict('<a href="/shop">x</a>')).toEqual(['raw-path'])
+    expect(verdict('<Link href="/">x</Link>')).toEqual(['raw-path'])
+    expect(verdict('<form action="/shop" />')).toEqual(['raw-path'])
+    expect(verdict('<form action={"/shop"} />')).toEqual(['raw-path'])
+    expect(verdict("router.replace('/shop')")).toEqual(['raw-path'])
+    expect(verdict('router.push(`/shop?q=1`)')).toEqual(['raw-path'])
+    expect(verdict("redirect('/shop')")).toEqual(['raw-path'])
+    // 同一文件里多处命中都要报，不能只报第一处
+    expect(verdict('<a href="/a">1</a><a href="/b">2</a>')).toEqual(['raw-path', 'raw-path'])
+    // JSX 内联导航：属性初始化表达式必须继续下探，否则 router.push / redirect 写在 JSX 回调里就逃出检测面
+    expect(verdict('<button onClick={() => router.push("/shop")}>x</button>')).toEqual(['raw-path'])
+    expect(verdict('<form onSubmit={() => redirect("/shop")}>')).toEqual(['raw-path'])
+    // 同一处字面量不得因「属性判定 + 内联导航判定」两条路径被报两次
+    expect(verdict('<a href="/shop" onClick={() => router.push("/shop")}>x</a>')).toEqual([
+      'raw-path',
+      'raw-path',
+    ])
   })
 
-  it('放行 LocaleLink 属性、localePath 包裹与站外链接', () => {
-    expect(probe('export const A = () => <LocaleLink href="/shop">x</LocaleLink>')).toHaveLength(0)
-    expect(probe("export const A = () => <a href={localePath('/shop')}>x</a>")).toHaveLength(0)
-    expect(probe("export const A = () => <a href='mailto:hi@evoloop.site'>x</a>")).toHaveLength(0)
-    expect(probe("export const A = () => <a href='https://evoloop.site/shop'>x</a>")).toHaveLength(
-      0,
+  it('PASS：LocaleLink 属性、localePath 包裹、站外链接与纯锚点都不命中', () => {
+    expect(verdict('<LocaleLink href="/shop">x</LocaleLink>')).toEqual([])
+    expect(verdict('<LocaleLink href={"/shop"}>x</LocaleLink>')).toEqual([])
+    expect(verdict('<LocaleLink href={`/product/${row.handle}`}>x</LocaleLink>')).toEqual([])
+    expect(verdict('<LocaleLink action="/shop">x</LocaleLink>')).toEqual([])
+    expect(verdict("<Link href={localePath(locale, '/shop')}>x</Link>")).toEqual([])
+    expect(verdict('<Link href={localePath(locale, `/blog/${post.slug}`)}>x</Link>')).toEqual([])
+    expect(verdict("router.replace(localePath(locale, qs ? `/shop?${qs}` : '/shop'))")).toEqual([])
+    expect(verdict("redirect(localePath(locale, '/shop'))")).toEqual([])
+    expect(verdict('<Link href={href}>x</Link>')).toEqual([])
+    expect(verdict('<LocaleLink href="/">Home</LocaleLink>')).toEqual([])
+    expect(verdict("<Link href={localePath(locale, '/')}>Home</Link>")).toEqual([])
+    expect(verdict('<a href="#main">Skip</a>')).toEqual([])
+    expect(verdict('<a href="mailto:hello@evoloop.site">Mail</a>')).toEqual([])
+    expect(
+      verdict('<a href="https://github.com/WhatDamon/shoe-online-store-demo">Source</a>'),
+    ).toEqual([])
+  })
+})
+
+describe('check-i18n：扫描面确实覆盖真实仓库（不只喂合成源码）', () => {
+  it('对真实源码文件跑扫描，产出散文命中', () => {
+    // 单测若只喂合成源码，「scanSource 对真实文件不再产出散文」也不会有人发现。
+    const file = 'src/components/shop/shopify-buy-button.tsx'
+    const findings = scanSource(readFileSync(join(REPO_ROOT, file), 'utf8'), file)
+    expect(findings).toContainEqual(
+      expect.objectContaining({ rule: 'prose-literal', text: 'no window' }),
     )
+  })
+
+  it('collectSources 真的走进了 src/components（挡住「返回空 = 全绿」）', () => {
+    const files = collectSources(REPO_ROOT, ['src/components'])
+    expect(files).toContain('src/components/shop/shopify-buy-button.tsx')
+    // 余量阈值：拦住「扫描面塌成空/只剩一两个文件」，不钉死具体文件数。
+    expect(files.length).toBeGreaterThan(40)
+  })
+
+  it('真实仓库的门禁结果：0 阻塞，且白名单条目都在压制命中（没有惰性条目）', () => {
+    const result = analyze()
+    expect(result.suppressed).toBeGreaterThan(0)
+    expect(result.findings).toEqual([])
+  })
+})
+
+describe('check-i18n：惰性白名单条目（stale-allowlist）', () => {
+  it('没有压制任何命中的抑制条目会被报出来（负向对照：字面量还在但已不产生命中）', () => {
+    const entry = {
+      path: 'src/components/a.tsx',
+      rule: 'prose-literal',
+      text: '这条字面量还在文件里，但今天的扫描不再把它当散文',
+      reason: '自证惰性条目判据有判别力',
+    }
+    expect(unusedAllowlistEntries([entry], new Set())).toHaveLength(1)
+    expect(unusedAllowlistEntries([entry], new Set([entry]))).toEqual([])
+  })
+
+  it('扫描面外的登记（internal-copy / error-code）不参与惰性判定', () => {
+    const internal = {
+      path: 'src/lib/gift-offer.ts',
+      rule: 'internal-copy',
+      text: 'x',
+      reason: 'y',
+    }
+    const code = { rule: 'error-code', code: 'product_not_found', reason: 'z' }
+    expect(unusedAllowlistEntries([internal, code], new Set())).toEqual([])
   })
 })
 
