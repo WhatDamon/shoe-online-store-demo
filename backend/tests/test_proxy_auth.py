@@ -7,10 +7,11 @@ never be ingestable anonymously, an anonymous caller must never open a refund, a
 rejected request must leave neither a row nor an outbound refund behind.
 
 The webhook's own rejection and storage behaviour is pinned in ``tests/test_webhooks.py``
-(the wrong secret, the single acknowledged row, the 503 without a configured secret). What
-this file adds is the statement that one does not make: the payment endpoints are gated
-*like every other* ``/api/v1`` route, and the refund endpoint, which had no credential test
-at all, cannot reach Stripe.
+(the wrong secret, the single acknowledged row, and the 503 both without a configured
+secret and -- stricter than the rest of the router -- outside production as well). What this
+file adds is the statement that one does not make: the payment endpoints are gated *like
+every other* ``/api/v1`` route, and the refund endpoint, which had no credential test at
+all, cannot reach Stripe.
 """
 
 import pytest

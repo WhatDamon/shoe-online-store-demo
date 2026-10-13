@@ -5,10 +5,18 @@ axes, so "the customer paid but the stock was already released" is representable
 fifth order status. The tests below pin the three invariants that separation exists to
 hold:
 
-1. ``orders.status='paid'`` implies a ``succeeded`` payment and consumed reservations;
+1. ``orders.status='paid'`` means the money was captured -- ``payments.status`` is one of
+   ``succeeded``, ``refund_pending`` (a refund is owed but not completed) or ``refunded`` --
+   and every reservation of that order is ``consumed``;
 2. a released order with captured money becomes ``refund_pending``, the only source of the
    "this customer is owed money" signal;
 3. ``payments.status='succeeded'`` never puts stock back on sale.
+
+Invariant 1 used to read "``paid`` implies ``succeeded``", which the refund axis cannot
+honour: a refund that Stripe did not complete leaves ``payments.status='refund_pending'``
+while the order is still a sale to fulfil. The money axis is reported to clients as
+``payment_status`` on every order view, so both halves are readable without collapsing the
+two axes into one.
 
 Every confirmation runs under the cart lock and re-reads the order inside it, exactly like
 checkout, customer cancellation and the expiry sweep, so the two sides of the
@@ -335,6 +343,30 @@ def test_confirmation_of_a_refunded_order_is_ignored(
         money_state(engine, paid_order["id"]),
         stock_levels(engine, variant["id"]),
     ) == before
+
+
+def test_the_order_view_reports_the_captured_money_axis(commerce, paid_order):
+    """A paid order says both things at once: a sale to fulfil and captured money (F11)."""
+    client, _ = commerce
+
+    body = client.get(f"/api/v1/orders/{paid_order['id']}").json()
+
+    assert (body["status"], body["payment_status"]) == ("paid", "succeeded")
+
+
+def test_an_order_with_no_payment_row_reports_no_money_axis(commerce, variant):
+    """The convention for an order the payment channel never touched.
+
+    No payment row exists, so there is no money state to report: ``None``. It is not the
+    same statement as ``disabled``, which is the row a switched-off provider writes when it
+    is asked for a session, and a client must be able to tell the two apart.
+    """
+    client, _ = commerce
+    order = place_order(client, variant)
+
+    body = client.get(f"/api/v1/orders/{order['id']}").json()
+
+    assert (body["status"], body["payment_status"]) == ("pending_payment", None)
 
 
 def test_release_order_refuses_a_paid_order(commerce, variant, paid_order):

@@ -15,7 +15,7 @@ from app.domain.models import (
     Reservation,
     Variant,
 )
-from app.domain.states import ORDER_STATUSES
+from app.domain.states import ORDER_STATUSES, PAYMENT_STATUSES
 
 
 def test_openapi_describes_every_success_response(commerce):
@@ -51,6 +51,10 @@ def test_openapi_registers_widened_payment_contract(commerce):
     assert schemas["OrderResponse"]["properties"]["payment_enabled"]["type"] == "boolean"
     # The vocabulary must come from app.domain.states, not a second copy in the schema module.
     assert schemas["OrderResponse"]["properties"]["status"]["enum"] == list(ORDER_STATUSES)
+    # The money axis is readable and nullable: ``null`` is "no payment row yet".
+    money_axis = schemas["OrderResponse"]["properties"]["payment_status"]["anyOf"]
+    assert {"type": "null"} in money_axis
+    assert [option["enum"] for option in money_axis if "enum" in option] == [list(PAYMENT_STATUSES)]
     payment = schemas["PaymentResponse"]["properties"]
     assert payment["order_status"]["enum"] == list(ORDER_STATUSES)
     assert payment["code"]["enum"] == [
@@ -186,7 +190,13 @@ def test_internal_catalog_fields_are_not_exposed(commerce, monkeypatch):
 
 @pytest.mark.parametrize(
     ("field", "invalid"),
-    [("total", 118.0), ("status", "shipped"), ("payment_enabled", "yes"), ("quantity", "2")],
+    [
+        ("total", 118.0),
+        ("status", "shipped"),
+        ("payment_status", "shipped"),
+        ("payment_enabled", "yes"),
+        ("quantity", "2"),
+    ],
 )
 def test_invalid_order_response_rolls_back_checkout(commerce, variant, monkeypatch, field, invalid):
     client, engine = commerce

@@ -28,7 +28,13 @@ class Settings(BaseSettings):
         default="sqlite:///./commerce.db", validation_alias="COMMERCE_DATABASE_URL"
     )
     commerce_proxy_secret: str = ""
-    reservation_ttl_seconds: int = Field(default=1800, ge=1, le=604800)
+    # Stripe refuses a Checkout Session that expires in less than 30 minutes, so the hold
+    # this deadline describes has to outlive that window by a margin: at or below it, the
+    # most ordinary flow there is -- order, then pay immediately -- is refused by this
+    # service's own payable check (``payments.MIN_CHECKOUT_WINDOW``). The floor is the
+    # default for the same reason, and it is a floor and not a clamp: a deployment may hold
+    # stock for longer, never for less time than a checkout session can stay open.
+    reservation_ttl_seconds: int = Field(default=3600, ge=3600, le=604800)
     reservation_sweep_seconds: int = Field(default=30, ge=1, le=3600)
     reservation_sweep_batch_size: int = Field(default=100, ge=1, le=1000)
     reservation_sweeper_enabled: bool = True

@@ -22,14 +22,14 @@ def test_reads_root_env_file(monkeypatch, tmp_path):
     monkeypatch.delenv("RESERVATION_TTL_SECONDS", raising=False)
     root_env = tmp_path / ".env"
     root_env.write_text(
-        "COMMERCE_DATABASE_URL=sqlite:///./from-root.db\nRESERVATION_TTL_SECONDS=900\n",
+        "COMMERCE_DATABASE_URL=sqlite:///./from-root.db\nRESERVATION_TTL_SECONDS=3600\n",
         encoding="utf-8",
     )
 
     loaded = Settings(_env_file=(root_env,))
 
     assert loaded.commerce_database_url == "sqlite:///./from-root.db"
-    assert loaded.reservation_ttl_seconds == 900
+    assert loaded.reservation_ttl_seconds == 3600
     assert config.ROOT_ENV == Path(config.__file__).parents[2] / ".env"
     assert Settings.model_config["env_file"] == (config.ROOT_ENV, config.BACKEND_ENV)
 
@@ -39,15 +39,15 @@ def test_backend_env_overrides_root_env(monkeypatch, tmp_path):
     monkeypatch.delenv("RESERVATION_TTL_SECONDS", raising=False)
     root_env = tmp_path / "root.env"
     root_env.write_text(
-        "RESERVATION_TTL_SECONDS=900\nCOMMERCE_PROXY_SECRET=root-secret\n",
+        "RESERVATION_TTL_SECONDS=3600\nCOMMERCE_PROXY_SECRET=root-secret\n",
         encoding="utf-8",
     )
     backend_env = tmp_path / "backend.env"
-    backend_env.write_text("RESERVATION_TTL_SECONDS=1200\n", encoding="utf-8")
+    backend_env.write_text("RESERVATION_TTL_SECONDS=5400\n", encoding="utf-8")
 
     loaded = Settings(_env_file=(root_env, backend_env))
 
-    assert loaded.reservation_ttl_seconds == 1200
+    assert loaded.reservation_ttl_seconds == 5400
     assert loaded.commerce_proxy_secret == "root-secret"
     assert config.BACKEND_ENV == Path(config.__file__).parents[1] / ".env"
     assert Settings.model_config["env_file"] == (config.ROOT_ENV, config.BACKEND_ENV)

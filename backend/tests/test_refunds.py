@@ -26,7 +26,7 @@ from app.config import settings
 from app.dependencies import database
 from app.domain.models import AuditLog, Inventory, Order, Payment, PaymentEvent, Reservation
 from app.main import app
-from tests.conftest import session_post
+from tests.conftest import place_order, session_post
 
 # dc-1001's first variant holds this many sellable units in the seeded catalog.
 SEEDED_AVAILABLE = 10
@@ -191,6 +191,54 @@ def test_refund_marks_the_order_and_the_payment_refunded(
     # A refund is a money event, never a stock event: nothing goes back on sale here.
     assert stock_levels(engine, variant["id"]) == (SEEDED_AVAILABLE - 1, 0)
     assert reservation_statuses(engine, paid_order["id"]) == ["consumed"]
+
+
+def test_a_failed_refund_is_readable_as_paid_money_on_its_way_back(
+    commerce, paid_order, stripe_checkout, failing_gateway, monkeypatch
+):
+    """The refund axis, read back through the order view (P0-④/F11).
+
+    The money is owed but not back yet, and the order is deliberately still a sale to
+    fulfil, so the two axes disagree by design. A client can only act on that if it can read
+    both halves of the order.
+    """
+    client, engine = commerce
+    monkeypatch.setattr(payments, "default_gateway", lambda: failing_gateway)
+    assert refund(client, paid_order["id"]).status_code == 409
+
+    body = client.get(f"/api/v1/orders/{paid_order['id']}").json()
+
+    assert (body["status"], body["payment_status"]) == ("paid", "refund_pending")
+    assert money_state(engine, paid_order["id"])["status"] == "refund_pending"
+
+
+def test_a_completed_refund_reports_the_refunded_money_axis(commerce, paid_order, stripe_checkout):
+    client, _ = commerce
+
+    response = refund(client, paid_order["id"])
+
+    assert response.status_code == 200
+    assert (response.json()["status"], response.json()["payment_status"]) == (
+        "refunded",
+        "refunded",
+    )
+    assert client.get(f"/api/v1/orders/{paid_order['id']}").json()["payment_status"] == ("refunded")
+
+
+def test_the_client_can_tell_a_released_hold_from_money_owed_back(
+    commerce, variant, refund_pending_order, stripe_checkout
+):
+    """Both orders are ``cancelled``; only the money axis separates them (F11)."""
+    client, engine = commerce
+    plain = place_order(client, variant, key="no-money-behind-it")
+    assert client.post(f"/api/v1/orders/{plain['id']}/cancel").json()["status"] == "cancelled"
+
+    released = client.get(f"/api/v1/orders/{plain['id']}").json()
+    owed = client.get(f"/api/v1/orders/{refund_pending_order['id']}").json()
+
+    assert (released["status"], released["payment_status"]) == ("cancelled", None)
+    assert (owed["status"], owed["payment_status"]) == ("cancelled", "refund_pending")
+    assert money_state(engine, plain["id"]) is None
 
 
 def test_refund_records_the_gateway_reference_for_reconciliation(

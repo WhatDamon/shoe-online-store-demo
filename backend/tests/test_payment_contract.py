@@ -9,6 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.config import settings
+from app.domain.states import PAYMENT_STATUSES
 from app.schemas.responses import OrderResponse, PaymentResponse
 
 
@@ -16,6 +17,8 @@ def order_payload(**overrides):
     return {
         "id": "order-1",
         "status": "pending_payment",
+        # No payment row yet: the money axis this store reports alongside the order status.
+        "payment_status": None,
         "expires_at": None,
         "cancellation_reason": None,
         "total": "118.00",
@@ -45,6 +48,18 @@ def test_order_response_accepts_paid_and_refunded(status):
 def test_order_response_rejects_unknown_status():
     with pytest.raises(ValidationError):
         OrderResponse(**order_payload(status="shipped"))
+
+
+@pytest.mark.parametrize("payment_status", [None, *PAYMENT_STATUSES])
+def test_order_response_accepts_every_money_state(payment_status):
+    assert OrderResponse(**order_payload(payment_status=payment_status)).payment_status == (
+        payment_status
+    )
+
+
+def test_order_response_rejects_an_unknown_money_state():
+    with pytest.raises(ValidationError):
+        OrderResponse(**order_payload(payment_status="captured"))
 
 
 def test_health_reports_payment_enabled_from_stripe_ready(commerce, monkeypatch):

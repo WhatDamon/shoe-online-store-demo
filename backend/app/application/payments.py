@@ -5,6 +5,15 @@ inside the caller's cart lock and after re-reading the order, and every outbound
 through the :class:`StripeGateway` port, so the whole flow is provable without network
 access.
 
+``orders.status`` (fulfilment) and ``payments.status`` (money) are deliberately orthogonal,
+and the invariant that ties them is *not* "``paid`` implies ``succeeded``": a refund Stripe
+has not completed leaves the money at ``refund_pending`` while the order stays ``paid`` and
+stays a sale to fulfil. The invariant is that ``orders.status='paid'`` means the money was
+captured -- ``payments.status`` is one of ``succeeded``, ``refund_pending`` or ``refunded``
+-- and that every reservation of that order is ``consumed``. ``REFUNDABLE_PAYMENT_STATUSES``
+spells that set once, and every order view reports the money axis as ``payment_status``, so
+no client has to infer it from the fulfilment axis.
+
 All four ``payments/session`` codes are machine-readable HTTP 200 outcomes rather than
 errors: ``payment_disabled`` (Stripe is off), ``payment_ready``, ``order_not_payable`` and
 ``currency_unsupported``. Ownership failures deliberately reuse the existing

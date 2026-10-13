@@ -2,7 +2,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.domain.states import OrderStatus
+from app.domain.states import OrderStatus, PaymentStatus
 
 Money = Annotated[str, Field(pattern=r"^(0|[1-9][0-9]*)\.[0-9]{2}$")]
 Currency = Annotated[str, Field(pattern=r"^[A-Z]{3}$")]
@@ -76,6 +76,12 @@ class CartResponse(ResponseModel):
 class OrderResponse(ResponseModel):
     id: str
     status: OrderStatus
+    # The money axis, alongside the fulfilment axis ``status`` reports: a paid order whose
+    # refund Stripe has not completed is still a sale to fulfil, and only this field says
+    # the customer is owed money. ``None`` means no payment row exists at all -- no channel
+    # was ever asked for this order -- which is not the same statement as ``disabled``, the
+    # row a switched-off provider writes.
+    payment_status: PaymentStatus | None
     expires_at: str | None
     cancellation_reason: Literal["expired", "customer_cancelled"] | None
     total: Money

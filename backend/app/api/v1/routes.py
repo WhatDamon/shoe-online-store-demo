@@ -22,7 +22,7 @@ from app.application.errors import (
 )
 from app.application.payments import RefundRefused, create_payment_session, refund_order
 from app.application.webhooks import ingest_event
-from app.dependencies import anonymous_session, database, internal_proxy
+from app.dependencies import anonymous_session, database, internal_proxy, webhook_proxy
 from app.domain.models import CartItem, Inventory, Media, Product, Variant
 from app.schemas.commerce import AddItem, PaymentRequest, Quantity, StripeEventProjection
 from app.schemas.responses import CartResponse, OrderResponse, PaymentResponse, ProductResponse
@@ -206,14 +206,15 @@ def payment(body: PaymentRequest, db: DB, sid: SessionID, response: Response) ->
     return asdict(create_payment_session(db, sid, str(body.order_id)))
 
 
-@router.post("/webhooks/stripe", response_model=None)
+@router.post("/webhooks/stripe", response_model=None, dependencies=[Depends(webhook_proxy)])
 def stripe_webhook(projection: StripeEventProjection, db: DB, request: Request) -> Response | dict:
     """Ingest one projected Stripe event forwarded by the Next public route.
 
     The signature was verified there, against ``STRIPE_WEBHOOK_SECRET``, and the body is
     already the projection this store acts on; the raw event never reaches Python. Like
-    every other ``/api/v1`` route this one is protected by the internal proxy credential,
-    because it only ever accepts this repository's own server as a caller.
+    every other ``/api/v1`` route this one requires the internal proxy credential -- and,
+    unlike them, it refuses to run without one being configured at all
+    (``dependencies.webhook_proxy``), because a forged event here writes "paid".
 
     A processing failure is deliberately answered with a non-2xx. Stripe retries a delivery
     it could not acknowledge, and folding this failure into a 2xx would silently drop a

@@ -89,7 +89,7 @@ class Order(Base):
     __table_args__ = (
         UniqueConstraint("cart_id", "idempotency_key"),
         CheckConstraint(sql_in("status", ORDER_STATUSES), name="ck_orders_order_status"),
-        CheckConstraint("total >= 0"),
+        CheckConstraint("total >= 0", name="ck_orders_total_non_negative"),
         Index("ix_orders_status_expires_at", "status", "expires_at"),
     )
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=identifier)
@@ -125,7 +125,7 @@ class Reservation(Base):
     __tablename__ = "inventory_reservations"
     __table_args__ = (
         UniqueConstraint("order_id", "variant_id"),
-        CheckConstraint("quantity > 0"),
+        CheckConstraint("quantity > 0", name="ck_inventory_reservations_quantity_positive"),
         CheckConstraint(
             sql_in("status", RESERVATION_STATUSES),
             name="ck_inventory_reservations_reservation_status",

@@ -22,7 +22,11 @@ external webhook, or real payment provider is required. All amounts are calculat
 with Decimal and serialized as decimal strings. The only provider is
 `MockPaymentProvider`: `payment_disabled`, `charged=false`; it cannot mark an order paid.
 
-Pending orders reserve inventory for 30 minutes by default. The FastAPI lifespan runs a
+Pending orders reserve inventory for 60 minutes by default. That default is not a
+preference: Stripe refuses a Checkout Session shorter than 30 minutes, so a hold that
+expires inside that window would make every "order, then pay immediately" flow refuse
+itself. `RESERVATION_TTL_SECONDS` is therefore floor-bounded at 3600, and may only be
+raised above it. The FastAPI lifespan runs a
 bounded in-process sweeper every 30 seconds; `python -m app.expire_orders` also runs one
 manual batch. Both paths use the same transactional release code as cancellation.
 Each lifespan worker keeps its own transient `(expires_at, id)` cursor and a frozen
@@ -318,7 +322,8 @@ template and other copies intact. Run it with
 
 ## MVP limitations
 
-- Pending orders expire after 30 minutes by default. Release occurs on the next bounded
+- Pending orders expire after 60 minutes by default (floor 3600: a shorter hold cannot
+  outlive a Stripe Checkout Session). Release occurs on the next bounded
   sweep or order access; server downtime and sweep backlogs can delay release. Run
   `python -m app.expire_orders` for a manual pass when needed.
 - Losing the anonymous cookie loses access to orders; no account recovery or admin UI.

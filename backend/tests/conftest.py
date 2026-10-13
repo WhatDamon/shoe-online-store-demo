@@ -28,6 +28,10 @@ from app.main import app
 from app.seed import seed
 from tests.postgres_support import postgres_database
 
+# The credential every test that walks the fail-closed webhook presents. It is longer than
+# the 32 bytes production requires and it is not a deployment secret.
+PROXY_SECRET = "abcdefghijklmnopqrstuvwxyz123456"
+
 
 @pytest.fixture(scope="session")
 def template(tmp_path_factory):
@@ -107,6 +111,22 @@ def commerce(commerce_engine, monkeypatch):
             yield client, engine
     finally:
         app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def proxy_credential(commerce, monkeypatch):
+    """Configure the internal proxy credential and present it on every call of the test.
+
+    Only the routes that fail closed without it need this: a test that configures the
+    credential has to send it on all of its own calls too, because the gate applies to the
+    whole ``/api/v1`` router and not only to the webhook. The rest of the suite keeps the
+    development passthrough and exercises it without a credential.
+    """
+    client, _ = commerce
+    monkeypatch.setattr(settings, "commerce_proxy_secret", PROXY_SECRET)
+    headers = {"X-Internal-Proxy-Secret": PROXY_SECRET}
+    client.headers.update(headers)
+    return headers
 
 
 @pytest.fixture

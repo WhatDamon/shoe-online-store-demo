@@ -11,7 +11,9 @@ these tests pin what Python does with it:
    leaves inventory on exactly two paths: the expiry sweep and customer cancellation;
 4. a processing failure rolls its partial business writes back, keeps ``failed`` plus the
    attempt count, and answers non-2xx so the delivery is retried;
-5. only the projected fields are stored, so no personal data reaches the row or a log.
+5. only the projected fields are stored, so no personal data reaches the row or a log;
+6. the endpoint fails closed: without a configured ``COMMERCE_PROXY_SECRET`` it refuses
+   instead of inheriting the development passthrough that the rest of ``/api/v1`` keeps.
 """
 
 import json
@@ -33,7 +35,7 @@ from app.domain.models import (
     Reservation,
     WebhookEvent,
 )
-from tests.conftest import session_post
+from tests.conftest import PROXY_SECRET, session_post
 
 # dc-1001's first variant holds this many sellable units in the seeded catalog.
 SEEDED_AVAILABLE = 10
@@ -52,7 +54,17 @@ PROJECTION_FIELDS = {
 
 
 def webhook(client, payload):
-    return client.post("/api/v1/webhooks/stripe", json=payload)
+    """Deliver one projected event with the credential the endpoint requires."""
+    return client.post(
+        "/api/v1/webhooks/stripe", json=payload, headers={"X-Internal-Proxy-Secret": PROXY_SECRET}
+    )
+
+
+@pytest.fixture(autouse=True)
+def configured_proxy_credential(proxy_credential):
+    """The webhook refuses to run without a configured credential (pinned below), so every
+    test in this file walks the gate its own rejection tests assert."""
+    return proxy_credential
 
 
 def order_total_minor(client, order_id):
@@ -427,17 +439,20 @@ def test_a_malformed_projection_is_rejected_without_recording_anything(commerce,
 
 def test_the_webhook_endpoint_requires_the_internal_proxy_credential(commerce, monkeypatch):
     client, engine = commerce
-    secret = "abcdefghijklmnopqrstuvwxyz123456"
     monkeypatch.setattr(settings, "app_env", "production")
-    monkeypatch.setattr(settings, "commerce_proxy_secret", secret)
     payload = {"id": "evt_proxy", "type": COMPLETED_EVENT, "checkout_session_id": "cs_test_absent"}
 
-    missing = webhook(client, payload)
+    # No credential at all: this test's own client presents one by default, so it sends a
+    # request the way a stranger reaching the Python origin does.
+    del client.headers["X-Internal-Proxy-Secret"]
+    missing = client.post("/api/v1/webhooks/stripe", json=payload)
     wrong = client.post(
         "/api/v1/webhooks/stripe", json=payload, headers={"X-Internal-Proxy-Secret": "wrong"}
     )
     correct = client.post(
-        "/api/v1/webhooks/stripe", json=payload, headers={"X-Internal-Proxy-Secret": secret}
+        "/api/v1/webhooks/stripe",
+        json=payload,
+        headers={"X-Internal-Proxy-Secret": PROXY_SECRET},
     )
 
     assert (missing.status_code, wrong.status_code) == (403, 403)
@@ -455,6 +470,45 @@ def test_the_webhook_endpoint_is_unavailable_without_a_configured_credential(com
 
     assert response.status_code == 503
     assert row_count(engine, WebhookEvent) == 0
+
+
+def test_the_webhook_endpoint_fails_closed_in_development_too(
+    commerce, variant, payable_order, stripe_checkout, monkeypatch, caplog
+):
+    """An unconfigured credential must never mean "open" on this route (P0-②).
+
+    The rest of ``/api/v1`` deliberately lets an anonymous call through outside production,
+    where the Next server is the only caller and a session cookie still owns every cart.
+    The webhook is the exception: nothing but the proxy credential stands between the public
+    internet and a forged "this order is paid" event, so a missing credential is refused
+    here instead of being inherited from the development passthrough.
+    """
+    client, engine = commerce
+    assert session_post(client, payable_order["id"]).json()["code"] == "payment_ready"
+    before = stock_levels(engine, variant["id"])
+    monkeypatch.setattr(settings, "app_env", "development")
+    monkeypatch.setattr(settings, "commerce_proxy_secret", "")
+    payload = completed_payload(
+        client, payable_order["id"], stripe_checkout.session_id, "evt_unauthenticated"
+    )
+
+    with caplog.at_level("ERROR", logger="commerce.proxy"):
+        response = webhook(client, payload)
+
+    assert response.status_code == 503
+    # ``app.main`` normalizes every 503 body, so the actionable half of the refusal is the
+    # log line: the operator who reads it is the one who can set the credential.
+    hints = [
+        json.loads(record.message) for record in caplog.records if record.name == "commerce.proxy"
+    ]
+    assert [hint["event"] for hint in hints] == ["webhook_credential_missing"]
+    assert "COMMERCE_PROXY_SECRET" in hints[0]["detail"]
+    # Nothing was ingested and no money moved: the forged event left no trace at all.
+    assert event_state(engine, "evt_unauthenticated") is None
+    assert order_state(engine, payable_order["id"])["status"] == "pending_payment"
+    assert reservation_statuses(engine, payable_order["id"]) == ["active"]
+    assert stock_levels(engine, variant["id"]) == before
+    assert money_state(engine, payable_order["id"])["status"] == "requires_payment"
 
 
 def test_money_arriving_after_the_release_never_restores_a_buyable_order(

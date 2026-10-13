@@ -116,9 +116,15 @@ def owned_order(db: Session, session_id: str, order_id: str) -> Order:
 
 def order_view(db: Session, order: Order) -> dict:
     items = db.scalars(select(OrderItem).where(OrderItem.order_id == order.id)).all()
+    # The money axis travels with the order on purpose. ``order.status`` answers only the
+    # fulfilment question, so a client that reads it alone cannot tell "paid" (money
+    # captured, refund owed, still a sale) from "paid and done", nor a released hold from
+    # money this customer is owed back. ``None`` is "no payment row yet".
+    money = db.scalar(select(Payment.status).where(Payment.order_id == order.id))
     return dict(
         id=order.id,
         status=order.status,
+        payment_status=money,
         expires_at=as_utc(order.expires_at).isoformat() if order.expires_at else None,
         cancellation_reason=order.cancellation_reason,
         total=str(order.total),

@@ -11,13 +11,14 @@ from uuid import uuid4
 
 import pytest
 import stripe
+from pydantic import ValidationError
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.application import payments
-from app.application.payments import checkout_expires_at
-from app.config import settings
-from app.domain.models import Order, OrderItem, Payment, PaymentEvent
+from app.application.payments import MIN_CHECKOUT_WINDOW, checkout_expires_at
+from app.config import Settings, settings
+from app.domain.models import Inventory, Order, OrderItem, Payment, PaymentEvent, Reservation
 from app.infrastructure.stripe_gateway import SdkStripeGateway
 from tests.conftest import place_order, session_post, update_order
 
@@ -202,6 +203,73 @@ def test_session_normalizes_stored_currency_before_charging(
         assert db.scalar(
             select(Payment).where(Payment.order_id == payable_order["id"])
         ).currency == ("USD")
+
+
+def test_default_reservation_window_outlives_the_stripe_minimum_window():
+    """The shipped configuration must be able to open a session at all (P0-①).
+
+    Pinned against ``MIN_CHECKOUT_WINDOW`` rather than a number: whenever Stripe's minimum
+    moves, this is the pair that has to move with it. A shorter default would hold stock
+    for less time than a checkout session needs, so every order this store created would be
+    refused by its own payable check.
+    """
+    configured = Settings(_env_file=None).reservation_ttl_seconds
+    assert configured > MIN_CHECKOUT_WINDOW.total_seconds()
+
+
+def test_a_reservation_shorter_than_the_checkout_window_is_refused():
+    # The floor is the operator-facing half of the same fix: a deployment cannot configure
+    # a deadline that makes its own orders unpayable.
+    with pytest.raises(ValidationError):
+        Settings(reservation_ttl_seconds=int(MIN_CHECKOUT_WINDOW.total_seconds()), _env_file=None)
+
+
+def test_the_default_reservation_window_can_be_paid_end_to_end(
+    commerce, variant, stripe_checkout, proxy_credential
+):
+    """The ordinary flow, under the real default deadline (P0-①).
+
+    Nothing here monkeypatches ``reservation_ttl_seconds``: add to cart, create the order,
+    open the checkout session, deliver Stripe's completion. Before the default was raised
+    above Stripe's 30-minute minimum this test failed at the session request, which answered
+    ``order_not_payable`` for every order the service created.
+    """
+    client, engine = commerce
+    order = place_order(client, variant)
+
+    session = session_post(client, order["id"])
+
+    assert session.json()["code"] == "payment_ready"
+    assert stripe_checkout.created[0]["order_id"] == order["id"]
+    with Session(engine) as db:
+        deadline = db.get(Order, order["id"]).expires_at.replace(tzinfo=UTC)
+        total_minor = int(db.get(Order, order["id"]).total * 100)
+    assert deadline - datetime.now(UTC) > MIN_CHECKOUT_WINDOW
+
+    delivered = client.post(
+        "/api/v1/webhooks/stripe",
+        headers=proxy_credential,
+        json={
+            "id": "evt_default_window",
+            "type": "checkout.session.completed",
+            "order_id": order["id"],
+            "checkout_session_id": stripe_checkout.session_id,
+            "payment_intent": "pi_test_default_window",
+            "amount_total": total_minor,
+            "currency": "usd",
+        },
+    )
+
+    assert delivered.status_code == 200
+    assert delivered.json()["status"] == "processed"
+    body = client.get(f"/api/v1/orders/{order['id']}").json()
+    assert (body["status"], body["payment_status"]) == ("paid", "succeeded")
+    with Session(engine) as db:
+        holds = db.scalars(select(Reservation.status).where(Reservation.order_id == order["id"]))
+        assert list(holds) == ["consumed"]
+        # The hold became a sale: the unit stays out of available and stops being reserved.
+        stock = db.get(Inventory, variant["id"])
+        assert (stock.available, stock.reserved) == (9, 0)
 
 
 def test_session_creates_checkout_session_for_a_payable_order(

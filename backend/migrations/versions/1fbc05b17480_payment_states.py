@@ -20,7 +20,49 @@ _LEGACY_STATUSES = {
     "payments": ("disabled",),
     "inventory_reservations": ("active", "released"),
 }
+# The checks the initial migration left unnamed, with the name ``models.py`` gives them. A
+# batch recreate omits every unnamed CHECK on SQLite, so a rebuilt table would silently lose
+# the rule; PostgreSQL keeps its table and would end up with the auto-named original next to
+# the new name, which is the other half of the same divergence. Naming them here is what
+# makes both dialects end up with the constraints the models declare.
+_NAMED_ANONYMOUS_CHECKS = {
+    "orders": (("total >= 0", "ck_orders_total_non_negative"),),
+    "inventory_reservations": (("quantity > 0", "ck_inventory_reservations_quantity_positive"),),
+}
 _CHECK_LITERAL = re.compile(r"'([^']*)'")
+
+
+def _normalized(expression: str | None) -> str:
+    """Compare check constraints by what they mean: databases re-print their own text."""
+    sqltext = " ".join(str(expression or "").casefold().split())
+    while sqltext.startswith("(") and sqltext.endswith(")"):
+        sqltext = sqltext[1:-1].strip()
+    return sqltext
+
+
+def _name_anonymous_checks(batch_op, table: str, dialect: str) -> None:
+    """Re-create the table's unnamed checks under the names the models declare.
+
+    The drop half is a no-op on SQLite, where the recreate omits the unnamed original on
+    its own and no unnamed constraint can be dropped by name; it matters on PostgreSQL, and
+    it also makes a database that already went through the downgrade (which leaves the named
+    check in place) upgrade again without a duplicate.
+    """
+    existing = {
+        _normalized(constraint.get("sqltext")): constraint.get("name")
+        for constraint in sa.inspect(op.get_bind()).get_check_constraints(table)
+    }
+    for condition, name in _NAMED_ANONYMOUS_CHECKS[table]:
+        found = existing.get(_normalized(condition))
+        if found == name:
+            # A database that already ran this upgrade (or ran the downgrade, which leaves
+            # the named check where it is) has nothing left to rename.
+            continue
+        if found:
+            batch_op.drop_constraint(found, type_="check")
+        elif dialect != "sqlite":
+            raise RuntimeError(f"Could not find the unnamed check {condition!r} on {table}")
+        batch_op.create_check_constraint(name, condition)
 
 
 def _drop_legacy_status_check(batch_op, table: str, dialect: str) -> None:
@@ -52,6 +94,7 @@ def upgrade() -> None:
 
     with op.batch_alter_table("orders") as batch_op:
         _drop_legacy_status_check(batch_op, "orders", dialect)
+        _name_anonymous_checks(batch_op, "orders", dialect)
         batch_op.create_check_constraint("ck_orders_order_status", sql_in("status", ORDER_STATUSES))
         batch_op.add_column(sa.Column("paid_at", sa.DateTime(timezone=True), nullable=True))
         batch_op.add_column(sa.Column("refunded_at", sa.DateTime(timezone=True), nullable=True))
@@ -78,6 +121,7 @@ def upgrade() -> None:
 
     with op.batch_alter_table("inventory_reservations") as batch_op:
         _drop_legacy_status_check(batch_op, "inventory_reservations", dialect)
+        _name_anonymous_checks(batch_op, "inventory_reservations", dialect)
         batch_op.create_check_constraint(
             "ck_inventory_reservations_reservation_status",
             sql_in("status", RESERVATION_STATUSES),
@@ -93,6 +137,13 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Undo this upgrade, keeping every rule it introduced.
+
+    The checks this revision renamed (``ck_orders_total_non_negative``,
+    ``ck_inventory_reservations_quantity_positive``) stay named: the batch recreate copies
+    named constraints, the models declare those names, and the rule they express is the same
+    one the pre-branch schema carried unnamed.
+    """
     connection = op.get_bind()
     checks = (
         ("orders", ORDER_STATUSES),
