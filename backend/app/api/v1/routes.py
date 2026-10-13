@@ -1,7 +1,7 @@
 from dataclasses import asdict
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, Response
+from fastapi import APIRouter, Depends, Header, Request, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -20,7 +20,7 @@ from app.application.errors import (
     ProductNotFound,
     QuantityLimitExceeded,
 )
-from app.application.payments import create_payment_session, refund_order
+from app.application.payments import RefundRefused, create_payment_session, refund_order
 from app.dependencies import anonymous_session, database, internal_proxy
 from app.domain.models import CartItem, Inventory, Media, Product, Variant
 from app.schemas.commerce import AddItem, PaymentRequest, Quantity
@@ -184,9 +184,19 @@ def cancel(order_id: str, db: DB, sid: SessionID) -> dict:
 
 
 @router.post("/orders/{order_id}/refund", response_model=OrderResponse)
-def refund(order_id: str, db: DB, sid: SessionID) -> dict:
+def refund(order_id: str, db: DB, sid: SessionID, request: Request) -> Response | dict:
     # Same ownership contract as cancel: another session's order is a plain 404.
-    return refund_order(db, sid, order_id)
+    outcome = refund_order(db, sid, order_id)
+    if isinstance(outcome, RefundRefused):
+        # Report the refusal instead of raising it: an exception would unwind this request's
+        # transaction and discard the failed refund attempt it just recorded, and that debt
+        # is what the compensation pass retries. ``app.main`` imports this module to register
+        # the router, so the shared response helper can only be imported here.
+        from app.main import error_response
+
+        refusal = outcome.error
+        return error_response(request, refusal.status_code, refusal.code, refusal.message)
+    return outcome.order
 
 
 @router.post("/payments/session", response_model=PaymentResponse)

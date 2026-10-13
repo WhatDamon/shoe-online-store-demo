@@ -11,22 +11,28 @@ Every outbound call goes to the fake gateways defined in ``conftest.py``: no tes
 file performs network access.
 """
 
+import contextlib
+import io
+import runpy
 from uuid import uuid4
 
 import pytest
 from sqlalchemy import select, update
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.application import payments
 from app.application.payments import refund_attempts, refund_pending_payments
 from app.config import settings
+from app.dependencies import database
 from app.domain.models import AuditLog, Inventory, Order, Payment, PaymentEvent, Reservation
+from app.main import app
 from tests.conftest import session_post
 
 # dc-1001's first variant holds this many sellable units in the seeded catalog.
 SEEDED_AVAILABLE = 10
 NOT_REFUNDABLE = "This payment cannot be refunded"
 REFUND_FAILED = "The refund could not be completed"
+REFUNDS_UNAVAILABLE = "Refunds are not available right now. Please try again later."
 
 
 def refund(client, order_id, **kwargs):
@@ -71,6 +77,17 @@ def audit_actions(engine, entity_id):
         return list(db.scalars(select(AuditLog.action).where(AuditLog.entity_id == entity_id)))
 
 
+def audit_details(engine, entity_id, action):
+    with Session(engine) as db:
+        return list(
+            db.scalars(
+                select(AuditLog.details).where(
+                    AuditLog.entity_id == entity_id, AuditLog.action == action
+                )
+            )
+        )
+
+
 def stock_levels(engine, variant_id):
     with Session(engine) as db:
         stock = db.get(Inventory, variant_id)
@@ -88,10 +105,14 @@ def attempts_of(engine, order_id):
         return refund_attempts(db, payment.id)
 
 
+def sessions_of(engine):
+    """A sessionmaker shaped like the application's own: one session per pass attempt."""
+    return sessionmaker(engine, class_=Session, expire_on_commit=False)
+
+
 def run_compensation_pass(engine, gateway):
-    """Run the pass the way the CLI does: its own transaction, its own error."""
-    with Session(engine) as db, db.begin():
-        return refund_pending_payments(db, gateway=gateway)
+    """Run the pass the way the CLI does: its own sessions, its own error."""
+    return refund_pending_payments(sessions_of(engine), gateway=gateway)
 
 
 def test_refund_requires_a_session_that_owns_the_order(commerce, paid_order, stripe_checkout):
@@ -139,11 +160,14 @@ def test_refund_is_refused_before_any_outbound_call_while_payments_are_disabled(
 
     response = refund(client, paid_order["id"])
 
-    # A disabled store must not construct a gateway that would call Stripe with no key.
+    # A disabled store must not construct a gateway that would call Stripe with no key. The
+    # refusal is about the channel, not about this money: the payment never becomes
+    # unrefundable, so it must not borrow ``payment_not_refundable``.
     assert response.status_code == 409
-    assert response.json() == {"code": "payment_not_refundable", "detail": NOT_REFUNDABLE}
+    assert response.json() == {"code": "refunds_unavailable", "detail": REFUNDS_UNAVAILABLE}
     assert stripe_checkout.refunds == []
     assert money_state(engine, paid_order["id"])["status"] == "succeeded"
+    assert event_names(engine, paid_order["id"]).count("refund_failed") == 0
 
 
 def test_refund_marks_the_order_and_the_payment_refunded(
@@ -167,6 +191,18 @@ def test_refund_marks_the_order_and_the_payment_refunded(
     # A refund is a money event, never a stock event: nothing goes back on sale here.
     assert stock_levels(engine, variant["id"]) == (SEEDED_AVAILABLE - 1, 0)
     assert reservation_statuses(engine, paid_order["id"]) == ["consumed"]
+
+
+def test_refund_records_the_gateway_reference_for_reconciliation(
+    commerce, paid_order, stripe_checkout
+):
+    client, engine = commerce
+    assert refund(client, paid_order["id"]).status_code == 200
+
+    # The gateway's own refund id is what a reconciliation reads back to match the money
+    # movement. It is an identifier, not a key or a session reference.
+    details = audit_details(engine, paid_order["id"], "refund_succeeded")
+    assert [detail["refund_id"] for detail in details] == ["re_test_fake"]
 
 
 def test_refund_uses_a_deterministic_key_derived_from_the_order(
@@ -249,6 +285,67 @@ def test_refund_without_a_recorded_payment_intent_stays_a_business_error(
     assert attempts_of(engine, paid_order["id"]) == 1
 
 
+def test_a_failed_refund_attempt_is_discarded_with_the_transaction_that_owns_it(
+    commerce, paid_order, stripe_checkout, failing_gateway, monkeypatch
+):
+    """Only the owner of a transaction may decide the fate of the writes inside it.
+
+    This request runs inside a caller-owned transaction that ends in a rollback, so the
+    ``refund_failed`` record the refund path wrote must vanish with it. Before this fix
+    ``refund_order`` committed the attempt itself, so the record outlived the rollback and
+    this test failed.
+    """
+    client, engine = commerce
+    monkeypatch.setattr(payments, "default_gateway", lambda: failing_gateway)
+
+    def abandoned_transaction():
+        with Session(engine) as db:
+            db.begin()
+            try:
+                yield db
+            finally:
+                # The caller throws the whole transaction away; nothing a request wrote
+                # through the application layer may survive it.
+                db.rollback()
+
+    app.dependency_overrides[database] = abandoned_transaction
+    response = refund(client, paid_order["id"])
+
+    # The route still answers, and it answers the request that was thrown away.
+    assert response.status_code == 409
+    # The attempt really reached the gateway; only its record is supposed to be gone.
+    assert failing_gateway.calls == ["refund"]
+    # Read through a fresh session: only what was committed is visible here.
+    money = money_state(engine, paid_order["id"])
+    assert (money["status"], money["refunded_at"]) == ("succeeded", None)
+    assert event_names(engine, paid_order["id"]).count("refund_failed") == 0
+    assert "refund_failed" not in audit_actions(engine, paid_order["id"])
+    assert attempts_of(engine, paid_order["id"]) == 0
+    assert order_state(engine, paid_order["id"])["status"] == "paid"
+
+
+def test_a_failed_refund_attempt_is_committed_by_the_transaction_the_route_owns(
+    commerce, paid_order, stripe_checkout, failing_gateway, monkeypatch
+):
+    """The pair of the rollback test: the 409 must still leave the debt recorded.
+
+    The route reports the refusal as a response instead of raising it, so the attempt is
+    committed by the transaction the request dependency owns. The assertions read through a
+    fresh session, so only committed rows can satisfy them.
+    """
+    client, engine = commerce
+    monkeypatch.setattr(payments, "default_gateway", lambda: failing_gateway)
+
+    response = refund(client, paid_order["id"])
+
+    assert response.status_code == 409
+    assert response.json() == {"code": "refund_failed", "detail": REFUND_FAILED}
+    assert money_state(engine, paid_order["id"])["status"] == "refund_pending"
+    assert event_names(engine, paid_order["id"]).count("refund_failed") == 1
+    assert "refund_failed" in audit_actions(engine, paid_order["id"])
+    assert attempts_of(engine, paid_order["id"]) == 1
+
+
 def test_refund_of_released_money_waits_for_the_compensation_pass(
     commerce, refund_pending_order, stripe_checkout
 ):
@@ -262,8 +359,7 @@ def test_refund_of_released_money_waits_for_the_compensation_pass(
     assert stripe_checkout.refunds == []
     assert money_state(engine, refund_pending_order["id"])["status"] == "refund_pending"
 
-    with Session(engine) as db, db.begin():
-        assert refund_pending_payments(db, gateway=stripe_checkout) == 1
+    assert run_compensation_pass(engine, stripe_checkout) == 1
 
     assert money_state(engine, refund_pending_order["id"])["status"] == "refunded"
     assert order_state(engine, refund_pending_order["id"])["status"] == "refunded"
@@ -271,9 +367,8 @@ def test_refund_of_released_money_waits_for_the_compensation_pass(
 
 def test_compensation_pass_rejects_an_unbounded_batch(commerce, refund_pending_order):
     _, engine = commerce
-    with Session(engine) as db, db.begin():
-        with pytest.raises(ValueError, match="Refund batch size"):
-            refund_pending_payments(db, limit=-1)
+    with pytest.raises(ValueError, match="Refund batch size"):
+        refund_pending_payments(sessions_of(engine), limit=-1)
     # A negative limit would silently mean "no limit" in SQL, so it is refused instead.
     assert money_state(engine, refund_pending_order["id"])["status"] == "refund_pending"
 
@@ -285,8 +380,7 @@ def test_compensation_pass_refunds_pending_money_and_is_repeatable(
     # The pay-after-release signal: money captured for an order whose stock was released.
     assert money_state(engine, refund_pending_order["id"])["status"] == "refund_pending"
 
-    with Session(engine) as db, db.begin():
-        assert refund_pending_payments(db, gateway=stripe_checkout) == 1
+    assert run_compensation_pass(engine, stripe_checkout) == 1
 
     money = money_state(engine, refund_pending_order["id"])
     assert (money["status"], money["refunded_at"] is not None) == ("refunded", True)
@@ -302,8 +396,7 @@ def test_compensation_pass_refunds_pending_money_and_is_repeatable(
     ]
 
     # Running the command again finds nothing left to do and never refunds twice.
-    with Session(engine) as db, db.begin():
-        assert refund_pending_payments(db, gateway=stripe_checkout) == 0
+    assert run_compensation_pass(engine, stripe_checkout) == 0
     assert len(stripe_checkout.refunds) == 1
 
 
@@ -315,8 +408,8 @@ def test_compensation_pass_records_every_failed_attempt(
     for expected in (1, 2):
         with pytest.raises(RuntimeError, match="Refund pass failed"):
             run_compensation_pass(engine, failing_gateway)
-        # Both the raised failure signal and the attempt record survive the caller's
-        # rollback, which is what makes a failed pass diagnosable at all.
+        # The pass commits each attempt itself, so a failed attempt is already durable when
+        # the pass reports its failure: that is what makes a failed pass diagnosable.
         assert attempts_of(engine, refund_pending_order["id"]) == expected
 
     assert failing_gateway.calls == ["refund", "refund"]
@@ -331,8 +424,58 @@ def test_compensation_pass_skips_a_disabled_store_without_an_outbound_call(
     _, engine = commerce
     monkeypatch.setattr(settings, "stripe_enabled", False)
 
-    with Session(engine) as db, db.begin():
-        assert refund_pending_payments(db, gateway=failing_gateway) == 0
+    assert refund_pending_payments(sessions_of(engine), gateway=failing_gateway) == 0
 
     assert failing_gateway.calls == []
+    assert money_state(engine, refund_pending_order["id"])["status"] == "refund_pending"
+
+
+def test_refund_command_is_the_compensation_entry_point(
+    commerce, refund_pending_order, stripe_checkout, monkeypatch
+):
+    """``python -m app.refund_pending`` was uncovered until now.
+
+    The replacement takes no arguments on purpose: a command that wrapped the pass in a
+    session or transaction of its own would fail this call instead of quietly committing
+    work inside someone else's transaction.
+    """
+    _, engine = commerce
+    original = payments.refund_pending_payments
+    monkeypatch.setattr(
+        payments,
+        "refund_pending_payments",
+        lambda: original(sessions_of(engine), gateway=stripe_checkout),
+    )
+    stdout = io.StringIO()
+
+    with contextlib.redirect_stdout(stdout):
+        runpy.run_module("app.refund_pending", run_name="__main__")
+
+    assert stdout.getvalue() == "Refunded 1 payments.\n"
+    # The command commits the attempt without an outer transaction of its own.
+    assert money_state(engine, refund_pending_order["id"])["status"] == "refunded"
+    assert order_state(engine, refund_pending_order["id"])["status"] == "refunded"
+    assert stripe_checkout.refunds == [
+        {
+            "payment_intent": "pi_test_late",
+            "idempotency_key": f"refund:{refund_pending_order['id']}",
+        }
+    ]
+
+
+def test_refund_command_reports_nothing_to_do_for_a_disabled_store(
+    commerce, refund_pending_order, stripe_checkout, monkeypatch
+):
+    """A switched-off channel must not even build a gateway: the owed rows stay put."""
+    _, engine = commerce
+    monkeypatch.setattr(settings, "stripe_enabled", False)
+    original = payments.refund_pending_payments
+    monkeypatch.setattr(payments, "refund_pending_payments", lambda: original(sessions_of(engine)))
+    stdout = io.StringIO()
+
+    with contextlib.redirect_stdout(stdout):
+        runpy.run_module("app.refund_pending", run_name="__main__")
+
+    assert stdout.getvalue() == "Refunded 0 payments.\n"
+    assert stripe_checkout.refunds == []
     assert money_state(engine, refund_pending_order["id"])["status"] == "refund_pending"

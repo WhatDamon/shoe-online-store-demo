@@ -76,11 +76,29 @@ class PaymentNotRefundable(CommerceError):
         super().__init__("payment_not_refundable", 409, "This payment cannot be refunded")
 
 
+class RefundsUnavailable(CommerceError):
+    """The refund channel is switched off; this payment's money is still refundable.
+
+    The money stays owed and stays ``refund_pending`` for a later pass, so this must not
+    borrow ``payment_not_refundable``: that code tells the customer the money will never
+    come back, which would be false.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            "refunds_unavailable",
+            409,
+            "Refunds are not available right now. Please try again later.",
+        )
+
+
 class RefundFailed(CommerceError):
     """Stripe did not complete the refund. The money stays marked as owed back.
 
     Deliberately not a 5xx: the customer must read a stable business code instead of the
-    Next proxy's ``backend_unavailable``, and the compensation pass keeps the retry.
+    Next proxy's ``backend_unavailable``, and the compensation pass keeps the retry. The
+    refund path reports this refusal instead of raising it, so the failure record it writes
+    is committed by the transaction that owns it.
     """
 
     def __init__(self) -> None:
