@@ -80,11 +80,14 @@ export async function CollectionCards({ locale }: { locale: Locale }) {
                       />
                     </div>
                   ) : (
+                    // RSC 手里就有 URL 语言：显式传下去，否则该 SVG 的可及名会落到
+                    // `ProductVisual` 的缺省语言而静默留英文（4 个客户端调用点在阶段 2 接线）。
                     <ProductVisual
                       visual={card.representative.visual}
                       name={card.representative.title}
                       construction={card.representative.construction}
                       view="side"
+                      locale={locale}
                       className="aspect-[4/3] w-full transition-transform duration-300 group-hover:scale-[1.03]"
                     />
                   )

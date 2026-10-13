@@ -126,8 +126,9 @@ const en = {
   // SEO 文案。品牌名与 Slogan（`src/lib/site.ts`）仍不本地化（阶段 2 决策）。
   //
   // **事实与数值一律不进词典**：尺码体系名（US/EU/…）、赠品门槛与材质（`src/lib/gift-offer.ts`）、
-  // 价格分档的边界、色名与货号都留在原模块；带数据的句子在这里只以「句子片段 + 原模块数据」
-  // 拼回（片段存在的原因就是句子中间夹了数据）。
+  // 色名与货号都留在原模块；带数据的句子在这里只以「句子片段 + 原模块数据」拼回（片段存在的
+  // 原因就是句子中间夹了数据）。唯一例外是价格分档标签：金额进了词典但**不翻译**（保留 USD），
+  // 见 `shop.filter.price*` 的注释。
   'shop.meta.description': 'Shop all styles — every pair is printed to order around your size.',
   'shop.schema.name': 'Shop Evoloop shoes',
   'shop.schema.description': 'Browse Evoloop casual shoe styles and their available size ranges.',
@@ -138,9 +139,10 @@ const en = {
   'shop.styleCount.one': 'style',
   'shop.styleCount.many': 'styles',
 
-  // 筛选条（`product-filter-bar.tsx`）。价格分档的标签含美元金额：金额是市场事实（ADR 0008
-  // 决策 6），翻译时保留 USD 金额，不得按语言改币种。排序选项的键在组件里按 `ShopFilter['sort']`
-  // 取值（`SORT_OPTIONS` 是键表，与 `src/lib/site.ts` 的 nav 同款）。
+  // 筛选条（`product-filter-bar.tsx`）。**价格分档标签的金额是市场事实，只能保留 USD、绝不随
+  // 语言改币种**（ADR 0008 决策 6）：同一个边界由 `applyPriceRange`（数字 100/150）与本处键值
+  // （`$100`/`$150` 文案）两处共同表达，改一处必须同步另一处。排序选项的键在组件里按
+  // `ShopFilter['sort']` 取值（`SORT_OPTIONS` 是键表，与 `src/lib/site.ts` 的 nav 同款）。
   'shop.filter.label': 'Shop filters',
   'shop.filter.searchLabel': 'Search within results',
   'shop.filter.search': 'Search',
