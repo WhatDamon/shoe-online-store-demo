@@ -22,6 +22,7 @@
 | 前端 / UI / 客户端组件 | `src/domain/`（同构层）、`src/components/`、`CONTEXT.md` | 0005 |
 | SEO / metadata / sitemap / JSON-LD | `src/lib/seo.ts`、`src/lib/site.ts`、`src/app/robots.ts`、`src/app/sitemap.ts`、`docs/seo-geo-plan.md` | — |
 | 依赖 / 包管理器 / 构建 | `package.json`、`backend/pyproject.toml`、`.github/workflows/verify.yml` | 0006 |
+| 多语言 / locale / 文案 | `src/i18n/`（纯模块层）、`src/lib/market.ts`、`src/lib/format.ts`、`src/lib/seo.ts`、`proxy.ts`、`docs/i18n-string-inventory-2026-10-13.md`、`docs/superpowers/specs/2026-10-13-i18n-multi-language-design.md` | 0008 |
 | 数据库结构 | 先读下方「数据库双轨」，再按上面对应行读代码 | 0002、0003、0007 |
 
 ## 数据库双轨（最容易搞错的地方）
@@ -45,6 +46,7 @@
 | 0005 | 共享领域层 `src/domain/`，`server/` 不得被客户端运行时导入 | 碰客户端组件导入 |
 | 0006 | 包管理器层从 Bun 迁移到 npm | 碰依赖、锁文件、CI |
 | 0007 | TypeScript 展示库使用版本化 Drizzle 迁移 | 碰 `drizzle/` 迁移 |
+| 0008 | URL 子路径 locale 路由 + 手写类型化词典；语言与市场解耦 | 碰路由、`proxy.ts`、文案、locale、格式化、内容翻译 |
 
 ## 改 Next.js 之前
 
