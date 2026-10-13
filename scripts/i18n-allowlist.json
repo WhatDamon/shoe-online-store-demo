@@ -1,0 +1,199 @@
+[
+  {
+    "path": "src/app/api/ai/chat/route.ts",
+    "rule": "prose-literal",
+    "text": "Request validation failed",
+    "reason": "API 契约消息：按 ADR 0008 决策 8 保持英文，前端按 `code` 本地化（任务 9 的 S2 裁决）；只出现在响应体里，不是界面文案。 这条是 422「请求体不合法」的 message。"
+  },
+  {
+    "path": "src/app/api/ai/chat/route.ts",
+    "rule": "prose-literal",
+    "text": "Request origin is not allowed.",
+    "reason": "API 契约消息：按 ADR 0008 决策 8 保持英文，前端按 `code` 本地化（任务 9 的 S2 裁决）；只出现在响应体里，不是界面文案。 这条是 403「跨站 POST」的 message。"
+  },
+  {
+    "path": "src/app/api/commerce/[...path]/route.ts",
+    "rule": "prose-literal",
+    "text": "Request body is too large",
+    "reason": "API 契约消息：按 ADR 0008 决策 8 保持英文，前端按 `code` 本地化（任务 9 的 S2 裁决）；只出现在响应体里，不是界面文案。 这两条是 413/422 分支的 detail（detail 同样由前端按 code 收窄）。"
+  },
+  {
+    "path": "src/app/api/commerce/[...path]/route.ts",
+    "rule": "prose-literal",
+    "text": "Request body is invalid",
+    "reason": "API 契约消息：按 ADR 0008 决策 8 保持英文，前端按 `code` 本地化（任务 9 的 S2 裁决）；只出现在响应体里，不是界面文案。 这两条是 413/422 分支的 detail（detail 同样由前端按 code 收窄）。"
+  },
+  {
+    "path": "src/components/assistant/use-chat-stream.ts",
+    "rule": "prose-literal",
+    "text": "Chat stream ended before a terminal event",
+    "reason": "流解析的开发者断言（SSE 协议不变量：流结束前没有终止事件）。只在开发期抛出，从不渲染；改语言不改它。"
+  },
+  {
+    "path": "src/components/shop/commerce-panel.tsx",
+    "rule": "prose-jsx-text",
+    "text": "· EU",
+    "reason": "量词与尺码体系之间的分隔符（`{n} · EU {size}`）：符号串，语言不改变它。尺码体系名是领域事实（ADR 0008 决策 6），词典只承载它周围的句子。"
+  },
+  {
+    "path": "src/components/shop/my-size-guide.tsx",
+    "rule": "prose-jsx-text",
+    "text": "US 4.5–12.5",
+    "reason": "尺码覆盖范围（`US 4.5–12.5`）：尺码体系标签是领域事实，语言不改变它（ADR 0008 决策 6）。"
+  },
+  {
+    "path": "src/components/shop/product-visual.tsx",
+    "rule": "prose-literal",
+    "text": "M38 100 C34 78 44 58 62 50 C84 40 108 44 120 58 C130 70 148 78 168 82 C186 86 202 84 212 74 ",
+    "reason": "鞋楦侧视图的 SVG 路径数据（`SIDE_UPPER` 常量，喂给 `<path d>`）：图形坐标，不是文案。属性形态的路径已按属性名放过，常量形态只能逐条登记。"
+  },
+  {
+    "path": "src/components/shop/product-visual.tsx",
+    "rule": "prose-literal",
+    "text": "C220 66 224 56 224 48 C226 68 226 84 220 96 L214 100 L40 100 Z",
+    "reason": "同上：`SIDE_UPPER` 的路径数据续行常量。"
+  },
+  {
+    "path": "src/components/shop/shopify-buy-button.tsx",
+    "rule": "prose-literal",
+    "text": "no window",
+    "reason": "Shopify Buy Button 的 SDK 开发者诊断（`no window`：SSR 下 window 缺失）。异常消息只进控制台，从不渲染；Shopify 入口默认关闭（`SHOPIFY_ENABLED=false`）。"
+  },
+  {
+    "path": "src/components/shop/shopify-buy-button.tsx",
+    "rule": "prose-literal",
+    "text": "SDK loaded without ShopifyBuy",
+    "reason": "同上：SDK 脚本加载完成但全局对象缺失时的开发者诊断。"
+  },
+  {
+    "path": "src/components/shop/shopify-buy-button.tsx",
+    "rule": "prose-literal",
+    "text": "SDK script load failed",
+    "reason": "同上：SDK 脚本加载失败的开发者诊断。"
+  },
+  {
+    "path": "src/components/shop/shopify-buy-button.tsx",
+    "rule": "prose-literal",
+    "text": "Shopify Buy Button init failed:",
+    "reason": "同上：初始化失败的 `console.warn` 前缀（诚实失败：界面保持空容器，不假渲染成功）。"
+  },
+  {
+    "path": "src/components/shop/wishlist-provider.tsx",
+    "rule": "prose-literal",
+    "text": "useWishlist must be used within a WishlistProvider",
+    "reason": "开发者用法错误（`useWishlist` 缺 Provider 时抛出），从不渲染给访客。"
+  },
+  {
+    "path": "src/db/client.ts",
+    "rule": "internal-copy",
+    "count": 11,
+    "reason": "数据库连接与迁移的运维错误 + SQL 语句（PRAGMA/DDL/迁移表查询）。启动失败时抛给运维或进日志，不进响应体、不渲染。改用 count 登记：新增一条散文类字面量会让门禁变红，要求重新归类。"
+  },
+  {
+    "path": "src/domain/commerce-response.ts",
+    "rule": "internal-copy",
+    "count": 1,
+    "reason": "`Invalid commerce response`：前端解析响应失败时抛的契约错误，由调用方映射成词典文案 `errors.invalidResponse`（任务 9 的 S2 口径），字面量本身不直接渲染。"
+  },
+  {
+    "path": "src/lib/gift-offer.ts",
+    "rule": "internal-copy",
+    "count": 5,
+    "reason": "赠品事实单源（门槛/名称/材质/供给口径）。事实与数值按既有裁决不进词典（`src/i18n/dictionaries/en.ts` 的 shop.gift.* 只承载它们周围的句子片段），本文件是唯一出处。"
+  },
+  {
+    "path": "src/lib/gift-offer.ts",
+    "rule": "internal-copy",
+    "text": "Store offer: any order over $${GIFT_OFFER.thresholdUsd} at the storefront includes one free ${GIFT_OFFER.name} — ${GIFT_OFFER.composition} — ${GIFT_OFFER.availability}.",
+    "reason": "`GIFT_OFFER_FACT`：AI shopping prompt 注入的整句店头事实（模板字符串，判据与清单快照都看不见插值里的静态文案，故这里逐条登记）。它只进 `src/server/ai/prompts.ts`，全仓无渲染点（任务 8 审查实测 grep）；prompt 是模型输入不是界面文案，本地化属阶段 2 的模型输入决策。"
+  },
+  {
+    "path": "src/lib/gift-offer.ts",
+    "rule": "internal-copy",
+    "text": "A ${GIFT_OFFER.name} pressed from ${GIFT_OFFER.material}. Free with any order over $${GIFT_OFFER.thresholdUsd} — ${GIFT_OFFER.availability}.",
+    "reason": "`GIFT_ITEM_DESCRIPTION`：进入 `src/server/catalog/gifts.ts` 的 `giftItems[].description`；赠品画廊只渲染 `title`/`images`，该字段今天全仓无渲染点（任务 8 审查实测 grep），故按 server 侧数据保留英文。"
+  },
+  {
+    "path": "src/lib/speak-preference.ts",
+    "rule": "internal-copy",
+    "count": 0,
+    "reason": "朗读开关偏好：该文件的散文类字面量只有 `'use client'` 指令序言，已被判据特判放过（不占白名单），故登记数为 0。存储键 `evoloop:speak` 是纯路径形状的键名，不是文案。"
+  },
+  {
+    "path": "src/server/catalog/shopify-stub.ts",
+    "rule": "internal-copy",
+    "count": 3,
+    "reason": "Shopify 兼容入口未配置时的服务端异常。Shopify 默认关闭（`SHOPIFY_ENABLED=false`），消息只进日志、不进响应体。"
+  },
+  {
+    "path": "src/server/guardrails/bounded-store.ts",
+    "rule": "internal-copy",
+    "count": 1,
+    "reason": "护栏存储的参数断言（TTL/容量由代码传入，不是用户输入），开发者错误，不渲染。"
+  },
+  {
+    "path": "src/server/guardrails/rate-limit.ts",
+    "rule": "internal-copy",
+    "count": 1,
+    "reason": "令牌桶的参数断言（速率/突发量由代码传入），开发者错误，不渲染。"
+  },
+  {
+    "path": "src/server/guardrails/request.ts",
+    "rule": "internal-copy",
+    "count": 1,
+    "reason": "AI Session 配置不合法（`AI_SESSION_SECRET` 少于 32 字节）时的服务端异常：运维可见，不进响应体。"
+  },
+  {
+    "path": "src/server/search/embedder.ts",
+    "rule": "internal-copy",
+    "count": 1,
+    "reason": "`Real AI is disabled`：服务端能力/配置异常，由调用方转成统一兜底文案，字面量本身不渲染。"
+  },
+  {
+    "path": "src/server/search/repository-postgres.ts",
+    "rule": "internal-copy",
+    "count": 2,
+    "reason": "AI 预算预留行缺失的内部一致性问题（服务端异常），不进响应体。"
+  },
+  {
+    "path": "src/server/search/repository.ts",
+    "rule": "internal-copy",
+    "count": 2,
+    "reason": "AI 预算预留行缺失的内部一致性问题（服务端异常），不进响应体。"
+  },
+  {
+    "rule": "error-code",
+    "code": "product_not_found",
+    "reason": "后端 `ProductNotFound`。前端码联合只列「有专门用户文案」的码，它今天正确地落到 `errors.unknown`；阶段 1 不允许新增英文文案，补文案属阶段 2。"
+  },
+  {
+    "rule": "error-code",
+    "code": "quantity_limit",
+    "reason": "后端 `QuantityLimitExceeded`。同上：走 `errors.unknown` 兜底，补文案属阶段 2。"
+  },
+  {
+    "rule": "error-code",
+    "code": "variant_not_found",
+    "reason": "后端 `VariantNotFound`。同上：走 `errors.unknown` 兜底，补文案属阶段 2。"
+  },
+  {
+    "rule": "error-code",
+    "code": "invalid_origin",
+    "reason": "Route Handler 对跨站 POST 的 403。任务 8 裁决 R30 明确本轮不给它新增文案，现阶段正确地走兜底串（`src/lib/commerce-client.test.ts` 有用例钉住）。"
+  },
+  {
+    "rule": "error-code",
+    "code": "invalid_request",
+    "reason": "Route Handler 对请求体过大/不合法的 413/422（commerce 与 ai/chat 两侧）。前端按 `errors.unknown`（commerce）与 `assistant.networkError`（助手）兜底，补专门文案属阶段 2。"
+  },
+  {
+    "rule": "error-code",
+    "code": "not_found",
+    "reason": "Route Handler（commerce 代理）对不在白名单路径的 404。与 `invalid_origin` 同批：前端按 `errors.unknown` 兜底，补文案属阶段 2。"
+  },
+  {
+    "rule": "error-code",
+    "code": "session_unavailable",
+    "reason": "Route Handler（ai/chat）会话不可用的 503。助手客户端对 `!res.ok` 一律走 `assistant.networkError` 兜底，没有按码映射文案；补映射属阶段 2。"
+  }
+]
