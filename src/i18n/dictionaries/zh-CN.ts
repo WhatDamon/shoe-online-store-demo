@@ -23,6 +23,12 @@ const zhCN = {
   // PDP 面包屑的结构化数据里回指首页的 crumb（不渲染成导航链接）。
   'nav.home': '首页',
 
+  // 语言切换器（`src/components/i18n/language-switcher.tsx`）。`lang.en` / `lang.zhCN` 是
+  // 「语言自称」，与英文词典**同值、不译**（读屏用户在中文界面里也要能找到 EN）。
+  'lang.switchLabel': '切换语言',
+  'lang.en': 'EN',
+  'lang.zhCN': '中文',
+
   // 固定头部（`app-bar.tsx`）。'item'/'items' 是愿望单计数的量词片段：中文没有单复数，
   // 两条键同值（键集必须与英文一致，语言侧不因语法差异删键）。
   'marketing.appBar.cart': '购物车',

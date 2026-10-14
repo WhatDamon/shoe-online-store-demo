@@ -47,7 +47,15 @@ export function proxy(request: NextRequest): NextResponse {
   // 307 保留方法与请求体，且不把非幂等请求永久改写。
   const status = request.method === 'GET' || request.method === 'HEAD' ? 308 : 307
   const destination = localePath(locale, `${pathname}${search}${hash}`)
-  return withVary(NextResponse.redirect(new URL(destination, request.nextUrl.origin), status))
+  const response = withVary(
+    NextResponse.redirect(new URL(destination, request.nextUrl.origin), status),
+  )
+  // 重定向目标不只取决于 `Accept-Language`，还取决于 `evoloop_locale` cookie（`Vary` 只能表达
+  // 请求头维度）。按 `Accept-Language` 复用同一个 308 会把 cookie 已选好的语言覆盖掉，
+  // 故重定向出口声明 `private, no-store`。只加在这一处：页面响应（上面两条 `NextResponse.next()`）
+  // 不该被标成 no-store，那会让每个 /en/* 响应失去共享缓存（CDN / ISR）能力。
+  response.headers.set('Cache-Control', 'private, no-store')
+  return response
 }
 
 /** 所有出口都声明 Vary：响应取决于 Accept-Language，共享缓存不得跨语言复用。 */

@@ -19,6 +19,12 @@ const en = {
   // PDP 面包屑的结构化数据里回指首页的 crumb（不渲染成导航链接，故与上面四条分开）。
   'nav.home': 'Home',
 
+  // 语言切换器（`src/components/i18n/language-switcher.tsx`）。`lang.en` / `lang.zhCN` 是
+  // 「语言自称」，两个词典**必须同值**：读屏用户在中文界面里也要能找到 EN 这条出口。
+  'lang.switchLabel': 'Change language',
+  'lang.en': 'EN',
+  'lang.zhCN': '中文',
+
   // 固定头部（`app-bar.tsx`）。'item'/'items' 是愿望单计数的量词片段，与上方 `wishlist`
   // 拼成 `Wishlist, 1 item`；拆开是因为复数形随语言变化（阶段 2 加语言时改为按语言的复数规则组合）。
   'marketing.appBar.cart': 'Cart',

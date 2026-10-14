@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { HeartIcon, MenuIcon, SearchIcon, ShoppingBagIcon, XIcon } from 'lucide-react'
 import { site } from '@/lib/site'
+import { LanguageSwitcher } from '@/components/i18n/language-switcher'
 import { LocaleLink } from '@/components/i18n/locale-link'
 import { useLocale, useMessages } from '@/components/i18n/locale-provider'
 import { useWishlist } from '@/components/shop/wishlist-provider'
@@ -17,8 +18,8 @@ import { cn } from 'cn'
  * tone 决定未滚动时的表现：
  * - overlay：顶部透明 + 白色文字，压在深色 Hero 全出血图上（Landing 专用）；
  * - solid（默认）：canvas 实底 + ink 文字，用于普通内容页。
- * 滚动 > 8px 后统一变为磨砂底。纯交互客户端组件，数据来自 site 配置与
- * WishlistProvider，无自有状态数据源。
+ * 滚动 > 8px 后统一变为磨砂底。纯交互客户端组件，数据来自 site 配置、WishlistProvider 与
+ * locale 上下文（切换器），无自有状态数据源。
  *
  * 搜索对齐桌面/移动可用：lg+ 显示内联输入框；<lg 用搜索按钮展开整行输入
  * （autoFocus + Enter 提交到 /shop?q= + Escape/取消关闭），保证手机与桌面
@@ -111,6 +112,19 @@ export function AppBar({
                   {t[item.key]}
                 </LocaleLink>
               ))}
+              {/* 语言切换器（裁决 R39）：移动端放在这个已有 <nav> 里，头部宽度增量因此为 0。
+                  本仓库没有 headless 浏览器、jsdom 不做布局，溢出只能靠「构造上不增宽」保证，
+                  不能靠尺寸估算。
+
+                  断点相接规则（R39 扩充）：AppBar 的断点并不统一（移动菜单 `md:hidden`、
+                  中央导航 `hidden md:flex`、头部内联搜索 `hidden lg:flex`、移动搜索卡 `lg:hidden`）。
+                  任何用响应式可见性把同一个功能在多个位置之间切换的改动，必须逐条核对断点是否相接，
+                  否则会在两个断点之间留下功能空档（按 `lg` 分界会让 768–1024px 一台切换器都没有）。
+                  不变量：两个实例的可见性并集覆盖整个宽度区间且交集为空——此处以 **md** 为界，
+                  `<md` 只有本实例，`≥md` 只有右侧操作区那个。 */}
+              <div className="border-t border-ink/10 px-4 py-3">
+                <LanguageSwitcher />
+              </div>
             </nav>
           </details>
           <LocaleLink
@@ -216,6 +230,13 @@ export function AppBar({
               {count}
             </Badge>
           </LocaleLink>
+
+          {/* 语言切换器（裁决 R39）：≥md 留在右侧操作区；<md 的实例在左侧移动菜单里，
+              故移动端（<md）头部宽度增量为 0。md 是移动菜单自身的断点，两边相接不留空档
+              （不变量与断点相接规则见移动菜单内的注释）。 */}
+          <div className="hidden items-center md:flex">
+            <LanguageSwitcher />
+          </div>
         </div>
       </div>
 

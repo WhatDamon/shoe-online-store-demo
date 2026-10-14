@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_LOCALE, LOCALES, isLocale, localePath, resolveLocale } from './locales'
+import {
+  DEFAULT_LOCALE,
+  LOCALES,
+  isLocale,
+  localePath,
+  resolveLocale,
+  stripLocale,
+} from './locales'
 
 describe('LOCALES', () => {
   // 语言集合的期望值随 `LOCALES` 本身变化（裁决 R35：改语言集合的那个任务承担这类机械后果）。
@@ -62,5 +69,33 @@ describe('localePath', () => {
   })
   it('已是绝对 URL 时原样返回', () => {
     expect(localePath('en', 'https://evoloop.site/shop')).toBe('https://evoloop.site/shop')
+  })
+})
+
+describe('stripLocale', () => {
+  it.each([
+    ['/en/shop?q=a#b', '/shop?q=a#b'],
+    ['/en', '/'],
+    ['/zh-CN', '/'],
+    ['/zh-CN/shop', '/shop'],
+    ['/', '/'],
+    ['/shop', '/shop'], // 无合法前缀原样
+    ['/enen/shop', '/enen/shop'], // 与 localePath 同一口径：/enen 不算已带前缀
+    ['/EN/shop', '/EN/shop'], // 大小写敏感
+    ['/en/../api', '/../api'], // 不做路径规范化（与 localePath 对称），也不抛
+  ])('stripLocale(%s) -> %s', (path, expected) => {
+    expect(stripLocale(path)).toBe(expected)
+  })
+
+  it('localePath ∘ stripLocale 往返幂等（不会双重前缀）', () => {
+    // 审查重点 4：切换语言 = `localePath(to, stripLocale(当前 pathname))`。
+    // 若 stripLocale 漏掉前缀，第二次切换就会叠成 /en/zh-CN/shop。
+    for (const from of LOCALES) {
+      for (const to of LOCALES) {
+        const once = localePath(to, stripLocale(localePath(from, '/shop')))
+        const twice = localePath(to, stripLocale(once))
+        expect(twice, `${from} -> ${to}`).toBe(once)
+      }
+    }
   })
 })

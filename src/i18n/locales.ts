@@ -34,6 +34,27 @@ export function localePath(locale: Locale, path: string): string {
   return `/${locale}${rest}${suffix}`
 }
 
+/**
+ * `localePath` 的逆运算：去掉开头的 `/<合法 locale>` 段，供语言切换使用
+ * （`stripLocale('/zh-CN/shop')` → `'/shop'`，再 `localePath('en', rest)` → `'/en/shop'`）。
+ *
+ * 与 `localePath` 共用 `splitPath`（单一来源）：前缀只作用于路径段，query/hash 原样保留。
+ * 前缀判定沿用同一口径（大小写敏感、要求 `/` 或整段相同），否则 `/enen/shop` 会被误剥。
+ * 只做字符串前缀剥离，**不做路径规范化**（`/en/../api` → `/../api`）——
+ * 路径里有什么由路由层判定；这里多做一步只会与 `localePath` 的对称性脱节。
+ * 不带合法前缀时原样返回，绝不抛错。
+ */
+export function stripLocale(path: string): string {
+  const [pathname, suffix] = splitPath(path)
+  for (const locale of LOCALES) {
+    const prefix = `/${locale}`
+    // 只有前缀：`/en` → `/`；query/hash 原样拼回。
+    if (pathname === prefix) return `/${suffix}`
+    if (pathname.startsWith(`${prefix}/`)) return `${pathname.slice(prefix.length)}${suffix}`
+  }
+  return path
+}
+
 /** 拆成 `pathname + search + hash`，使前缀只作用于路径段。 */
 function splitPath(path: string): [pathname: string, suffix: string] {
   const boundary = path.search(/[?#]/)

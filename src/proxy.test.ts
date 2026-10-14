@@ -62,6 +62,20 @@ describe('proxy 跳转', () => {
   it('依赖 Accept-Language 时带 Vary', () => {
     expect(proxy(req('/shop')).headers.get('vary')).toContain('Accept-Language')
   })
+  it('协商重定向声明 private, no-store（目标还依赖 cookie，不能进共享缓存）', () => {
+    // 审查重点：308 的目标不只取决于 Accept-Language，还取决于 evoloop_locale cookie——
+    // 共享缓存按 Accept-Language 复用同一个 308 会把 cookie 已经选好的语言覆盖掉。
+    const res = proxy(req('/shop', { acceptLanguage: 'zh-CN' }))
+    expect(res.headers.get('cache-control')).toBe('private, no-store')
+    expect(res.headers.get('vary')).toContain('Accept-Language')
+  })
+  it('页面响应不得被标成 no-store（308 的缓存语义不是页面响应的语义）', () => {
+    // 只给重定向出口加 no-store：把 header 加到所有出口上会让每个 /en/* 页面响应
+    // 都失去共享缓存（CDN / ISR）能力，代价与收益不成比例。
+    expect(proxy(req('/en/shop')).headers.get('cache-control')).toBeNull()
+    expect(proxy(req('/api/ai/chat')).headers.get('cache-control')).toBeNull()
+    expect(proxy(req('/logo.png')).headers.get('cache-control')).toBeNull()
+  })
   it('设置偏好 cookie 但不重定向（已带前缀时）', () => {
     const res = proxy(req('/en/shop'))
     expect(res.headers.get('set-cookie')).toContain('evoloop_locale=en')
