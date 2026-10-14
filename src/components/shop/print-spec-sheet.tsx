@@ -1,6 +1,5 @@
 import { convert } from '@/domain/size'
 import { site } from '@/lib/site'
-import { POLICY_PRODUCTION, POLICY_RETURNS } from '@/lib/store-policy'
 import type { ProductView } from '@/domain/product'
 import type { CanonicalSize } from '@/domain/product'
 import { DEFAULT_LOCALE, type Locale } from '@/i18n/locales'
@@ -21,8 +20,11 @@ function systemRow(eu: CanonicalSize): { label: string; value: string }[] {
  * 屏幕上默认隐藏（CSS），仅 @media print 显示；非打印区块由全局打印样式隐藏。
  *
  * 真实数据原则：只印实有字段——货号、真实色数、尺码换算行（表内换算）；不印 demo
- * 价格（§AI 不带价原则延伸：价格只在店铺实时呈现），不印虚构工艺词。护理内容与
- * PDP 详情区同源（store-policy 常量）。尺码为演示换算口径。
+ * 价格（§AI 不带价原则延伸：价格只在店铺实时呈现），不印虚构工艺词。尺码为演示换算口径。
+ *
+ * 政策句按**本组件收到的 `locale`** 取词典（`pdp.policy.*`），与 PDP 手风琴同一处句子源：
+ * 服务端 AI prompt 注入仍读 `store-policy.ts` 的常量（模型输入，默认语言），但**页面上的可见
+ * 文案不再经过那些常量** —— 否则中文页会印出英文政策句。
  *
  * `locale` 可选并缺省默认语言（与 `promise-strip.tsx` 同一策略，裁定 R4）：本组件是服务端组件
  * （拿不到 Provider），而 `print-spec-sheet.test.tsx` 直接合成渲染 `<PrintSpecSheet product={…} />`
@@ -94,8 +96,8 @@ export function PrintSpecSheet({
 
       <section className="print-block">
         <h2>{t['pdp.print.policy']}</h2>
-        <p>{POLICY_PRODUCTION}</p>
-        <p>{POLICY_RETURNS}</p>
+        <p>{t['pdp.policy.production']}</p>
+        <p>{t['pdp.policy.returns']}</p>
       </section>
     </section>
   )
