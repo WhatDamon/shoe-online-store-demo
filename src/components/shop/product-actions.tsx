@@ -9,7 +9,7 @@ import type { ProductView } from '@/domain/product'
 import type { ShopifyBuyConfig } from '@/server/catalog/shopify-buy'
 import { footMmToEU } from '@/domain/size'
 import { mySize } from '@/lib/my-size'
-import { useMessages } from '@/components/i18n/locale-provider'
+import { useLocale, useMessages } from '@/components/i18n/locale-provider'
 import { useAssistant } from '@/components/assistant/assistant-provider'
 import { SizeSelector } from './size-selector'
 import { ProductBuyBar } from './product-buy-bar'
@@ -44,13 +44,16 @@ interface ProductActionsProps {
 // 持有所选尺码/颜色状态，供购买条在无 store 阶段做 aria-live 说明。
 export function ProductActions({ product, buyConfig = null, children }: ProductActionsProps) {
   const t = useMessages()
+  // 错误文案按界面语言取（commerce-client 的错误码 → 文案映射需要它）；Provider 缺席时
+  // useLocale() 返回默认语言，故孤立渲染（含既有测试）仍是英文。
+  const locale = useLocale()
   const storeLive = buyConfig != null
   const [commerce, setCommerce] = useState<CommerceProduct | null>(null)
   const [commerceError, setCommerceError] = useState<string | null>(null)
   useEffect(() => {
     if (storeLive) return
     let active = true
-    commerceRequest(`catalog/products/${product.handle}`, parseCommerceProduct)
+    commerceRequest(`catalog/products/${product.handle}`, parseCommerceProduct, { locale })
       .then((data) => {
         if (active) setCommerce(data)
       })
@@ -60,7 +63,7 @@ export function ProductActions({ product, buyConfig = null, children }: ProductA
     return () => {
       active = false
     }
-  }, [product.handle, storeLive])
+  }, [product.handle, storeLive, locale])
   const colors = product.colors ?? []
   // 「我的尺码」快照：demo 分支 Select-size 命中高亮（产品在库才显形，天然自然）。
   const myMm = useSyncExternalStore(mySize.subscribe, mySize.getSnapshot, mySize.getServerSnapshot)

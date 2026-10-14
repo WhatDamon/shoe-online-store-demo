@@ -10,10 +10,21 @@ import { messages } from '@/i18n/messages'
 // 句子级文案在词典里（`pdp.policy.*`），这里保留**导出名与单源关系**：改名或新增常量才会
 // 影响消费点，改文案只改词典一处。
 //
-// 形状说明（阶段 1 只有一种语言，故按默认语言取词典；不要改成函数或按 locale 分支）：
-// 这两个常量同时喂给服务端 AI prompt 与页面渲染，改成需要 locale 入参的函数会逼着
-// `prompts.test.ts` / `print-spec-sheet.test.tsx` 的既有断言跟着改。阶段 2 需要按语言取值时
-// 再连同那两个消费点一起改，那是阶段 2 自己的测试面。
+// **划分（裁决 R49）：句子进词典，事实（阈值/材质/期限）留在本模块。**
+// - 消费端句子 → 词典键 `pdp.policy.*`：PDP 手风琴按**URL 语言**直接读词典（`t['pdp.policy.production']`），
+//   与同页其它界面句子的语言一致。这与 SEO 的「内容语言」规则不矛盾：canonical / hreflang /
+//   sitemap / JSON-LD 指向的是**内容实际可用的语言**（商品文案只有英文，故 `/zh-CN/product/<handle>`
+//   的信号指向 `/en/...`），而界面句子的语言是 URL 语言。同一页上两者并存是刻意的：把英文内容
+//   宣称成中文才是给搜索引擎发假信号，把中文界面里的政策句留给英文才是给用户发错文案。
+// - 事实口径 → 留在本模块：`POLICY_PRODUCTION` / `POLICY_RETURNS` 是 AI 客服注入
+//   （`prompts.ts` 的 `STORE_POLICY_FACTS`）与打印规格单（`print-spec-sheet.tsx`）读的同一份，
+//   `POLICY_CARE` 是护理海报的原文（英文印刷品，不译）。事实（不可退、30 天、按订单打印这类
+//   阈值与承诺）变更时必须两个语言一起改，不允许只改一侧。
+//
+// 形状说明（不改）：这两个常量仍按**默认语言**取词典值。它们喂给服务端 AI prompt 与打印规格单，
+// 改成需要 locale 入参的函数会逼着 `prompts.test.ts` / `print-spec-sheet.test.tsx` 的既有断言
+// 跟着改。PDP 手风琴现在直接读词典（不再经过这里），打印规格单仍按默认语言渲染（移交项，
+// 见任务 9 报告）。
 const t = messages(DEFAULT_LOCALE)
 
 export const POLICY_PRODUCTION = t['pdp.policy.production']

@@ -4,7 +4,8 @@ import Image from 'next/image'
 import { useRef, useState } from 'react'
 import { XIcon } from 'lucide-react'
 import { useModalDismiss } from '@/lib/use-modal'
-import { useMessages } from '@/components/i18n/locale-provider'
+import { useLocale, useMessages } from '@/components/i18n/locale-provider'
+import { DEFAULT_LOCALE } from '@/i18n/locales'
 import carePoster from '@/assets/product-care-instructions.webp'
 
 // 护理说明海报：站点通用资产，每个 PDP 详情区提供查看入口。
@@ -17,6 +18,10 @@ const POSTER_HEIGHT = 1754
 
 export function CareInstructionsButton() {
   const t = useMessages()
+  // 卡面（`carePoster` 与 `POLICY_CARE` 原文）是**英文印刷品**：护理文案按语言翻译会与包装内
+  // 的实物矛盾，所以卡面保持英文，只在**非英文界面**加一句说明。
+  // 默认语言即英文，故未挂 `LocaleProvider` 的孤立渲染（含既有测试）不出现这句提示。
+  const showEnglishCardNote = useLocale() !== DEFAULT_LOCALE
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const dialogRef = useRef<HTMLDivElement | null>(null)
@@ -36,6 +41,9 @@ export function CareInstructionsButton() {
       >
         {t['pdp.care.title']}
       </button>
+      {showEnglishCardNote ? (
+        <p className="text-xs leading-5 text-neutral-500">{t['pdp.policy.careSheetEnglish']}</p>
+      ) : null}
 
       {open ? (
         <div

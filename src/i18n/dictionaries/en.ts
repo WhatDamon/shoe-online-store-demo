@@ -306,6 +306,10 @@ const en = {
     'Every pair is printed to order in our studio, so nothing sits in a warehouse — we only print what you buy.',
   'pdp.policy.returns':
     "Because each pair is made to your order, custom-printed items can't be returned or refunded. If your pair arrives faulty or the fit is not as promised, message us within 30 days and we'll sort it out.",
+  // 保养卡提示：卡面是**英文印刷品**（海报与 `POLICY_CARE` 原文），翻译会与实物矛盾，
+  // 故只在非英文界面单独说明（渲染点 `care-instructions.tsx`）。
+  'pdp.policy.careSheetEnglish':
+    'The care sheet is printed in English — the same card that comes in the box.',
 
   // 购物车（`CommercePanel` mode='cart'）。行内 `EU <n>` 的体系名是领域事实（ADR 0008
   // 决策 6）：语言不改变尺码显示体系。

@@ -278,6 +278,9 @@ const zhCN = {
   'pdp.policy.production': '每一双都在我们的工作室按订单打印，所以不占仓库 —— 只打印你买的那双。',
   'pdp.policy.returns':
     '每一双都按你的订单制作，因此定制打印商品不支持退货或退款。如果收到的鞋有质量问题，或合脚程度与承诺不符，请在 30 天内联系我们，我们会为你处理。',
+  // 保养卡提示：卡面是**英文印刷品**（海报与 `POLICY_CARE` 原文），翻译会与实物矛盾，
+  // 故中文界面只加这句说明，不译卡面本身（渲染点 `care-instructions.tsx`）。
+  'pdp.policy.careSheetEnglish': '保养卡为英文原版，与包装内卡片一致。',
 
   // 购物车（`CommercePanel` mode='cart'）。行内尺码体系名是领域事实：语言不改变尺码显示体系。
   'cart.title': '购物车',

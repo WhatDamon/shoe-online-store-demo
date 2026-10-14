@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { LocaleLink } from '@/components/i18n/locale-link'
-import { useMessages } from '@/components/i18n/locale-provider'
+import { useLocale, useMessages } from '@/components/i18n/locale-provider'
 import { Button } from '@/components/ui/button'
 import type { CommerceVariant } from '@/domain/commerce'
 import { parseCartView } from '@/domain/commerce-response'
@@ -22,6 +22,9 @@ export function ProductBuyBar({
   error: string | null
 }) {
   const t = useMessages()
+  // 错误文案按界面语言取（commerce-client 的错误码 → 文案映射需要它）；Provider 缺席时
+  // useLocale() 返回默认语言，故孤立渲染（含既有测试）仍是英文。
+  const locale = useLocale()
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   async function add() {
@@ -32,6 +35,7 @@ export function ProductBuyBar({
       await commerceRequest('cart/items', parseCartView, {
         method: 'POST',
         body: JSON.stringify({ variant_id: variant.id, quantity: 1 }),
+        locale,
       })
       setMessage(t['pdp.buy.added'])
     } catch (e) {

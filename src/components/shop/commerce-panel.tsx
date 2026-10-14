@@ -1,7 +1,7 @@
 'use client'
 
 import { LocaleLink } from '@/components/i18n/locale-link'
-import { useMessages } from '@/components/i18n/locale-provider'
+import { useLocale, useMessages } from '@/components/i18n/locale-provider'
 import { useEffect, useRef, useState } from 'react'
 import type { CartView, OrderView } from '@/domain/commerce'
 import { parseCartView, parseOrderView } from '@/domain/commerce-response'
@@ -18,6 +18,9 @@ export function CommercePanel({
   orderId?: string
 }) {
   const t = useMessages()
+  // 错误文案按界面语言取（commerce-client 的错误码 → 文案映射需要它）；Provider 缺席时
+  // useLocale() 返回默认语言，故孤立渲染（含既有测试）仍是英文。
+  const locale = useLocale()
   const [cart, setCart] = useState<CartView | null>(null)
   const [order, setOrder] = useState<OrderView | null>(null)
   const [error, setError] = useState('')
@@ -29,13 +32,13 @@ export function CommercePanel({
     let active = true
     const request =
       mode === 'order'
-        ? commerceRequest(`orders/${orderId}`, parseOrderView).then((data) => {
+        ? commerceRequest(`orders/${orderId}`, parseOrderView, { locale }).then((data) => {
             if (active) setOrder(data)
           })
         : commerceRequest(
             mode === 'checkout' ? 'checkout/preview' : 'cart',
             parseCartView,
-            mode === 'checkout' ? { method: 'POST' } : undefined,
+            mode === 'checkout' ? { method: 'POST', locale } : { locale },
           ).then((data) => {
             if (active) setCart(data)
           })
@@ -53,7 +56,7 @@ export function CommercePanel({
     return () => {
       active = false
     }
-  }, [mode, orderId])
+  }, [mode, orderId, locale])
 
   async function act(operation: () => Promise<void>) {
     if (inFlight.current) return
@@ -77,8 +80,8 @@ export function CommercePanel({
           `cart/items/${id}`,
           parseCartView,
           quantity == null
-            ? { method: 'DELETE' }
-            : { method: 'PATCH', body: JSON.stringify({ quantity }) },
+            ? { method: 'DELETE', locale }
+            : { method: 'PATCH', body: JSON.stringify({ quantity }), locale },
         ),
       ),
     )
@@ -92,6 +95,7 @@ export function CommercePanel({
       const created = await commerceRequest('checkout/create-order', parseOrderView, {
         method: 'POST',
         headers: { 'Idempotency-Key': key },
+        locale,
       })
       setOrder(created)
       sessionStorage.removeItem(pendingKey)
@@ -146,7 +150,9 @@ export function CommercePanel({
             className="text-sm underline"
             disabled={busy}
             onClick={() =>
-              act(async () => setOrder(await commerceRequest(`orders/${order.id}`, parseOrderView)))
+              act(async () =>
+                setOrder(await commerceRequest(`orders/${order.id}`, parseOrderView, { locale })),
+              )
             }
           >
             {t['orders.refresh']}
@@ -241,6 +247,7 @@ export function CommercePanel({
               setOrder(
                 await commerceRequest(`orders/${order.id}/cancel`, parseOrderView, {
                   method: 'POST',
+                  locale,
                 }),
               ),
             )

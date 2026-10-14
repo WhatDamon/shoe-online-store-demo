@@ -1,4 +1,4 @@
-import { DEFAULT_LOCALE } from '@/i18n/locales'
+import { DEFAULT_LOCALE, type Locale } from '@/i18n/locales'
 import { messages, type Messages } from '@/i18n/messages'
 
 /**
@@ -9,7 +9,8 @@ import { messages, type Messages } from '@/i18n/messages'
  *
  * **本联合只列「有专门用户文案」的码，不是后端码的全集。** 后端另有 `product_not_found` /
  * `variant_not_found` / `quantity_limit`，Route Handler 另有 `invalid_origin`；它们抽取前就走
- * 通用兜底串，阶段 1「输出与改造前等价」不允许顺手给它们补一句新英文，故不在此列（见
+ * 通用兜底串，阶段 1「输出与改造前等价」不允许顺手给它们补一句新英文，阶段 2 维持（裁决 R30：
+ * 本轮只覆盖既有的 5 个码，按语言取文案不改变它们的输出）。故不在此列（见
  * `commerce-client.test.ts` 的 `invalid_origin` 用例与 task-8 报告的移交项）。未列出的码
  * 照旧落到 `errors.unknown`，不会渲染 `undefined`。
  */
@@ -41,17 +42,24 @@ function isErrorCode(code: string): code is ErrorCode {
 }
 
 /**
- * 文案取自词典（`errors.*`）。本模块被 `'use client'` 组件导入，**不得**要求挂 Provider 才能
- * 取值——故这里按默认语言取一次。阶段 1 只有 `en`（`LOCALES = ['en']`），取值与抽取前逐字相同；
- * 阶段 2 要按 URL 语言取时，把语言从调用方（客户端组件能拿到 `useLocale()`）传进来。
+ * 发一个 commerce 代理请求，并把后端的**错误码**翻成当前界面语言的文案（`errors.*`）。
+ *
+ * 文案按 `locale` **现取**，不由本模块持有快照：本模块被 `'use client'` 组件导入，**不得**要求挂
+ * Provider 才能取值，所以语言由调用组件用 `useLocale()` 传进来（R43 的同一条口径：参数接上线
+ * 才算完成）。`locale` 挂在既有的 options 包上，而不是另开一个「按码取文案」的导出函数——码 →
+ * 文案的映射只该在**抛错这一处**发生；另开函数会逼着每个 `catch (e) { setError(e.message) }`
+ * 的调用点自己再查一次码，多出来的接线只会漂移。位置也不变（`init` 仍是第 3 个参数），故既有
+ * 调用点只多一个字段、测试一行不改。
  */
-const t = messages(DEFAULT_LOCALE)
-
 export async function commerceRequest<T>(
   path: string,
   parse: (value: unknown) => T,
-  init?: RequestInit,
+  // `locale` 是本站的选项、**不是** fetch 的：解构出来只用于取文案，绝不会漏进 `fetch(path, init)`
+  // （`commerce-client.test.ts` 断言了传给 fetch 的对象）。缺省默认语言——未挂 `LocaleProvider`
+  // 的孤立渲染（含既有组件测试）与阶段 1 的文案因此逐字相同。
+  { locale = DEFAULT_LOCALE, ...init }: RequestInit & { locale?: Locale } = {},
 ): Promise<T> {
+  const t = messages(locale)
   const response = await fetch(`/api/commerce/${path}`, {
     ...init,
     cache: 'no-store',

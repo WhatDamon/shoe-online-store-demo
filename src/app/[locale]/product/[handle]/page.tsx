@@ -27,7 +27,6 @@ import { DEFAULT_LOCALE, isLocale } from '@/i18n/locales'
 import { messages } from '@/i18n/messages'
 import { JsonLd } from '@/components/seo/json-ld'
 import { breadcrumbSchema, productSchema } from '@/lib/structured-data'
-import { POLICY_PRODUCTION, POLICY_RETURNS } from '@/lib/store-policy'
 
 export async function generateStaticParams() {
   const products = await catalog().getProducts()
@@ -166,9 +165,13 @@ export default async function ProductPage(props: {
                     <AccordionItem value="shipping">
                       <AccordionTrigger>{t['pdp.accordion.shipping']}</AccordionTrigger>
                       <AccordionContent>
-                        {/* 文案单源（store-policy.ts）：与 AI support 客服注入同一份，禁止在此另写。 */}
-                        <p className="mb-3 text-neutral-600">{POLICY_PRODUCTION}</p>
-                        <p className="text-neutral-600">{POLICY_RETURNS}</p>
+                        {/* 店务政策是**句子级 UI 文案**，按**URL 语言**取（与同页手风琴标题共用这份 `t`）。
+                          它与上方「内容语言」不矛盾：canonical / JSON-LD 指向的是**内容实际可用的
+                          语言**（商品文案只有英文 → `DEFAULT_LOCALE`，阶段 3 才改），而界面句子的
+                          语言是 URL 语言；`/zh-CN` 显示中文政策、SEO 信号指向 `/en`，三者各司其职
+                          （裁决 R49）。事实（阈值／材质／期限）仍单源在 `lib/store-policy.ts`。 */}
+                        <p className="mb-3 text-neutral-600">{t['pdp.policy.production']}</p>
+                        <p className="text-neutral-600">{t['pdp.policy.returns']}</p>
                       </AccordionContent>
                     </AccordionItem>
                   </Accordion>
