@@ -54,6 +54,15 @@ beforeEach(() => {
   mockEmbeddingsAvailable.mockReset()
   mockEmbeddingsAvailable.mockResolvedValue(false)
   vi.stubEnv('AI_API_KEY', '') // 强制 Mock provider（无真实调用）
+  // 本文件的断言隐含依赖这几个默认值：`turns 超限` 硬编码「第 21 次回合被拒」（⇒ AI_MAX_TURNS=20）、
+  // 用户消息不被截断（⇒ AI_MAX_MESSAGE_CHARS=800）、预算预留必然成功（⇒ AI_DAILY_TOKEN_CAP 默认值）。
+  // 还隐含一个运行前提：检索走 `createDefaultRepository()` → `db()`，而本文件的库是
+  // `createDb(':memory:')`；DB_DRIVER=postgres 会让每次检索抛错、退化成恒 NO_MATCH。
+  // 不 pin 这些名字，就会把外层 shell 的同名变量当成用例前提。
+  vi.stubEnv('AI_MAX_TURNS', '20')
+  vi.stubEnv('AI_MAX_MESSAGE_CHARS', '800')
+  vi.stubEnv('AI_DAILY_TOKEN_CAP', '1000000')
+  vi.stubEnv('DB_DRIVER', 'sqlite')
 })
 
 describe('events SSE 帧往返', () => {
