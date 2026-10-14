@@ -89,7 +89,7 @@ describe('alternatesFor', () => {
     expect(alternatesFor('en', '/shop').canonical).toBe(`${site.url}/en/shop`)
   })
 
-  it('为每种已声明语言成对输出 hreflang 与 x-default', async () => {
+  it('静态页 /shop 在两种语言下都存在：成对输出 hreflang 与 x-default', async () => {
     const { alternatesFor } = await import('./seo')
     // 期望值随 `LOCALES` 变化（裁决 R35）：「每一种已声明语言」现在是 en 与 zh-CN。
     // 这里断言的是**静态页** `/shop`（内容就是界面文案，两种语言都有），所以按实际译文收窄

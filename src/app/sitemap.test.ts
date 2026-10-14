@@ -56,7 +56,7 @@ describe('sitemap', () => {
     }
   })
 
-  it('为已译页面输出成对 hreflang（含 x-default）', async () => {
+  it('静态页在两种语言下都存在：成对输出 hreflang（含 x-default）', async () => {
     const home = (await sitemap()).find((entry) => entry.url === `${site.url}/en`)
     // 期望值随 `LOCALES` 变化（裁决 R35）：默认 `availableLocales` 是全部已声明语言。
     // 首页是**静态页**（内容就是界面文案，两种语言都有），所以收窄未译内容页之后本断言

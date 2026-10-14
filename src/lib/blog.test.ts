@@ -203,3 +203,74 @@ describe('blog content layer', () => {
     expect(listLocalizedPosts('../../' as Locale)).toEqual([])
   })
 })
+
+// ── 「可用」必须与「可渲染」同义（修复轮 1）────────────────────────────────────
+// 一份**存在但用不了**的译文（缺 date / frontmatter 语法错）曾经会得到三种答案：sitemap 说可用
+// （发出 404 的 /zh-CN/blog/<slug>）、文章页 404、索引页标 fallback。三条路径现在共用同一个
+// 「能不能解析」判定（`tryReadPost`），故下面每条断言都在钉「同一份文件只有一个答案」。
+describe('译文文件存在但用不了', () => {
+  const SLUG = 'fixture-post'
+  const EN_BODY = '---\ntitle: English original\ndate: 2026-09-07\n---\nEnglish body\n'
+  // 缺 `date`：语义非法 → `parsePostFile` 返回 null
+  const ZH_MISSING_DATE = '---\ntitle: 中文译文\n---\n中文正文\n'
+  // frontmatter 语法错：gray-matter 直接抛异常（不能把 sitemap / 索引页 / 文章页打红）
+  const ZH_BROKEN_YAML = '---\ntitle: "unclosed\n---\n中文正文\n'
+
+  /** 临时目录夹具：合法英文原文 + 一份「用不了」的中文译文（绝不写进 content/blog/）。 */
+  const unusableFixture = (zhBody: string): string => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'blog-unusable-'))
+    fs.writeFileSync(path.join(dir, `${SLUG}.md`), EN_BODY)
+    fs.mkdirSync(path.join(dir, 'zh-CN'))
+    fs.writeFileSync(path.join(dir, 'zh-CN', `${SLUG}.md`), zhBody)
+    return dir
+  }
+
+  const expectUnusable = (zhBody: string): void => {
+    const dir = unusableFixture(zhBody)
+    try {
+      // 1) 可用性：`zh-CN` 不出现 ⇒ sitemap 不发出 /zh-CN/blog/<slug>，也不发 zh-CN hreflang
+      expect(availableLocalesFor(SLUG, dir)).toEqual(['en'])
+      // 2) 单篇：回退英文原文（不是 null——`null` 会把「译文有瑕疵」升级成「页面不存在」404）
+      const localized = getLocalizedPost(SLUG, 'zh-CN', dir)
+      expect(localized?.status).toBe('fallback')
+      expect(localized?.sourceLocale).toBe('en')
+      expect(localized?.post.title).toBe('English original')
+      expect(localized?.post.content).toContain('English body')
+      expect(localized?.post.content).not.toContain('中文正文')
+      // 3) 索引：同一份文件必须给出同一个答案（fallback），不是 translated、也不是整页炸掉
+      const listed = listLocalizedPosts('zh-CN', dir)
+      expect(listed.map((item) => item.status)).toEqual(['fallback'])
+      expect(listed[0].sourceLocale).toBe('en')
+      // 默认语言不受这份坏译文影响
+      expect(getLocalizedPost(SLUG, 'en', dir)?.status).toBe('translated')
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  }
+
+  it('缺 date 的译文：不可用 + 回退（三条路径同一个答案）', () => {
+    expectUnusable(ZH_MISSING_DATE)
+  })
+
+  it('frontmatter 语法错的译文：不抛异常，同样按不可用 + 回退处理', () => {
+    expectUnusable(ZH_BROKEN_YAML)
+  })
+
+  it('连默认语言正文都用不了 → 文章不存在（回退不制造幽灵页面）', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'blog-unusable-en-'))
+    try {
+      fs.mkdirSync(path.join(dir, 'zh-CN'))
+      fs.writeFileSync(path.join(dir, `${SLUG}.md`), '---\ntitle: No date\n---\nEnglish body\n')
+      fs.writeFileSync(
+        path.join(dir, 'zh-CN', `${SLUG}.md`),
+        '---\ntitle: 中文译文\ndate: 2026-09-07\n---\n中文正文\n',
+      )
+      // 可用集合只认可解析的语言；默认语言不可用 ⇒ 回退无处可去 ⇒ null
+      expect(availableLocalesFor(SLUG, dir)).toEqual(['zh-CN'])
+      expect(getLocalizedPost(SLUG, 'en', dir)).toBeNull()
+      expect(getLocalizedPost(SLUG, 'zh-CN', dir)?.status).toBe('translated')
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})

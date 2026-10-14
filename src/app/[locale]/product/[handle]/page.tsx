@@ -85,14 +85,18 @@ export default async function ProductPage(props: {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:py-8">
+      {/* 结构化数据的 `locale` 是**内容语言**，不是 URL 段语言：阶段 2 的商品文案（标题/描述/
+        `additionalProperty` 标签）只有英文，`/zh-CN/product/<handle>` 是回退页，故与
+        `generateMetadata` 同一口径传 `DEFAULT_LOCALE`——`@id` / URL 前缀与 canonical 同源
+        （规格 §8.3，`structured-data.ts` 的模块注释）。阶段 3 商品译文落地后改传实际内容语言。 */}
       <JsonLd
-        data={breadcrumbSchema(locale, [
+        data={breadcrumbSchema(DEFAULT_LOCALE, [
           { name: t['nav.home'], path: '/' },
           { name: t['nav.shop'], path: '/shop' },
           { name: product.title, path: `/product/${product.handle}` },
         ])}
       />
-      <JsonLd data={productSchema(locale, product)} />
+      <JsonLd data={productSchema(DEFAULT_LOCALE, product)} />
       {/* 页面锚点（渲染 null）：FAB 打开时把当前鞋带给助手（设计：PDP 针对性介绍）。 */}
       <AssistantPageAnchor handle={product.handle} title={product.title} />
       {/* 打印规格说明：可交互主体包 .print-hidden，@media print 只保留 .print-spec-sheet。 */}

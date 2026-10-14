@@ -60,19 +60,22 @@ export default async function BlogPostPage(props: {
   const t = messages(locale)
   const localized = getLocalizedPost(slug, locale)
   if (!localized) notFound()
-  const { post, status } = localized
+  const { post, status, sourceLocale } = localized
 
   return (
     <article className="mx-auto w-full max-w-3xl px-4 pb-16 pt-10 sm:pt-14">
+      {/* 结构化数据的 `locale` 是**内容语言**（`sourceLocale`），不是 URL 段语言：回退页（中文 URL、
+        英文正文）的 `@id` / URL 前缀与 `inLanguage` 必须与 canonical 同源（规格 §8.3，
+        `structured-data.ts` 的模块注释）。已译页上 `sourceLocale === locale`，零影响。 */}
       <JsonLd
-        data={breadcrumbSchema(locale, [
+        data={breadcrumbSchema(sourceLocale, [
           { name: t['nav.home'], path: '/' },
           { name: t['blog.sectionName'], path: '/blog' },
           { name: post.title, path: `/blog/${post.slug}` },
         ])}
       />
       <JsonLd
-        data={articleSchema(locale, {
+        data={articleSchema(sourceLocale, {
           slug: post.slug,
           title: post.title,
           description: post.description ?? `${t['blog.articleMetaLead']} ${post.title}.`,
