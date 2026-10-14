@@ -46,10 +46,32 @@ function euFromCm(cm: number): CanonicalSize {
   return Math.floor((cm + 2) * 1.5) as CanonicalSize
 }
 
-/** 从消费者一句话里抽尺码意图（US/EU/UK/cm/JP 半码）→ canonical EU；抽不到返回 null */
+/**
+ * 从消费者一句话里抽尺码意图（US/EU/UK/cm/JP 及中文「码」说法）→ canonical EU；抽不到返回 null。
+ *
+ * **不取 locale 参数**：模式本身就在决定语言——`厘米` 只出现在中文句子里，`\bus\b` 只出现在
+ * 英文句子里，两边天然不会互相误伤；按 locale 分流反之会让「中文界面里的英文提问」退化。
+ *
+ * 顺序：**单位/体系明确的模式在前，语义最宽松的在后**。
+ * - `cm|厘米|公分`（单位明确，走 cm→EU 换算，与改动前同优先级）；
+ * - `美码/欧码/日码`（体系前缀明确：带前缀那一侧才是有单位的那一个，必须赢过裸「N 码」）；
+ * - 裸 `脚长 N`（无单位，按中文习惯视为 cm；带 `(?!\d)`，使「脚长 255」（毫米口径）
+ *   回 null 而不是把前两位当厘米——宁可让助手追问，也不给一个差一档的建议）；
+ * - 裸 `N 码`（中文语境默认 EU 码，最宽松，故最后）。
+ */
 export function parseSizeHint(text: string): CanonicalSize | null {
-  const cm = text.match(/(\d{2}(?:\.\d)?)\s*cm/i)
+  const cm = text.match(/(\d{2}(?:\.\d)?)\s*(?:cm|厘米|公分)/i)
   if (cm) return euFromCm(Number(cm[1]))
+  const cnUs = text.match(/美码\s*(\d{1,2}(?:\.5)?)/)
+  if (cnUs) return toEU(Number(cnUs[1]), 'US')
+  const cnEu = text.match(/欧码\s*(\d{2})/)
+  if (cnEu) return Number(cnEu[1]) as CanonicalSize
+  const cnJp = text.match(/日码\s*(\d{2}(?:\.5)?)/)
+  if (cnJp) return toEU(Number(cnJp[1]), 'JP')
+  const cnFoot = text.match(/脚长\s*(\d{2}(?:\.\d)?)(?!\d)/)
+  if (cnFoot) return euFromCm(Number(cnFoot[1]))
+  const cnSize = text.match(/(\d{2})\s*码/)
+  if (cnSize) return Number(cnSize[1]) as CanonicalSize
   const us = text.match(/\b(?:us|men's?|m)\s*(\d{1,2}(?:\.5)?)\b/i)
   if (us) return toEU(Number(us[1]), 'US')
   const eu = text.match(/\b(?:eu|size)\s*(\d{1,2})\b/i)

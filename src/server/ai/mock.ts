@@ -6,7 +6,7 @@
 // 守卫见 `copy-contract.test.ts`），因此改提示词不会静默改变这里的分派。
 // 文案一律引用注入 digest 里的真实商品名，绝不臆造价格/库存（规格 P1/P3）。
 import type { AiContext, AiProvider } from './provider'
-import { DEFAULT_LOCALE } from '@/i18n/locales'
+import { DEFAULT_LOCALE, type Locale } from '@/i18n/locales'
 import { messages } from '@/i18n/messages'
 import { GIFT_OFFER } from '@/lib/gift-offer'
 import { POLICY_CARE, POLICY_PRODUCTION, POLICY_RETURNS } from '@/lib/store-policy'
@@ -15,27 +15,60 @@ import { MODE_SIGNALS } from './prompts'
 // 消费端文案按**请求语言**取用（`ctx.locale`，由 `/api/ai/chat` 经 `isLocale` 校验后传下来），
 // 每次 stream 现取一份词典，不再有模块级的默认语言快照。
 
-const OFF_TOPIC = [
-  'recipe',
-  'bake',
-  'cook',
-  'dinner',
-  'weather',
-  'politics',
-  'election',
-  'stock market',
-  'movie',
-  'song',
-  'playlist',
-  'math',
-  'homework',
-  'essay',
-  'translate',
-  'python',
-  'code',
-  'poem',
-  'football game',
-]
+/**
+ * 离题词表，**按请求语言分表**（`OFF_TOPIC[locale]`）。
+ *
+ * 不把两表合并成一份来查：拉丁词（`code`、`math`、`song`）会出现在中文正常商品提问里
+ * （「这个 code 有货吗」），合并后会误伤中文购物问题；反之中文词不会出现在英文句子里，
+ * 所以「只查请求语言的表」是安全的。代价是中文界面里的英文离题提问不在此拦截——
+ * 那是 system 提示词（`prompts.ts` 的 PERSONA）负责的层次，不是这份演示词表。
+ *
+ * 中文词按**类别**而非逐个同义词堆砌：一个类别一个常见词，避免变成维护不完的同义词表。
+ */
+const OFF_TOPIC: Record<Locale, readonly string[]> = {
+  en: [
+    'recipe',
+    'bake',
+    'cook',
+    'dinner',
+    'weather',
+    'politics',
+    'election',
+    'stock market',
+    'movie',
+    'song',
+    'playlist',
+    'math',
+    'homework',
+    'essay',
+    'translate',
+    'python',
+    'code',
+    'poem',
+    'football game',
+  ],
+  'zh-CN': [
+    '食谱',
+    '菜谱',
+    '做菜',
+    '做饭',
+    '天气',
+    '政治',
+    '选举',
+    '股票',
+    '电影',
+    '歌曲',
+    '歌单',
+    '数学',
+    '作业',
+    '论文',
+    '翻译',
+    '代码',
+    'python',
+    '诗',
+    '球赛',
+  ],
+}
 
 /** 离题重定向文案：既有测试钉住的 `export const`（默认语言取值）。运行期按 `ctx.locale` 现取。 */
 export const REDIRECT_TEXT = messages(DEFAULT_LOCALE)['assistant.redirect']
@@ -63,21 +96,22 @@ export class MockProvider implements AiProvider {
     const t = messages(ctx.locale ?? DEFAULT_LOCALE)
     const lastUser = [...ctx.messages].reverse().find((m) => m.role === 'user')?.content ?? ''
     // 店务客服（support）：确定性回复注入的真实店务事实。先于 OFF_TOPIC 判断——
-    // 客服词（return/ship）不应被当离题 redirect；无命中子主题时给温和引导。
+    // 客服词（return/ship/清洗）不应被当离题 redirect；无命中子主题时给温和引导。
+    // 关键词同样按**模式**判定（中文词只可能在中文句子里命中），故不需要 locale 分派。
     if (ctx.system.includes(MODE_SIGNALS.support)) {
       const q = lastUser.toLowerCase()
-      if (/care|wash|clean|maintain/.test(q)) {
+      if (/care|wash|clean|maintain|保养|清洗|维护/.test(q)) {
         yield POLICY_CARE
-      } else if (/return|refund|exchange|replace/.test(q)) {
+      } else if (/return|refund|exchange|replace|退货|退款|换货/.test(q)) {
         yield POLICY_RETURNS
-      } else if (/shipping|ship|deliver|arrive|production|print/.test(q)) {
+      } else if (/shipping|ship|deliver|arrive|production|print|配送|发货|送达|生产|打印/.test(q)) {
         yield* toDeltas(POLICY_PRODUCTION)
       } else {
         yield* toDeltas(t['assistant.mock.supportFallback'])
       }
       return
     }
-    if (OFF_TOPIC.some((k) => lastUser.toLowerCase().includes(k))) {
+    if (OFF_TOPIC[ctx.locale ?? DEFAULT_LOCALE].some((k) => lastUser.toLowerCase().includes(k))) {
       yield t['assistant.redirect']
       return
     }
