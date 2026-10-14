@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { parseEvent } from '@/domain/chat-events'
 import type { ChatErrorCode, ChatEvent, Mode, ProductCard } from '@/domain/chat-events'
 import type { CanonicalSize } from '@/domain/product'
-import { useMessages } from '@/components/i18n/locale-provider'
+import { useLocale, useMessages } from '@/components/i18n/locale-provider'
 
 /** 发给服务端的最小商品引用（只需 handle + title）。 */
 interface ChatProductRef {
@@ -140,6 +140,9 @@ export function applyEvent(message: ChatMessage, event: ChatEvent): ChatMessage 
 
 export function useChatStream(): ChatStream {
   const t = useMessages()
+  // 界面语言随请求体发送：Route Handler 拿不到 URL 段语言（`/api` 不经 proxy），
+  // 只能由客户端显式传入；否则回复语言取决于浏览器 Accept-Language 而非页面语言。
+  const locale = useLocale()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -213,6 +216,7 @@ export function useChatStream(): ChatStream {
               text: userContent,
               product: p,
               ...(fm != null ? { footMm: fm } : {}),
+              locale,
             }),
             signal: controller.signal,
           })
@@ -239,7 +243,7 @@ export function useChatStream(): ChatStream {
         }
       })()
     },
-    [t],
+    [t, locale],
   )
 
   const retry = useCallback(() => {
