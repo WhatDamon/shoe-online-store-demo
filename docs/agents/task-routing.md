@@ -22,7 +22,7 @@
 | 前端 / UI / 客户端组件 | `src/domain/`（同构层）、`src/components/`、`CONTEXT.md` | 0005 |
 | SEO / metadata / sitemap / JSON-LD | `src/lib/seo.ts`、`src/lib/site.ts`、`src/app/robots.ts`、`src/app/sitemap.ts`、`docs/seo-geo-plan.md` | — |
 | 依赖 / 包管理器 / 构建 | `package.json`、`backend/pyproject.toml`、`.github/workflows/verify.yml` | 0006 |
-| 多语言 / locale / 文案 | `src/i18n/`（纯模块层）、`src/lib/market.ts`、`src/lib/format.ts`、`src/lib/seo.ts`、`proxy.ts`、`docs/i18n-string-inventory-2026-10-13.md`、`docs/superpowers/specs/2026-10-13-i18n-multi-language-design.md` | 0008 |
+| 多语言 / locale / 文案 | `src/i18n/`（纯模块层；`content.ts` 是内容可用性的纯词汇）、`src/lib/blog.ts`（内容 IO 与可用性判定）、`src/lib/market.ts`、`src/lib/format.ts`、`src/lib/seo.ts`、`proxy.ts`、`docs/i18n-string-inventory-2026-10-13.md`、`docs/superpowers/specs/2026-10-13-i18n-multi-language-design.md` | 0008、0009 |
 | 数据库结构 | 先读下方「数据库双轨」，再按上面对应行读代码 | 0002、0003、0007 |
 
 ## 数据库双轨（最容易搞错的地方）
@@ -47,6 +47,7 @@
 | 0006 | 包管理器层从 Bun 迁移到 npm | 碰依赖、锁文件、CI |
 | 0007 | TypeScript 展示库使用版本化 Drizzle 迁移 | 碰 `drizzle/` 迁移 |
 | 0008 | URL 子路径 locale 路由 + 手写类型化词典；语言与市场解耦 | 碰路由、`proxy.ts`、文案、locale、格式化、内容翻译 |
+| 0009 | 语言切换器 = 两个链接 + `proxy` 持久化偏好；内容可用性驱动 canonical/hreflang/sitemap；阶段 2 商品按回退；URL 语言管 UI 文案、内容语言管 SEO 信号 | 碰语言切换器/AppBar 头部布局、canonical/hreflang/sitemap、商品或文章的收录资格、`OFF_TOPIC` 等按语言的输入规则 |
 
 ## 改 Next.js 之前
 

@@ -157,6 +157,11 @@ PDP 挂载时注册、卸载时（若仍指向自己）清空；FAB 据此在 `s
   这样做的收益是类型系统强制配对：声明一个没有词典的语言是 **TS2741 编译错误**。
 - **语言与市场解耦**（ADR 0008）：`SITE_MARKET` / 币种 / 尺码体系决定**尺寸怎么显示**，
   `Locale` 只决定**文案**。中文界面里显示 `US 8.5` 与 `$128.00` 是**刻意**的结果，不是缺陷。
+- **三者各司其职**（ADR 0009 决策 4）：**语言决定文案、市场决定价格与尺码体系、内容可用性
+  决定 SEO 信号**。**句子级 UI 文案用 URL 语言**（中文页的政策句就是中文）；
+  **canonical / hreflang / sitemap / JSON-LD 用内容语言**（把英文内容宣称成中文是发假信号）。
+  同页并存不矛盾：`/zh-CN/product/<h>` 的界面是中文，而 canonical 指向内容语言那一侧
+  （阶段 2 商品回退 ⇒ `/en`）。复用任何一侧的规则到另一侧都是缺陷。
 - 字典只装**展示文案**：不装价格、库存、订单状态或任何交易事实（ADR 0004）。
 - **面向用户的「输入解析规则」不是词典条目**：`parseSizeHint` 的语言分支、`OFF_TOPIC` 关键词表、
   `estTokens` 的字符/token 比，都留在 domain/server 层作为**行为规则**，以 `Locale` 参数参与判断。
@@ -176,7 +181,17 @@ PDP 挂载时注册、卸载时（若仍指向自己）清空；FAB 据此在 `s
 - **回退页不进 sitemap、不发 hreflang**，且 canonical 指向**默认语言**的同一 slug 地址；
   已译页才自指 canonical 并成对发 hreflang。
 - hreflang 资格要求 status 为 `translated` **且** `source_hash` 与默认语言正文一致——
-  译文过期就不该声称是同一份内容。
+  译文过期就不该声称是同一份内容。（`source_hash` 是规格 §8.2/§8.3 的**要求**与提示级判据，
+  判定单源见下条；改动前先复核 `src/lib/blog.ts` 是否已实现它。）
+- **可用必须与可渲染同义**：文件缺失、YAML 语法错、必填字段缺失都等同于**不可用并回退**；
+  判定只得写在一处——`src/i18n/content.ts`（纯词汇：`ContentStatus` / `LocalizedPost<T>`）+
+  `src/lib/blog.ts` 的 `availableLocalesFor` / `getLocalizedPost` / `listLocalizedPosts`（IO）。
+  页面与 `sitemap.ts` 只消费结果，不自己判断（否则 metadata 与 sitemap 会得到不同结论）。
+- **商品在阶段 2 按回退处理（ADR 0009 决策 3）**：商品文案（标题/描述/特性/`fitNotes`）的翻译
+  排在阶段 3，故 `/zh-CN/product/<handle>` 是回退页——canonical → `/en/...`、不发 zh-CN
+  hreflang、不进 zh-CN sitemap（`src/app/sitemap.ts` 商品段固定 `['en']`）。界面文案已中文化，
+  与内容语言是两件事（见上一节 `Locale / Messages`）。翻转判据是「商品文案确实有译文且可渲染」
+  （届时商品段改为与文章段同一写法），**不是日期到了**。
 
 ---
 
