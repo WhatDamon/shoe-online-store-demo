@@ -25,6 +25,10 @@ beforeEach(() => {
   vi.stubEnv('AI_API_KEY', '')
   vi.stubEnv('AI_DISABLE_REAL', '1')
   vi.stubEnv('AI_DAILY_TOKEN_CAP', '1000000')
+  // 用量行的 `model` 取自 chat.ts 运行时读的 AI_EMBEDDING_MODEL，而下面的断言按字面量
+  // 'embedding' 过滤该列；不 pin 就会把外层 shell 的同名变量（如其它 AI 工具注入的）
+  // 当成期望值。用例内的 stub 一律在本行之后执行，仍覆盖这个默认值。
+  vi.stubEnv('AI_EMBEDDING_MODEL', 'embedding')
   vi.spyOn(console, 'error').mockImplementation(() => {})
   mockRetrieveProducts.mockReset()
 })
