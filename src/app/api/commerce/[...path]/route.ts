@@ -10,7 +10,7 @@ function allowed(path: string, method: string): boolean {
   if (method === 'GET')
     return /^(catalog\/products(?:\/[a-z0-9-]+)?|cart|orders\/[0-9a-f-]+)$/.test(path)
   if (method === 'POST')
-    return /^(cart\/items|checkout\/(preview|create-order)|orders\/[0-9a-f-]+\/cancel|payments\/session)$/.test(
+    return /^(cart\/items|checkout\/(preview|create-order)|orders\/[0-9a-f-]+\/(cancel|refund)|payments\/session)$/.test(
       path,
     )
   return ['PATCH', 'DELETE'].includes(method) && /^cart\/items\/[0-9a-f-]+$/.test(path)

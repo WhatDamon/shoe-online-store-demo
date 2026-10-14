@@ -3,6 +3,10 @@ const messages: Record<string, string> = {
   insufficient_stock: 'Not enough stock. Update the quantity in your cart.',
   empty_cart: 'Your cart is empty. Choose a product first.',
   order_not_found: "We couldn't find this order for the current session.",
+  payment_not_refundable: 'This order has no payment we can refund.',
+  refund_failed: "We couldn't complete the refund just now. Please try again later.",
+  refunds_unavailable: 'Refunds are not available right now. Please try again later.',
+  order_not_cancellable: 'This order has already been paid for, so it can no longer be cancelled.',
   backend_unavailable: 'The shopping service is temporarily unavailable. Please try again.',
 }
 export async function commerceRequest<T>(
