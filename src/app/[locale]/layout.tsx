@@ -1,14 +1,14 @@
 import type { ReactElement, ReactNode } from 'react'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { baseMetadata } from '@/lib/seo'
+import { baseMetadataFor } from '@/lib/seo'
 import { Geist, Geist_Mono, Newsreader } from 'next/font/google'
 import '../globals.css'
 import { WishlistProvider } from '@/components/shop/wishlist-provider'
 import { AssistantProvider } from '@/components/assistant/assistant-provider'
 import { SiteJsonLd } from '@/components/seo/site-json-ld'
 import { LocaleProvider } from '@/components/i18n/locale-provider'
-import { isLocale, LOCALES } from '@/i18n/locales'
+import { DEFAULT_LOCALE, isLocale, LOCALES } from '@/i18n/locales'
 import { messages } from '@/i18n/messages'
 
 const geistSans = Geist({
@@ -26,8 +26,16 @@ const newsreader = Newsreader({
   subsets: ['latin'],
 })
 
-// SEO 基座集中在 src/lib/seo.ts（brand 模板 / metadataBase / OG），单点维护。
-export const metadata: Metadata = baseMetadata
+// SEO 基座集中在 src/lib/seo.ts（brand 模板 / metadataBase / OG），单点维护；这里只把
+// **URL 段语言**交给它，`/zh-CN` 因此拿到中文的 description / keywords / og:locale。
+// 非法语言段不在本函数里 404：`generateMetadata` 与 layout 是两条执行路径，本函数只负责
+// 「拿不到可信语言段时用默认语言」，拦下非法段的是下面 layout 的 `notFound()`。
+export async function generateMetadata(props: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const { locale: raw } = await props.params
+  return baseMetadataFor(isLocale(raw) ? raw : DEFAULT_LOCALE)
+}
 
 // locale 由 URL 段带出，故本阶段（LOCALES 只有 'en'）只需要列出 /en 一棵树；
 // 阶段 2 加语言时这里自动扩展，与词典的「缺键即编译错误」同向。

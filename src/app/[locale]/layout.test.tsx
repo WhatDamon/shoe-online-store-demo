@@ -26,7 +26,8 @@ vi.mock('next/navigation', async (importOriginal) => ({
   notFound: navigation.notFound,
 }))
 
-import RootLayout from './layout'
+import RootLayout, { generateMetadata } from './layout'
+import { site } from '@/lib/site'
 
 describe('root layout', () => {
   it('html lang 等于入参 locale', async () => {
@@ -42,5 +43,29 @@ describe('root layout', () => {
     ).rejects.toThrow('NEXT_NOT_FOUND')
     expect(navigation.notFound).toHaveBeenCalledTimes(1)
     expect(document.documentElement.getAttribute('lang')).not.toBe('foo.bar')
+  })
+})
+
+// 根 metadata 按 URL 段语言产出（`/zh-CN` 的中文 description）。`generateMetadata` 与
+// layout 是两条执行路径：拿不到可信语言段时它必须回落到默认语言，而不是抛出。
+describe('root layout metadata', () => {
+  it('/zh-CN 的 description 是中文，且与 en 不同', async () => {
+    const zh = await generateMetadata({ params: Promise.resolve({ locale: 'zh-CN' }) })
+    const en = await generateMetadata({ params: Promise.resolve({ locale: 'en' }) })
+    expect(String(zh.description)).toMatch(/[\u4e00-\u9fff]/)
+    expect(zh.description).not.toBe(en.description)
+    expect(zh.openGraph?.locale).toBe('zh_CN')
+  })
+
+  it('title 默认值与模板不随语言改变（品牌名不本地化）', async () => {
+    const zh = await generateMetadata({ params: Promise.resolve({ locale: 'zh-CN' }) })
+    expect(zh.title).toMatchObject({ default: site.name, template: `%s — ${site.name}` })
+  })
+
+  it('非法 locale 回落到默认语言的 metadata，不抛错', async () => {
+    const invalid = await generateMetadata({ params: Promise.resolve({ locale: 'xx' }) })
+    const en = await generateMetadata({ params: Promise.resolve({ locale: 'en' }) })
+    expect(invalid.description).toBe(en.description)
+    expect(invalid.openGraph?.locale).toBe('en_US')
   })
 })

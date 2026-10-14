@@ -110,6 +110,14 @@ const zhCN = {
   'marketing.footer.projectNote': '诞生于一场学生黑客松，此后作为独立项目持续打造。',
   'marketing.footer.source': '在 GitHub 上查看源码',
 
+  // 站点级 metadata（`baseMetadataFor`，唯一消费点是最外层 `[locale]/layout.tsx` 的
+  // `generateMetadata`；`global-not-found.tsx` 不消费它——noindex 页不需要全站元数据，裁决 R41）。
+  // 两条键与英文信息等价：描述不含价格、库存、期限或额外承诺（ADR 0004），
+  // 关键词只是英文那四条的对应词。
+  // `keywords` 同样**逗号分隔且词条自身不含逗号**（`seo.ts` 按逗号 split）；分隔符用**半角**逗号。
+  'meta.description': '休闲鞋按订单印制，采用数字制造与以毫米为基准的尺码，库存占用更低。',
+  'meta.keywords': 'Evoloop,按订单制作的休闲鞋,3D 打印鞋,尺码指南',
+
   // OG 图的标题。`\n` 是排版换行（断行位置由词典决定），不是句子边界：
   // `src/app/og/route.tsx` 把它还原成 `<br/>`。
   'og.title': '休闲鞋，按需打印，\n按你的尺码制作。',

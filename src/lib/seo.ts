@@ -1,4 +1,5 @@
 import { DEFAULT_LOCALE, LOCALES, localePath, type Locale } from '@/i18n/locales'
+import { messages } from '@/i18n/messages'
 import { site } from './site'
 import type { Metadata } from 'next'
 
@@ -29,44 +30,71 @@ const resolveBaseUrl = (): URL => {
 export const absoluteUrl = (pathname = '/'): string =>
   new URL(pathname, resolveBaseUrl()).toString()
 
-const baseDescription =
-  'Casual shoes printed to order with digital manufacturing, millimetre-based sizing, and a lower-inventory footprint.'
+/**
+ * 关键词在词典里是**一条分隔符连接的字符串**（`Messages` 的键值必须是 `string`）。
+ * 分隔符选逗号的前提是**词条自身不含逗号**：改造前的英文四条（`Evoloop` / `made-to-order shoes` /
+ * `3D printed shoes` / `shoe sizing guide`）与中文四条都逐条核查过，均不含逗号；
+ * 若将来某条词本身含逗号，必须换分隔符并**同时**改两种语言的词典值，否则会多切出词条。
+ */
+const KEYWORD_SEPARATOR = ','
 
-export const baseMetadata: Metadata = {
-  metadataBase: resolveBaseUrl(),
-  title: { default: site.name, template: `%s — ${site.name}` },
-  description: baseDescription,
-  keywords: ['Evoloop', 'made-to-order shoes', '3D printed shoes', 'shoe sizing guide'],
-  authors: [{ name: site.name, url: site.url }],
-  creator: site.name,
-  publisher: site.name,
-  openGraph: {
-    type: 'website',
-    url: '/',
-    title: site.name,
-    description: baseDescription,
-    // 没有 locale 上下文时的兜底图；页面级一律走 pageMetadata 的逐语言 OG 图
-    images: ['/og'],
-    siteName: site.name,
-    locale: 'en_US',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: site.name,
-    description: baseDescription,
-    images: ['/og'],
-  },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
+/** 词典值 → 关键词数组。`trim` 让词典里逗号后的空格只是排版；空串必须滤掉（会产出空关键词）。 */
+const keywordsOf = (raw: string): string[] =>
+  raw
+    .split(KEYWORD_SEPARATOR)
+    .map((keyword) => keyword.trim())
+    .filter((keyword) => keyword !== '')
+
+/**
+ * 根布局的站点级 metadata 基座，**按语言产出**：`description` / `keywords` /
+ * `openGraph.locale` 都随 locale（规格 §8.5）。品牌名与 title 模板仍是单源、不随语言变化
+ * （阶段 2 决策：品牌名不本地化）。
+ *
+ * 唯一消费点是 `src/app/[locale]/layout.tsx` 的 `generateMetadata`（裁决 R41）：
+ * **noindex 页面（`global-not-found.tsx`）刻意不消费它**——404 不会被收录或分享，补上
+ * description / keywords / og / twitter 收益为零，而搭进来的 `robots` 字段可能让 404 变得可索引。
+ *
+ * **不产出 `alternates`**：canonical 与 hreflang 一律由 `pageMetadata` 逐页给出——这里曾经写死的
+ * `canonical: '/'` 会把全站 canonical 塌成一处的缺陷（规格 §8.5）。
+ */
+export function baseMetadataFor(locale: Locale): Metadata {
+  const t = messages(locale)
+  return {
+    metadataBase: resolveBaseUrl(),
+    title: { default: site.name, template: `%s — ${site.name}` },
+    description: t['meta.description'],
+    keywords: keywordsOf(t['meta.keywords']),
+    authors: [{ name: site.name, url: site.url }],
+    creator: site.name,
+    publisher: site.name,
+    openGraph: {
+      type: 'website',
+      url: '/',
+      title: site.name,
+      description: t['meta.description'],
+      // 页面级一律走 pageMetadata 的逐语言 OG 图；这一条是基座自己的兜底值（裁决 R25）
+      images: ['/og'],
+      siteName: site.name,
+      locale: OG_LOCALES[locale],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: site.name,
+      description: t['meta.description'],
+      images: ['/og'],
+    },
+    robots: {
       index: true,
       follow: true,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
-      'max-video-preview': -1,
+      googleBot: {
+        index: true,
+        follow: true,
+        'max-image-preview': 'large',
+        'max-snippet': -1,
+        'max-video-preview': -1,
+      },
     },
-  },
+  }
 }
 
 /**
@@ -149,15 +177,17 @@ export const pageMetadata = (
   const title = typeof overrides.title === 'string' ? overrides.title : undefined
   const canonical = absoluteUrl(localePath(locale, path))
   const image = ogImage(locale)
+  // 基座按**本页内容语言**取（description / keywords / 兜底 og:title 都随它）
+  const base = baseMetadataFor(locale)
   return {
-    ...baseMetadata,
+    ...base,
     ...overrides,
-    // alternates 一律由 alternatesFor 产出。baseMetadata 里曾经写死的 `canonical: '/'`
+    // alternates 一律由 alternatesFor 产出。基座里曾经写死的 `canonical: '/'`
     // 会让所有页面塌到同一处（规格 §8.5 的已知缺陷），因此连覆盖入口都不留
     // （PageMetadataOverrides 已 Omit 掉 alternates）。
     alternates: alternatesFor(locale, path, availableLocales),
     openGraph: {
-      ...baseMetadata.openGraph,
+      ...base.openGraph,
       ...(overrides.openGraph ?? {}),
       ...(title ? { title } : {}),
       // og:url 与 canonical 同源（规格 §6.4 要求它过 localePath）
@@ -166,7 +196,7 @@ export const pageMetadata = (
       images: overrides.openGraph?.images ?? [image],
     },
     twitter: {
-      ...baseMetadata.twitter,
+      ...base.twitter,
       ...(overrides.twitter ?? {}),
       ...(title ? { title } : {}),
       images: overrides.twitter?.images ?? [image],

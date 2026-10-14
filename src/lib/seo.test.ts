@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PageMetadataOverrides } from './seo'
 import { site } from './site'
+import { LOCALES } from '@/i18n/locales'
 
 const ENV_KEY = 'NEXT_PUBLIC_SITE_URL'
 
@@ -21,8 +22,9 @@ afterEach(() => {
 })
 
 describe('seo metadata helpers', () => {
-  it('baseMetadata defaults to the site brand and print-to-order promise', async () => {
-    const { baseMetadata } = await import('./seo')
+  it("baseMetadataFor('en') defaults to the site brand and print-to-order promise", async () => {
+    const { baseMetadataFor } = await import('./seo')
+    const baseMetadata = baseMetadataFor('en')
     expect(baseMetadata.title).toMatchObject({ default: site.name })
     expect(String((baseMetadata.title as { template?: string }).template)).toContain(site.name)
     expect(baseMetadata.description).toContain('printed to order')
@@ -54,22 +56,23 @@ describe('seo metadata helpers', () => {
 
   it('metadataBase honours NEXT_PUBLIC_SITE_URL and falls back for bad values', async () => {
     process.env[ENV_KEY] = 'https://evoloop.example'
-    const { baseMetadata: b1 } = await import('./seo')
+    const { baseMetadataFor } = await import('./seo')
+    const b1 = baseMetadataFor('en')
     expect(String(b1.metadataBase)).toBe('https://evoloop.example/')
 
     delete process.env[ENV_KEY]
     vi.resetModules()
-    const { baseMetadata: b2 } = await import('./seo')
+    const b2 = baseMetadataFor('en')
     expect(String(b2.metadataBase)).toBe('http://localhost:3000/')
 
     process.env[ENV_KEY] = 'not a url'
     vi.resetModules()
-    const { baseMetadata: b3 } = await import('./seo')
+    const b3 = baseMetadataFor('en')
     expect(String(b3.metadataBase)).toBe('http://localhost:3000/')
 
     process.env[ENV_KEY] = 'ftp://files.example'
     vi.resetModules()
-    const { baseMetadata: b4 } = await import('./seo')
+    const b4 = baseMetadataFor('en')
     expect(String(b4.metadataBase)).toBe('http://localhost:3000/')
   })
 })
@@ -165,5 +168,48 @@ describe('pageMetadata 的逐语言输出', () => {
     expect(meta.metadataBase).toBeDefined()
     expect(meta.description).toContain('printed to order')
     expect(meta.openGraph).toMatchObject({ siteName: site.name, type: 'website' })
+  })
+})
+
+// 英文侧不回归的守卫。期望值**逐字复制**自改造前的 `src/lib/seo.ts`（`baseDescription` 与
+// `keywords`，见 `git show e18fd1c:src/lib/seo.ts`）：刻意手写，不从 `messages('en')` 反推——
+// 从实现取期望值等于让实现自证，英文文案被悄悄改掉时守卫不会红。
+const LEGACY_BASE_DESCRIPTION =
+  'Casual shoes printed to order with digital manufacturing, millimetre-based sizing, and a lower-inventory footprint.'
+const LEGACY_KEYWORDS = ['Evoloop', 'made-to-order shoes', '3D printed shoes', 'shoe sizing guide']
+
+describe('baseMetadataFor 的逐语言基座', () => {
+  it('英文 description 与改造前逐字相同', async () => {
+    const { baseMetadataFor } = await import('./seo')
+    expect(baseMetadataFor('en').description).toBe(LEGACY_BASE_DESCRIPTION)
+  })
+
+  it('英文 keywords 与改造前同元素同顺序（逗号分隔的词典值原样还原成数组）', async () => {
+    const { baseMetadataFor } = await import('./seo')
+    expect(baseMetadataFor('en').keywords).toEqual(LEGACY_KEYWORDS)
+  })
+
+  it('og:locale 随 locale（OGP 用下划线形态）', async () => {
+    const { baseMetadataFor } = await import('./seo')
+    expect(baseMetadataFor('en').openGraph?.locale).toBe('en_US')
+    expect(baseMetadataFor('zh-CN').openGraph?.locale).toBe('zh_CN')
+  })
+
+  it('两种语言的 description 不同，且每种语言的 keywords 都是非空数组', async () => {
+    const { baseMetadataFor } = await import('./seo')
+    expect(baseMetadataFor('zh-CN').description).not.toBe(baseMetadataFor('en').description)
+    for (const locale of LOCALES) {
+      const keywords = baseMetadataFor(locale).keywords
+      expect(Array.isArray(keywords), `${locale} 的 keywords 必须是数组`).toBe(true)
+      expect(keywords as string[], `${locale} 的 keywords 不得为空`).not.toHaveLength(0)
+      // 词典值里多一个分隔符或多一个逗号后的空格都不该产出空词条
+      expect(keywords as string[], `${locale} 的 keywords 不得含空词条`).not.toContain('')
+    }
+  })
+
+  it('不携带 canonical：alternates 只由页面级 pageMetadata 给出', async () => {
+    const { baseMetadataFor } = await import('./seo')
+    expect(baseMetadataFor('en').alternates).toBeUndefined()
+    expect(baseMetadataFor('zh-CN').alternates).toBeUndefined()
   })
 })

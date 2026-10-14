@@ -116,6 +116,16 @@ const en = {
     'Born at a student hackathon. Built since as an independent project.',
   'marketing.footer.source': 'View source on GitHub',
 
+  // 站点级 metadata（`baseMetadataFor`，唯一消费点是最外层 `[locale]/layout.tsx` 的
+  // `generateMetadata`；`global-not-found.tsx` 刻意不消费它——noindex 页不需要全站元数据，
+  // 裁决 R41）。与页面级的 `shop.meta.*` / `blog.meta.*` 分工不同：这两条是**全站**
+  // 的 description 与 keywords，页面可以覆盖前者，但没有页面覆盖后者。
+  // `keywords` 是**逗号分隔的一条字符串**（键值必须是 string）：`src/lib/seo.ts` 按逗号 split
+  // 还原数组，因此词条自身**不得含逗号**（改词时先核这一条）。
+  'meta.description':
+    'Casual shoes printed to order with digital manufacturing, millimetre-based sizing, and a lower-inventory footprint.',
+  'meta.keywords': 'Evoloop,made-to-order shoes,3D printed shoes,shoe sizing guide',
+
   // OG 图的标题。`\n` 是排版换行（译者在词典里决定断行位置），不是句子边界：
   // `src/app/og/route.tsx` 把它还原成 `<br/>`。
   'og.title': 'Casual shoes, printed\nto order in your size.',
@@ -128,8 +138,8 @@ const en = {
   // 表面归属：`shop.*` = /shop 列表页、它的筛选条、空态、赠品活动，以及 /saved 清单页与
   // 两处共用的收藏心形按钮；`pdp.*` = 商品详情页及其客户端组件；`cart.*` / `checkout.*` /
   // `orders.*` = `CommercePanel` 的三个模式；`errors.*` = commerce 客户端的错误码文案与其
-  // 它系统反馈。页面元信息（`meta.*`）与结构化数据（`schema.*`）也归各自表面：它们是该页的
-  // SEO 文案。品牌名与 Slogan（`src/lib/site.ts`）仍不本地化（阶段 2 决策）。
+  // 它系统反馈。页面元信息（`<表面>.meta.*`）与结构化数据（`schema.*`）也归各自表面：它们是
+  // 该页的 SEO 文案（站点级的 `meta.*` 在上文，不属于任何页面）。品牌名与 Slogan（`src/lib/site.ts`）仍不本地化（阶段 2 决策）。
   //
   // **事实与数值一律不进词典**：尺码体系名（US/EU/…）、赠品门槛与材质（`src/lib/gift-offer.ts`）、
   // 色名与货号都留在原模块；带数据的句子在这里只以「句子片段 + 原模块数据」拼回（片段存在的
