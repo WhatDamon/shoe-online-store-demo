@@ -92,12 +92,22 @@ describe('alternatesFor', () => {
   it('为每种已声明语言成对输出 hreflang 与 x-default', async () => {
     const { alternatesFor } = await import('./seo')
     // 期望值随 `LOCALES` 变化（裁决 R35）：「每一种已声明语言」现在是 en 与 zh-CN。
-    // 过渡态期望值（任务 1–5）。任务 6 收口后本断言必然变红，届时改为「未译页面不含 `zh-CN`」。
+    // 这里断言的是**静态页** `/shop`（内容就是界面文案，两种语言都有），所以按实际译文收窄
+    // 内容页之后本断言仍应保持成对——它若变红说明静态页被误判为不可用（收窄做错了）。
     expect(alternatesFor('en', '/shop').languages).toEqual({
       en: `${site.url}/en/shop`,
       'zh-CN': `${site.url}/zh-CN/shop`,
       'x-default': `${site.url}/en/shop`,
     })
+  })
+
+  it('hreflang 由 availableLocales 参数驱动：只有 en 时不发 zh-CN，全语言时才发', async () => {
+    const { alternatesFor } = await import('./seo')
+    // 同一个 path 两种传参：收窄是参数驱动的事实，不是「某个页面被写死了 en」。
+    expect(Object.keys(alternatesFor('en', '/blog/x', ['en']).languages ?? {})).not.toContain(
+      'zh-CN',
+    )
+    expect(Object.keys(alternatesFor('en', '/blog/x', LOCALES).languages ?? {})).toContain('zh-CN')
   })
 
   it('availableLocales 为空时不输出 hreflang 对（回退内容的资格判定，规格 §8.2）', async () => {

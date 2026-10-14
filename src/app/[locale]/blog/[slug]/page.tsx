@@ -5,7 +5,7 @@ import { ArrowLeft } from 'lucide-react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { LocaleLink } from '@/components/i18n/locale-link'
-import { getLocalizedPost, listPosts } from '@/lib/blog'
+import { availableLocalesFor, getLocalizedPost, listPosts } from '@/lib/blog'
 // 日期标签在渲染点现算：唯一来源是 `formatPostDate`（locale 必填），
 // 不在内容层预先算出（那时不知道 locale）。
 import { formatPostDate } from '@/lib/format'
@@ -30,12 +30,17 @@ export async function generateMetadata(props: {
   // 标题与描述随实际渲染的正文走：回退页的标题是英文原文（与正文一致，不是假翻译）。
   const localized = getLocalizedPost(slug, locale)
   if (!localized) return {}
-  const { post } = localized
+  const { post, sourceLocale } = localized
   const description = post.description ?? `${t['blog.articleMetaLead']} ${post.title}.`
-  return pageMetadata(locale, {
+  // canonical / hreflang 一律按**本页内容语言**（`sourceLocale`）产出，不是 URL 段语言：
+  // 回退页（中文 URL、英文正文）的 canonical 必须落在默认语言的同一 slug 地址上，
+  // 否则会指到一份并不存在的译文（规格 §8.2/§8.3，CONTEXT.md「内容回退状态」）。
+  return pageMetadata(sourceLocale, {
     title: post.title,
     description,
     path: `/blog/${post.slug}`,
+    // 本页实际可用的语言 = 真有译文的语言：未译时只有默认语言，因此不发成对 hreflang。
+    availableLocales: availableLocalesFor(post.slug),
     openGraph: {
       type: 'article',
       description,

@@ -37,8 +37,8 @@ export async function generateMetadata(props: {
   return baseMetadataFor(isLocale(raw) ? raw : DEFAULT_LOCALE)
 }
 
-// locale 由 URL 段带出，故本阶段（LOCALES 只有 'en'）只需要列出 /en 一棵树；
-// 阶段 2 加语言时这里自动扩展，与词典的「缺键即编译错误」同向。
+// locale 由 URL 段带出：每个已声明语言各生成一份（`LOCALES` 是语言集合的单一来源，加语言时
+// 这里自动扩展，与词典的「缺键即编译错误」同向）。
 export function generateStaticParams() {
   return LOCALES.map((locale) => ({ locale }))
 }

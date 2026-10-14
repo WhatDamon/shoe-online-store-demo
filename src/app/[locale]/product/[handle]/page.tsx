@@ -37,15 +37,20 @@ export async function generateStaticParams() {
 export async function generateMetadata(props: {
   params: Promise<{ locale: string; handle: string }>
 }): Promise<Metadata> {
-  const { locale: raw, handle } = await props.params
-  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE
+  const { handle } = await props.params
   const product = await getProductForMarket(handle)
   // 未知 handle：由页面级 notFound() 决定 404，元数据仅回退默认品牌态。
   if (!product) return {}
-  return pageMetadata(locale, {
+  // 阶段 2 的**有意口径**：界面文案已中文化，但商品文案（标题/描述/特性）属阶段 3，所以
+  // /zh-CN/product/<handle> 是**回退页**——canonical 指向 /en/product/<handle>、不发成对
+  // hreflang（`availableLocales` 只留默认语言），与 sitemap 商品段同口径（规格 §8.2/§8.3，
+  // CONTEXT.md「内容回退状态」）。因此内容语言恒为 `DEFAULT_LOCALE`，不再读 URL 段语言。
+  // 阶段 3 商品译文落地后，改为按商品文案的实际可用语言判断。
+  return pageMetadata(DEFAULT_LOCALE, {
     title: product.title,
     description: product.description,
     path: `/product/${product.handle}`,
+    availableLocales: [DEFAULT_LOCALE],
     keywords: [product.title, product.productType, ...product.tags],
     openGraph: {
       type: 'website',
