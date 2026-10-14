@@ -53,6 +53,16 @@ describe('中文离题输入', () => {
     expect(reply).not.toBe(messages('zh-CN')['assistant.redirect'])
     expect(reply).toContain('Urban Bloom')
   })
+
+  it('中文界面里的英文离题句不被拦截（R48：**这不是 bug，是有意取舍**）', async () => {
+    // 词表按请求语言取，刻意不跨语言回落：合并中英两表会误伤上一条用例（含拉丁词的中文购物
+    // 提问而拒答），代价就是这里——中文界面里的英文离题句照旧走正常推荐分支。要改这条断言，先读
+    // `mock.ts` 的 `OFF_TOPIC` 注释：正确做法是加语言判定（文本以拉丁词为主时才查英文表），
+    // 不是合并两张表。
+    const reply = (await say('shopping', 'write me a poem about rain', 'zh-CN')).join('')
+    expect(reply).not.toBe(messages('zh-CN')['assistant.redirect'])
+    expect(reply).toContain('Urban Bloom')
+  })
 })
 
 describe('中文客服关键词', () => {
