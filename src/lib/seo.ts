@@ -90,6 +90,8 @@ const ogImage = (locale: Locale): string => `/og?locale=${locale}`
  * - `canonical` 永远是**该内容语言**下同一 path 的绝对 URL（规格 §8.5）；
  * - `languages` 只在 `availableLocales` 非空时输出：内容回退页不该向爬虫声明一对
  *   并不存在的译文（规格 §8.2/§8.3）；默认值 `LOCALES` 表达「该页在每种已声明语言下都存在」；
+ *   任务 1–5 过渡态：默认值等价于「假设所有页面都有译文」，未译页面因此会发出假 hreflang；
+ *   调用方必须以 `availableLocalesFor(...)` 收窄（任务 6）；
  * - `x-default` 与语言对成对出现，指向默认语言。
  */
 export type PageAlternates = {

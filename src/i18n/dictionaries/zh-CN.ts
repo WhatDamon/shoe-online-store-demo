@@ -62,7 +62,7 @@ const zhCN = {
 
   // 推荐位（`featured-grid.tsx`）
   'marketing.featured.kicker': '精选阵容',
-  'marketing.featured.title': '新鲜打印，你的尺码已备好',
+  'marketing.featured.title': '按你的尺码新鲜打印',
 
   // Our Story（`story-section.tsx`）
   'marketing.story.kicker': '舒适，可以被量出来',
@@ -268,7 +268,7 @@ const zhCN = {
   // 购物车（`CommercePanel` mode='cart'）。行内尺码体系名是领域事实：语言不改变尺码显示体系。
   'cart.title': '购物车',
   'cart.meta.description': '查看你保存的 Evoloop 选购。',
-  'cart.reviewCheckout': '前往结算',
+  'cart.reviewCheckout': '核对并结算',
   'cart.itemUnavailable': '已不可售。请移除该商品后继续。',
   'cart.perPair': '/ 双',
   // 可见标签与可及名后缀各自成键：中文下两者同值，但不合并（键集必须与英文一致）。
@@ -282,7 +282,7 @@ const zhCN = {
   'cart.backToCart': '返回购物车',
 
   // 结账（`CommercePanel` mode='checkout'）。支付未启用是硬事实，这里只承载它的说法。
-  'checkout.title': '确认订单',
+  'checkout.title': '核对订单',
   'checkout.meta.title': '结算',
   'checkout.meta.description': 'Evoloop 结算演示。',
   'checkout.note': '提交订单时会重新计算总额。本地演示不加配送费与税费。支付尚未开放。',

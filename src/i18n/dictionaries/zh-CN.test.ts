@@ -17,12 +17,12 @@ describe('zh-CN 词典', () => {
 
   it('没有留下占位符或未译标记', () => {
     for (const [key, value] of Object.entries(zh)) {
-      expect(value, key).not.toMatch(/TODO|FIXME|待翻译|未译|XXX/)
+      expect(value, key).not.toMatch(/TODO|FIXME|TBD|placeholder|待翻译|未译|XXX/)
     }
   })
 
   it('词典不改写货币（语言与市场解耦：中文界面仍显示 $）', () => {
     // ADR 0008 决策 6：价格由 `SITE_MARKET` / `formatPrice` 决定，语言只决定文案。
-    expect(Object.values(zh).join('\n')).not.toMatch(/人民币|CNY|￥/)
+    expect(Object.values(zh).join('\n')).not.toMatch(/人民币|CNY|RMB|￥|¥|元/)
   })
 })

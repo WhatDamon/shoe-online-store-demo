@@ -38,6 +38,7 @@ describe('sitemap', () => {
   it('为已译页面输出成对 hreflang（含 x-default）', async () => {
     const home = (await sitemap()).find((entry) => entry.url === `${site.url}/en`)
     // 期望值随 `LOCALES` 变化（裁决 R35）：默认 `availableLocales` 是全部已声明语言。
+    // 过渡态期望值（任务 1–5）。任务 6 收口后本断言必然变红，届时改为「未译页面不含 `zh-CN`」。
     expect(home?.alternates?.languages).toEqual({
       en: `${site.url}/en`,
       'zh-CN': `${site.url}/zh-CN`,
