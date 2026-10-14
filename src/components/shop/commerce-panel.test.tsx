@@ -18,6 +18,7 @@ const order = {
   id: 'order-1',
   status: 'pending_payment',
   payment_enabled: false,
+  payment_status: null,
   message: 'Payments are not available yet.',
   expires_at: '2026-09-21T14:30:00+00:00',
   cancellation_reason: null,
@@ -214,7 +215,7 @@ it('keeps the checkout key when a successful HTTP response has an invalid order'
   const fetcher = vi
     .fn()
     .mockResolvedValueOnce(ok(cart))
-    .mockResolvedValueOnce(ok({ ...order, status: 'paid' }))
+    .mockResolvedValueOnce(ok({ ...order, status: 'shipped' }))
     .mockResolvedValueOnce(ok(order))
   vi.stubGlobal('fetch', fetcher)
   render(<CommercePanel mode="checkout" />)
