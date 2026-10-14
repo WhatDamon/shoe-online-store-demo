@@ -61,16 +61,22 @@ export default async function BlogPostPage(props: {
   const localized = getLocalizedPost(slug, locale)
   if (!localized) notFound()
   const { post, status, sourceLocale } = localized
+  // 结构化数据（JSON-LD）属**内容语言**（R49 / ADR 0009 决策 4）：面包屑名必须与
+  // `breadcrumbSchema` / `articleSchema` 按内容语言产出的 `item` URL 与 `inLanguage` 同语言。
+  // 回退页（中文 URL、英文正文）的 `sourceLocale` 是 `en`，故 crumb 名取它的词典。已译页上
+  // `sourceLocale === locale`，与 `t` 同值、零影响。页面可见文案仍用 URL 语言的 `t`。
+  const contentT = messages(sourceLocale)
 
   return (
     <article className="mx-auto w-full max-w-3xl px-4 pb-16 pt-10 sm:pt-14">
       {/* 结构化数据的 `locale` 是**内容语言**（`sourceLocale`），不是 URL 段语言：回退页（中文 URL、
         英文正文）的 `@id` / URL 前缀与 `inLanguage` 必须与 canonical 同源（规格 §8.3，
-        `structured-data.ts` 的模块注释）。已译页上 `sourceLocale === locale`，零影响。 */}
+        `structured-data.ts` 的模块注释）。面包屑的 `name` 同取 `sourceLocale` 的词典（`contentT`），
+        否则会发出「中文 crumb 名 + `/en/...` 地址」。已译页上 `sourceLocale === locale`，零影响。 */}
       <JsonLd
         data={breadcrumbSchema(sourceLocale, [
-          { name: t['nav.home'], path: '/' },
-          { name: t['blog.sectionName'], path: '/blog' },
+          { name: contentT['nav.home'], path: '/' },
+          { name: contentT['blog.sectionName'], path: '/blog' },
           { name: post.title, path: `/blog/${post.slug}` },
         ])}
       />

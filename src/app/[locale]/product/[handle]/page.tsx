@@ -71,6 +71,10 @@ export default async function ProductPage(props: {
   const { locale: raw, handle } = await props.params
   const locale = isLocale(raw) ? raw : DEFAULT_LOCALE
   const t = messages(locale)
+  // 结构化数据（JSON-LD）属**内容语言**（R49 / ADR 0009 决策 4），故面包屑的名必须与
+  // `breadcrumbSchema` 按内容语言产出的 `item` URL 同语言。阶段 2 商品文案只有英文 ⇒ 内容语言
+  // 恒为 `DEFAULT_LOCALE`，与 `generateMetadata` / `productSchema` 同一口径（阶段 3 译文落地后改）。
+  const contentT = messages(DEFAULT_LOCALE)
   const product = await getProductForMarket(handle)
   if (!product) notFound()
 
@@ -87,11 +91,14 @@ export default async function ProductPage(props: {
       {/* 结构化数据的 `locale` 是**内容语言**，不是 URL 段语言：阶段 2 的商品文案（标题/描述/
         `additionalProperty` 标签）只有英文，`/zh-CN/product/<handle>` 是回退页，故与
         `generateMetadata` 同一口径传 `DEFAULT_LOCALE`——`@id` / URL 前缀与 canonical 同源
-        （规格 §8.3，`structured-data.ts` 的模块注释）。阶段 3 商品译文落地后改传实际内容语言。 */}
+        （规格 §8.3，`structured-data.ts` 的模块注释）。阶段 3 商品译文落地后改传实际内容语言。
+        面包屑的 `name` 同样取内容语言（`contentT`）：`item` 已是 `/en/...`，名若取 URL 语言
+        就会发出「中文 crumb 名 + 英文地址」的自相矛盾节点——名与地址必须同语言。页面**可见**
+        的返回链接仍按 URL 语言（`t['pdp.backToShop']`，R49）。 */}
       <JsonLd
         data={breadcrumbSchema(DEFAULT_LOCALE, [
-          { name: t['nav.home'], path: '/' },
-          { name: t['nav.shop'], path: '/shop' },
+          { name: contentT['nav.home'], path: '/' },
+          { name: contentT['nav.shop'], path: '/shop' },
           { name: product.title, path: `/product/${product.handle}` },
         ])}
       />
