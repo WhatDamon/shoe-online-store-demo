@@ -5,7 +5,7 @@ import { ArrowLeft } from 'lucide-react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { LocaleLink } from '@/components/i18n/locale-link'
-import { getPost, listPosts } from '@/lib/blog'
+import { getLocalizedPost, listPosts } from '@/lib/blog'
 // 日期标签在渲染点现算：唯一来源是 `formatPostDate`（locale 必填），
 // 不在内容层预先算出（那时不知道 locale）。
 import { formatPostDate } from '@/lib/format'
@@ -27,8 +27,10 @@ export async function generateMetadata(props: {
   const { locale: raw, slug } = await props.params
   const locale = isLocale(raw) ? raw : DEFAULT_LOCALE
   const t = messages(locale)
-  const post = getPost(slug)
-  if (!post) return {}
+  // 标题与描述随实际渲染的正文走：回退页的标题是英文原文（与正文一致，不是假翻译）。
+  const localized = getLocalizedPost(slug, locale)
+  if (!localized) return {}
+  const { post } = localized
   const description = post.description ?? `${t['blog.articleMetaLead']} ${post.title}.`
   return pageMetadata(locale, {
     title: post.title,
@@ -51,8 +53,9 @@ export default async function BlogPostPage(props: {
   const { locale: raw, slug } = await props.params
   const locale = isLocale(raw) ? raw : DEFAULT_LOCALE
   const t = messages(locale)
-  const post = getPost(slug)
-  if (!post) notFound()
+  const localized = getLocalizedPost(slug, locale)
+  if (!localized) notFound()
+  const { post, status } = localized
 
   return (
     <article className="mx-auto w-full max-w-3xl px-4 pb-16 pt-10 sm:pt-14">
@@ -79,6 +82,13 @@ export default async function BlogPostPage(props: {
         <ArrowLeft aria-hidden="true" className="size-4 shrink-0" />
         {t['blog.allPosts']}
       </LocaleLink>
+
+      {/* 回退提示条：正文是默认语言原文，显式告诉读者，而不是让中文页面静默地显示英文。 */}
+      {status === 'fallback' ? (
+        <p className="mt-6 rounded-xl border border-neutral-200 bg-surface px-4 py-3 text-sm text-neutral-600">
+          {t['blog.fallbackNotice']}
+        </p>
+      ) : null}
 
       {post.cover ? (
         <div className="relative mt-6 h-56 w-full overflow-hidden rounded-2xl border border-neutral-200/80 sm:h-72">

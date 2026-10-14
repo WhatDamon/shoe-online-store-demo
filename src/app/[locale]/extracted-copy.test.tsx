@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import type { BlogPost } from '@/lib/blog'
+import type { LocalizedPost } from '@/i18n/content'
 import { WishlistProvider } from '@/components/shop/wishlist-provider'
 import { itemListSchema, productSchema } from '@/lib/structured-data'
 import type { ProductView } from '@/domain/product'
@@ -40,6 +41,13 @@ vi.mock('@/lib/blog', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/blog')>()),
   listPosts: () => content.posts,
   getPost: () => content.post,
+  // 夹具内容全部是 `en` 原文，且本文件只在 `'en'` 语境下渲染这些页面，所以写
+  // `translated` / `sourceLocale: 'en'` 与真实机制同义（不是「用 mock 盖住回退」）。
+  // 回退行为由 `src/lib/blog.test.ts` 的夹具测试与生产抽查负责，本文件不测它。
+  getLocalizedPost: (): LocalizedPost<BlogPost> | null =>
+    content.post ? { post: content.post, status: 'translated', sourceLocale: 'en' } : null,
+  listLocalizedPosts: (): LocalizedPost<BlogPost>[] =>
+    content.posts.map((post) => ({ post, status: 'translated', sourceLocale: 'en' })),
 }))
 
 import HomePage, { generateMetadata as landingMetadata } from './(landing)/page'

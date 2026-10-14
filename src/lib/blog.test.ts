@@ -2,8 +2,15 @@ import { describe, expect, it } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { getPost, listPosts } from './blog'
+import {
+  availableLocalesFor,
+  getLocalizedPost,
+  getPost,
+  listLocalizedPosts,
+  listPosts,
+} from './blog'
 import { formatPostDate } from './format'
+import type { Locale } from '@/i18n/locales'
 
 // Blog 内容层测试：真实 content/blog/ 单篇示例 + tmpdir 夹具验证容错分支。
 describe('blog content layer', () => {
@@ -73,5 +80,126 @@ describe('blog content layer', () => {
     if (!post) throw new Error('fixture post finding-your-evoloop-size is missing')
     expect(formatPostDate(post.date, 'en')).toBe('Sep 6, 2026')
     expect(formatPostDate(post.date, 'zh-CN')).toBe('2026年9月6日')
+  })
+
+  // ── 内容可用性与回退（阶段 2 任务 5）─────────────────────────────────────────
+
+  it('未译文章在 zh-CN 下回退英文原文，并标出正文来源语言', () => {
+    const slug = 'finding-your-evoloop-size'
+    const english = getPost(slug)
+    if (!english) throw new Error(`fixture post ${slug} is missing`)
+    const localized = getLocalizedPost(slug, 'zh-CN')
+    expect(localized?.status).toBe('fallback')
+    expect(localized?.sourceLocale).toBe('en')
+    // 回退真的拿到了英文内容（标题 + 正文），不是空壳也不是空字符串
+    expect(localized?.post.title).toBe(english.title)
+    expect(localized?.post.content).toBe(english.content)
+    // 译文出现前，该文章的可用语言只有默认语言
+    expect(availableLocalesFor(slug)).toEqual(['en'])
+  })
+
+  it('默认语言下必然是 translated', () => {
+    const localized = getLocalizedPost('finding-your-evoloop-size', 'en')
+    expect(localized?.status).toBe('translated')
+    expect(localized?.sourceLocale).toBe('en')
+  })
+
+  it('索引列表的状态与 availableLocalesFor 一致（en/zh-CN 均用真实内容复核）', () => {
+    const english = listPosts()
+    for (const locale of ['en', 'zh-CN'] as const) {
+      const localized = listLocalizedPosts(locale)
+      expect(localized.map((item) => item.post.slug)).toEqual(english.map((p) => p.slug))
+      for (const item of localized) {
+        const expected = availableLocalesFor(item.post.slug).includes(locale)
+          ? 'translated'
+          : 'fallback'
+        expect(item.status, `${locale}:${item.post.slug}`).toBe(expected)
+        expect(item.sourceLocale).toBe(expected === 'translated' ? locale : 'en')
+      }
+    }
+  })
+
+  it('机制随译文出现而翻转（临时目录夹具，不依赖真实译文）', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'blog-i18n-'))
+    try {
+      const slug = 'fixture-post'
+      fs.writeFileSync(
+        path.join(dir, `${slug}.md`),
+        '---\ntitle: English original\ndate: 2026-09-07\n---\nEnglish body\n',
+      )
+      // 没有译文：回退英文
+      expect(availableLocalesFor(slug, dir)).toEqual(['en'])
+      expect(getLocalizedPost(slug, 'zh-CN', dir)).toMatchObject({
+        status: 'fallback',
+        sourceLocale: 'en',
+      })
+      expect(getLocalizedPost(slug, 'zh-CN', dir)?.post.title).toBe('English original')
+
+      // 造出译文 → 可用语言与状态必须跟着翻（证明机制真的跟着文件走）
+      fs.mkdirSync(path.join(dir, 'zh-CN'))
+      fs.writeFileSync(
+        path.join(dir, 'zh-CN', `${slug}.md`),
+        '---\ntitle: 中文译文\ndate: 2026-09-07\n---\n中文正文\n',
+      )
+      expect(availableLocalesFor(slug, dir)).toEqual(['en', 'zh-CN'])
+      const translated = getLocalizedPost(slug, 'zh-CN', dir)
+      expect(translated?.status).toBe('translated')
+      expect(translated?.sourceLocale).toBe('zh-CN')
+      expect(translated?.post.title).toBe('中文译文')
+      expect(translated?.post.content).toContain('中文正文')
+      expect(listLocalizedPosts('zh-CN', dir).map((item) => item.status)).toEqual(['translated'])
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('恶意或非法 slug 绝不被拼进路径：返回空结果', () => {
+    const unsafeSlugs = [
+      '../../etc/passwd',
+      // 2 层向上就是仓库根的 `README.md`：不校验 slug 时它会真被拼出路径并读到（下面还有
+      // 临时目录夹具把这一条证明得更死，不靠仓库里碰巧存在的文件）。
+      '../../README',
+      '..%2f..%2fetc',
+      '/etc/passwd',
+      'a\u0000b',
+      '..',
+      'UPPER',
+      'a/b',
+      'a\\b',
+      'a b',
+    ]
+    for (const slug of unsafeSlugs) {
+      const where = `slug=${JSON.stringify(slug)}`
+      expect(availableLocalesFor(slug), where).toEqual([])
+      expect(getLocalizedPost(slug, 'zh-CN'), where).toBeNull()
+      expect(getLocalizedPost(slug, 'en'), where).toBeNull()
+    }
+    // 合法但不存在的 slug
+    expect(availableLocalesFor('no-such-post')).toEqual([])
+    expect(getLocalizedPost('no-such-post', 'en')).toBeNull()
+  })
+
+  it('被拒绝的 slug 即便能逃出内容目录也读不到文件（临时目录夹具）', () => {
+    const base = fs.mkdtempSync(path.join(os.tmpdir(), 'blog-escape-'))
+    try {
+      const dir = path.join(base, 'content', 'blog')
+      fs.mkdirSync(dir, { recursive: true })
+      // 内容目录之外放一个真实文件：slug 一旦参与拼路径，`../../secret` 就会碰到它。
+      fs.writeFileSync(
+        path.join(base, 'secret.md'),
+        '---\ntitle: Secret\ndate: 2026-09-07\n---\nSecret body\n',
+      )
+      expect(availableLocalesFor('../../secret', dir)).toEqual([])
+      expect(getLocalizedPost('../../secret', 'en', dir)).toBeNull()
+      expect(getLocalizedPost('../../secret', 'zh-CN', dir)).toBeNull()
+    } finally {
+      fs.rmSync(base, { recursive: true, force: true })
+    }
+  })
+
+  it('非法 locale（运行期值来自 URL）不参与拼路径', () => {
+    const slug = 'finding-your-evoloop-size'
+    expect(getLocalizedPost(slug, '../en' as Locale)).toBeNull()
+    expect(listLocalizedPosts('../../' as Locale)).toEqual([])
   })
 })

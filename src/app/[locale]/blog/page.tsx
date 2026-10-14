@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Image from 'next/image'
 import { LocaleLink } from '@/components/i18n/locale-link'
-import { listPosts, type BlogPost } from '@/lib/blog'
+import { listLocalizedPosts, type BlogPost } from '@/lib/blog'
 // 日期标签在渲染点现算：唯一来源是 `formatPostDate`（locale 必填），
 // 不在内容层预先算出（那时不知道 locale）。
 import { formatPostDate } from '@/lib/format'
@@ -63,7 +63,7 @@ export default async function BlogPage(props: { params: Promise<{ locale: string
   const { locale: raw } = await props.params
   const locale = isLocale(raw) ? raw : DEFAULT_LOCALE
   const t = messages(locale)
-  const posts = listPosts()
+  const posts = listLocalizedPosts(locale)
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 pb-16 pt-10 sm:pt-14">
@@ -85,7 +85,7 @@ export default async function BlogPage(props: { params: Promise<{ locale: string
         <p className="mt-10 text-neutral-600">{t['blog.empty']}</p>
       ) : (
         <div className="mt-10 flex flex-col divide-y divide-neutral-200">
-          {posts.map((post) => (
+          {posts.map(({ post, status }) => (
             <LocaleLink
               key={post.slug}
               href={`/blog/${post.slug}`}
@@ -94,9 +94,17 @@ export default async function BlogPage(props: { params: Promise<{ locale: string
               <CoverSlot post={post} label={`${post.title} ${t['blog.coverLabel']}`} />
               <div className="flex min-w-0 flex-col">
                 <p className="text-sm text-neutral-500">{formatPostDate(post.date, locale)}</p>
-                <h2 className="mt-1.5 font-heading text-xl font-semibold tracking-tight text-ink transition-colors group-hover:text-brand">
-                  {post.title}
-                </h2>
+                <div className="mt-1.5 flex items-center gap-2">
+                  <h2 className="font-heading text-xl font-semibold tracking-tight text-ink transition-colors group-hover:text-brand">
+                    {post.title}
+                  </h2>
+                  {/* 回退条目的徽标：标出正文语言，读者点进去前就知道是英文原文。 */}
+                  {status === 'fallback' ? (
+                    <span className="shrink-0 rounded-full border border-neutral-200 px-2 py-0.5 text-[11px] font-medium tracking-wide text-neutral-500">
+                      {t['blog.fallbackBadge']}
+                    </span>
+                  ) : null}
+                </div>
                 {post.description ? (
                   <p className="mt-2 text-[15px] leading-6 text-neutral-600">{post.description}</p>
                 ) : null}

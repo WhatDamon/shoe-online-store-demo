@@ -450,6 +450,11 @@ const zhCN = {
   'blog.coverLabel': '封面',
   // 文章缺 description 时的元信息句首（`{这里} {标题}.`，标题与句号在拼装处）。
   'blog.articleMetaLead': 'Evoloop 手记文章：',
+  // 回退提示条（`status === 'fallback'`）：说清「为什么这里是英文」，不是错误态。
+  // 阶段 3 之前没有任何译文，故本语言的回退页都会渲染它。
+  'blog.fallbackNotice': '本文暂无中文版本，以下为英文原文。',
+  // 索引页回退条目的徽标，内容是**正文语言代码**：与英文词典同值（语言代码不翻译）。
+  'blog.fallbackBadge': 'EN',
 
   // 错误边界（`src/app/[locale]/error.tsx`）。与 404 共用 `StatusShell`，但文案各自独立。
   'error.title': '我们这边出了点问题',

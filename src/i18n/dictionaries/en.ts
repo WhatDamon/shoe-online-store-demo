@@ -516,6 +516,12 @@ const en = {
   'blog.coverLabel': 'cover',
   // 文章缺 description 时的元信息句首（`{这里} {标题}.`，标题与句号在拼装处）。
   'blog.articleMetaLead': 'An Evoloop Journal article:',
+  // 回退提示条（`status === 'fallback'`）：说清「为什么这里是英文」，不是错误态。
+  // 只有默认语言下有正文时，本语言的回退页才会渲染它；按钮/链接不加——正文就在下面。
+  'blog.fallbackNotice':
+    'This article is not available in your language yet — you are reading the original English version.',
+  // 索引页回退条目的徽标，内容是**正文语言代码**（不是「回退」二字）：读者一眼知道点进去是英文。
+  'blog.fallbackBadge': 'EN',
 
   // 错误边界（`src/app/[locale]/error.tsx`）。与 404 共用 `StatusShell`，但文案各自独立：
   // 错误是「重试」，404 是「页面没了」（`notFound.*`）。
