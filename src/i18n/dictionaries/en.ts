@@ -482,6 +482,12 @@ const en = {
   // 绝不出现 "rate limited"（`GuardrailError.code` 才是机器契约）。
   'guardrail.cooldown': 'The assistant is taking a short break — try again in a moment.',
 
+  // 提示词里的**语言指令**（`src/server/ai/prompts.ts` 的 `systemFor` 在结尾追加）：提示词主体
+  // 不进词典（见上面的「提示词不进词典」），但「用哪种语言回答」是随请求语言变化的一条指令，
+  // 不进词典就会让中文界面里的助手仍用英文作答。单列一族 `prompts.*`：它不是消费端文案，
+  // 是给模型的输入，故不与 `assistant.*` 混。
+  'prompts.languageInstruction': 'Always answer in English.',
+
   // ── 批次 D：landing / blog / 状态页与剩下的结构化数据文案 ──────────────────────────
   // 表面归属：`marketing.landing.*` 是落地页（`src/app/[locale]/(landing)/page.tsx`）自己的
   // 元信息与结构化数据（`marketing.<area>.*` 里的区块文案归各组件）；`blog.*` 是

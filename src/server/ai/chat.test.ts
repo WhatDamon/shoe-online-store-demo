@@ -38,6 +38,9 @@ const req = (over: Partial<ChatRequest> = {}): ChatRequest => ({
   text: '',
   product: null,
   ...over,
+  // R47：`ChatRequest.locale` 是必填的（入口总是解析出语言）。本文件的断言都是英文文案，
+  // 故未显式传入的回合按默认语言构造。
+  locale: over.locale ?? 'en',
 })
 
 const deltasOf = (evs: ChatEvent[]): string =>

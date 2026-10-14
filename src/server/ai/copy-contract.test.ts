@@ -4,10 +4,10 @@ import { createElement } from 'react'
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { ProductResultCard } from '@/components/assistant/product-result-card'
-import type { ProductCard as ProductCardEvent } from '@/domain/chat-events'
+import type { Mode, ProductCard as ProductCardEvent } from '@/domain/chat-events'
 import type { Messages } from '@/i18n/messages'
 import { messages } from '@/i18n/messages'
-import { DEFAULT_LOCALE } from '@/i18n/locales'
+import { DEFAULT_LOCALE, LOCALES, type Locale } from '@/i18n/locales'
 import { GUARDRAIL_MESSAGE } from '@/server/guardrails'
 import { POLICY_CARE } from '@/lib/store-policy'
 import { FALLBACK_ERROR_TEXT } from './chat'
@@ -34,12 +34,14 @@ import { MODE_SIGNALS, systemFor } from './prompts'
  */
 const t: Messages = messages(DEFAULT_LOCALE)
 
-const reply = async (system: string, user: string): Promise<string> => {
+const reply = async (system: string, user: string, locale?: Locale): Promise<string> => {
   const chunks: string[] = []
   for await (const chunk of new MockProvider().stream({
     system,
     messages: [{ role: 'user', content: user }],
     maxTokens: 500,
+    // 不传时 Mock 按默认语言取词典，既有断言逐字不变；传了才走该语言的词典。
+    locale,
   }))
     chunks.push(chunk)
   return chunks.join('')
@@ -191,5 +193,70 @@ describe('mock 的整句拼装（期望值是字面量，不走词典取值）',
         'Layer a soft crew-neck sweater in a neutral tone over slim jeans on cooler days. ' +
         'Dress them up with tailored trousers and a tucked-in shirt for a smarter casual look.',
     )
+  })
+})
+
+// ── 语言指令（任务 7）──────────────────────────────────────────────────────────────
+// 阶段 2 给 `systemFor` 结尾追加了一句**给模型的**语言指令（`prompts.languageInstruction`）。
+// 这步改动同时接了两种危险：①指令没追上（中文界面里模型仍回英文）；②追加时动了 `MODE_SIGNALS`
+// 的插值，mock 会静默掉进另一个分支（不报错、只是答非所问）。下面三层各钉一个面：
+// 提示词文本（本组）、mock 的可见文案（按语言取词典）、mock 的分派行为（每个语言都走对分支）。
+const MODES: readonly Mode[] = ['shopping', 'find-shoes', 'outfit', 'size-fit', 'support']
+/** 该 mode 的提示词里**必须**在场的分派信号；`shopping` / `size-fit` 本就不带任何信号。 */
+const SIGNALS: Record<Mode, string | null> = {
+  shopping: null,
+  'find-shoes': MODE_SIGNALS.findShoes,
+  outfit: MODE_SIGNALS.outfit,
+  'size-fit': null,
+  support: MODE_SIGNALS.support,
+}
+
+const outfitReply = (locale: Locale): string =>
+  `${messages(locale)['assistant.mock.outfitStyleLead']} Urban Bloom ${messages(locale)['assistant.mock.outfitStyleTail']} ` +
+  `${messages(locale)['assistant.mock.outfitLayer']} ${messages(locale)['assistant.mock.outfitDress']}`
+
+describe('语言指令随请求语言进提示词，MODE_SIGNALS 逐字不丢', () => {
+  it.each(LOCALES)('%s：每个 mode 都含本语言的语言指令与它该有的信号', (locale) => {
+    const others = LOCALES.filter((candidate) => candidate !== locale)
+    for (const mode of MODES) {
+      const system = systemFor(mode, {}, locale)
+      expect(system, `${mode} 缺 ${locale} 的语言指令`).toContain(
+        messages(locale)['prompts.languageInstruction'],
+      )
+      // 两条语言指令同时出现 = 提示词自相矛盾；这也是「追加」写成「替换」的探测器。
+      for (const other of others) {
+        expect(system).not.toContain(messages(other)['prompts.languageInstruction'])
+      }
+      const signal = SIGNALS[mode]
+      if (signal === null) {
+        for (const value of Object.values(MODE_SIGNALS)) expect(system).not.toContain(value)
+      } else {
+        expect(system, `${mode} 丢了信号`).toContain(signal)
+      }
+    }
+  })
+
+  it('mock 的可见文案按请求语言取词典（同一提示词，两个语言两份文案）', async () => {
+    for (const locale of LOCALES) {
+      const system = systemFor('shopping', { catalogDigest: '' }, locale)
+      expect(await reply(system, 'everyday shoes', locale)).toBe(
+        messages(locale)['assistant.mock.noCatalogMatch'],
+      )
+      // 不传 locale（直接构造 ctx 的调用点）→ 默认语言：既有断言依赖这一条。
+      expect(await reply(system, 'everyday shoes')).toBe(t['assistant.mock.noCatalogMatch'])
+    }
+  })
+
+  it.each(LOCALES)('%s：加了语言指令后 mock 仍按信号走各自的分支', async (locale) => {
+    expect(
+      await reply(systemFor('find-shoes', { catalogDigest: '' }, locale), 'sneakers', locale),
+    ).toBe(messages(locale)['assistant.mock.noStyles'])
+    expect(
+      await reply(
+        systemFor('outfit', { product: 'Product: Urban Bloom.' }, locale),
+        'date night',
+        locale,
+      ),
+    ).toBe(outfitReply(locale))
   })
 })

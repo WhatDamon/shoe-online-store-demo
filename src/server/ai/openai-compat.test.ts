@@ -98,6 +98,7 @@ describe('real SDK against an isolated loopback gateway', () => {
           sessionKey: 'measured-usage',
           ip: '127.0.0.1',
           mode: 'support',
+          locale: 'en', // R47：必填字段
           text: 'store policy',
           product: null,
         },
@@ -194,6 +195,7 @@ describe('real SDK against an isolated loopback gateway', () => {
       sessionKey: 'sdk-timeout',
       ip: '127.0.0.1',
       mode: 'support' as const,
+      locale: 'en' as const, // R47：必填字段；本文件断言的是英文文案
       text: 'store policy',
       product: null,
     }

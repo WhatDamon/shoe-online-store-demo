@@ -18,6 +18,7 @@ const request: ChatRequest = {
   mode: 'support',
   text: 'What is the store policy?',
   product: null,
+  locale: 'en', // R47：必填字段；本文件断言的是英文文案
 }
 
 beforeEach(() => {

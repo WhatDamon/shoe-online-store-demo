@@ -16,8 +16,10 @@ describe('en 词典命名空间', () => {
 
 // 批次 D 是最后一个抽取任务（landing / blog / 错误边界与系统页），故全量断言放这里。
 // 清单以**词典实际拥有的命名空间**为准：计划里写的 13 个漏了 `faq`（批次 A）与 `og`（批次 A 既有）
-// 两个早已交付的族，而 `notFound` 已在表内；这里是实测的 17 个（`lang` 随语言切换器加入，
-// `meta` 随根 metadata 本地化加入——站点级的 description / keywords，与页面级的 `*.meta.*` 不同族）。
+// 两个早已交付的族，而 `notFound` 已在表内；这里是实测的 18 个（`lang` 随语言切换器加入，
+// `meta` 随根 metadata 本地化加入——站点级的 description / keywords，与页面级的 `*.meta.*` 不同族；
+// `prompts` 随阶段 2 的 AI locale 全链路加入——提示词**主体**不进词典，只有随请求语言变化的
+// 语言指令进词典，故它是独立于 `assistant.*` 的一族）。
 const NAMESPACES = [
   'nav',
   'lang',
@@ -34,6 +36,7 @@ const NAMESPACES = [
   'errors',
   'assistant',
   'guardrail',
+  'prompts',
   'blog',
   'error',
 ] as const

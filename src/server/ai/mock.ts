@@ -12,9 +12,8 @@ import { GIFT_OFFER } from '@/lib/gift-offer'
 import { POLICY_CARE, POLICY_PRODUCTION, POLICY_RETURNS } from '@/lib/store-policy'
 import { MODE_SIGNALS } from './prompts'
 
-// 消费端文案取自词典。阶段 1 只有一种语言，故取默认语言；**阶段 2 必须把请求 locale 接进来**
-// （`/api/ai/chat` 请求体经 `isLocale` 校验后转交，见规格 §9「AI 回答语言」）。
-const t = messages(DEFAULT_LOCALE)
+// 消费端文案按**请求语言**取用（`ctx.locale`，由 `/api/ai/chat` 经 `isLocale` 校验后传下来），
+// 每次 stream 现取一份词典，不再有模块级的默认语言快照。
 
 const OFF_TOPIC = [
   'recipe',
@@ -38,7 +37,8 @@ const OFF_TOPIC = [
   'football game',
 ]
 
-export const REDIRECT_TEXT = t['assistant.redirect']
+/** 离题重定向文案：既有测试钉住的 `export const`（默认语言取值）。运行期按 `ctx.locale` 现取。 */
+export const REDIRECT_TEXT = messages(DEFAULT_LOCALE)['assistant.redirect']
 
 // 模拟流式：整段文案按 ~8 词切成一串 delta；离题 redirect 不切分（单 delta）。
 function* toDeltas(text: string, step = 8): Generator<string> {
@@ -59,6 +59,8 @@ const productTitle = (system: string): string | null =>
 
 export class MockProvider implements AiProvider {
   async *stream(ctx: AiContext & { system: string; maxTokens: number }): AsyncGenerator<string> {
+    // 直接构造 ctx 的调用点（测试 / 探针）不传 locale → 默认语言，与既有断言逐字一致。
+    const t = messages(ctx.locale ?? DEFAULT_LOCALE)
     const lastUser = [...ctx.messages].reverse().find((m) => m.role === 'user')?.content ?? ''
     // 店务客服（support）：确定性回复注入的真实店务事实。先于 OFF_TOPIC 判断——
     // 客服词（return/ship）不应被当离题 redirect；无命中子主题时给温和引导。
@@ -76,7 +78,7 @@ export class MockProvider implements AiProvider {
       return
     }
     if (OFF_TOPIC.some((k) => lastUser.toLowerCase().includes(k))) {
-      yield REDIRECT_TEXT
+      yield t['assistant.redirect']
       return
     }
     const titles = digestTitles(ctx.system)

@@ -3,6 +3,7 @@
 import type { SessionMessage } from '@/server/guardrails/session-state'
 import type { ChatEvent, Mode } from '@/domain/chat-events'
 import type { Product } from '@/domain/product'
+import type { Locale } from '@/i18n/locales'
 import type { AiContext, AiUsage } from './provider'
 
 export interface ChatRequest {
@@ -13,6 +14,9 @@ export interface ChatRequest {
   text: string
   /** 「我的尺码」脚长 mm（可选预填）：size-fit 且文本无显式尺码时回退用之。 */
   footMm?: number | null
+  /** 请求语言：决定服务端产出的消费端文案与提示词尾部的语言指令。
+   * 入口 `/api/ai/chat` 解析后必填（Route Handler 拿不到 URL 段语言，见 ADR 0008 决策 5）。 */
+  locale: Locale
 }
 
 /** 逐段透传 provider 输出的 delta 帧，返回完整回复文本（供记账落库）。 */

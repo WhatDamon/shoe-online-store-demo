@@ -2,11 +2,14 @@
 // 口径中性真实：真实货品为供应商实拍休闲鞋，故不自称 3D-printed brand（避免与实图矛盾）。
 // Mock 会匹配下方短语以产生确定性行为，真实模型遵循同一指令——两者输入输出同构。
 //
-// 提示词本身**不进词典**：它是模型面向的输入，用户看不到（规格 §9 的口径是阶段 2 给
-// `systemFor` 追加**语言指令**，而不是把指令本身翻掉）；维持英文并进 `check:i18n` 白名单。
+// 提示词**主体不进词典**：它是模型面向的输入，用户看不到。进词典的只有结尾那句**语言指令**
+// （`prompts.languageInstruction`）——它必须随请求语言变化，否则中文界面里的助手仍用英文作答；
+// 由 `systemFor` 统一追加，见文件末尾。
 import type { Mode } from '@/domain/chat-events'
 import { GIFT_OFFER_FACT } from '@/lib/gift-offer'
 import { STORE_POLICY_FACTS } from '@/lib/store-policy'
+import { DEFAULT_LOCALE, type Locale } from '@/i18n/locales'
+import { messages } from '@/i18n/messages'
 
 /**
  * MockProvider 的分派信号（它读 system 里的这些短语决定确定性行为）。
@@ -32,7 +35,15 @@ export const GIFT_OFFER_RULES =
 export function systemFor(
   mode: Mode,
   ctx: { product?: string; catalogDigest?: string } = {},
+  locale: Locale = DEFAULT_LOCALE,
 ): string {
+  // 语言指令在这里**统一追加**（不是五个 case 各写一遍）：mock 的分派读的是提示词**主体**里的
+  // `MODE_SIGNALS` 短语，拼接后它仍在场，故分派不受影响；`copy-contract.test.ts` 钉住这一条。
+  return `${modePrompt(mode, ctx)}\n\n${messages(locale)['prompts.languageInstruction']}`
+}
+
+/** 各 mode 的提示词主体（模型输入，不进词典）。locale 只影响 `systemFor` 追加的语言指令。 */
+function modePrompt(mode: Mode, ctx: { product?: string; catalogDigest?: string }): string {
   const base = `${PERSONA}\n\n`
   switch (mode) {
     case 'shopping': {
