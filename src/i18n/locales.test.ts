@@ -99,3 +99,30 @@ describe('stripLocale', () => {
     }
   })
 })
+
+describe('stripLocale 边界输入（审查者给的输入表）', () => {
+  // 这些期望值是审查者列出的边界输入表：与其做一次性探针，不如永久钉住。
+  // 弦外之音：每一条都编码一条具体口径——空串不抛、query/hash 原样、纯前缀成根、
+  // 保留尾斜杠、绝对 URL 不误判、超长路径不抛、无前导斜杠不当前缀。
+  it.each([
+    ['', ''],
+    ['/', '/'],
+    ['?q=1', '?q=1'], // 只有 query：不是路径，原样
+    ['#top', '#top'], // 同上
+    ['/en?q=a', '/?q=a'], // 纯前缀 + query：剥成根，query 保留
+    ['/en#top', '/#top'],
+    ['/en/', '/'], // 前缀 + 尾斜杠：剥剩 '/'，不额外规范化
+    ['/zh-CN/shop/', '/shop/'], // 保留尾斜杠（不做规范化）
+    ['http://x/y', 'http://x/y'], // 绝对 URL 不会被误当成 `/http:...`
+    ['zh-CN/zebra', 'zh-CN/zebra'], // 无前导斜杠：`zh-CN/` 不构成 `/zh-CN/` 前缀
+  ])('stripLocale(%s) -> %s', (path, expected) => {
+    expect(stripLocale(path)).toBe(expected)
+  })
+
+  it('超长路径不抛错，且只剥掉前缀', () => {
+    const long = `/en/${'a'.repeat(100_000)}`
+    const result = stripLocale(long)
+    expect(result.startsWith('/a')).toBe(true)
+    expect(result).toHaveLength(long.length - '/en'.length)
+  })
+})

@@ -33,9 +33,27 @@ import { useLocale, useMessages } from './locale-provider'
  * navigation 查询。移动端实例嵌在已有的 `<nav aria-label={t['marketing.appBar.mobileNav']}>` 内，
  * 不新增 landmark。
  */
-const LABEL_KEY: Record<Locale, keyof Messages> = { en: 'lang.en', 'zh-CN': 'lang.zhCN' }
+// 只接受 `lang.*` 的键：`Record<Locale, keyof Messages>` 会放行任意词典键，写错成
+// `'lang.enN'` 能编译通过并渲染出空标签（可见文案与可及名同时为空）。
+const LABEL_KEY: Record<Locale, Extract<keyof Messages, `lang.${string}`>> = {
+  en: 'lang.en',
+  'zh-CN': 'lang.zhCN',
+}
 
-export function LanguageSwitcher(): ReactElement {
+/**
+ * `onNavigate`（可选）：由**移动实例**传入（AppBar 的 `<details>` 菜单），点击语言链接后收起
+ * 菜单面板——语言切换是 `next/link` 的客户端导航，AppBar 挂在共享 layout 上不会重挂，
+ * 面板不收起就会在新页面上继续展开并遮挡内容。桌面实例不传：那里没有可收起的面板，
+ * 传一个只对移动端有意义的回调只会让桌面实例做无意义的 DOM 操作。
+ *
+ * 名字与 `next/link` 自带的 `onNavigate`（导航**完成后**触发）无关：这里把它接到链接的
+ * `onClick`，因为面板必须在导航**之前**收起。
+ */
+export function LanguageSwitcher({
+  onNavigate,
+}: {
+  onNavigate?: () => void
+} = {}): ReactElement {
   const current = useLocale()
   const t = useMessages()
   const pathname = usePathname()
@@ -49,6 +67,7 @@ export function LanguageSwitcher(): ReactElement {
         <Link
           key={locale}
           href={localePath(locale, rest)}
+          onClick={onNavigate}
           aria-current={locale === current ? 'true' : undefined}
           className="rounded-full px-2 py-1.5 text-sm font-medium text-current transition-opacity hover:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
         >

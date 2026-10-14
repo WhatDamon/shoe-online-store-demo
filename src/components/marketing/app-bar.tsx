@@ -123,7 +123,11 @@ export function AppBar({
                   不变量：两个实例的可见性并集覆盖整个宽度区间且交集为空——此处以 **md** 为界，
                   `<md` 只有本实例，`≥md` 只有右侧操作区那个。 */}
               <div className="border-t border-ink/10 px-4 py-3">
-                <LanguageSwitcher />
+                {/* `onNavigate` 收起上面的 `<details>`：语言切换是客户端导航，AppBar 不会重挂，
+                    不收起就会在新页面上继续遮住内容（与同层四个 `LocaleLink` 的 onClick 同理）。 */}
+                <LanguageSwitcher
+                  onNavigate={() => mobileMenuRef.current?.removeAttribute('open')}
+                />
               </div>
             </nav>
           </details>

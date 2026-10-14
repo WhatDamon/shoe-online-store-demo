@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { messages } from '@/i18n/messages'
 import { LocaleProvider } from './locale-provider'
 // 切换器渲染在 AppBar 里，而 AppBar 的既有测试不挂 router（usePathname 返回 null）；
@@ -75,6 +75,14 @@ describe('LanguageSwitcher', () => {
     expect(screen.getByRole('link', { name: '中文' })).toHaveAttribute('href', '/zh-CN')
   })
 
+  it('在 /zh-CN 上给出 /en 与 /zh-CN（语言根路径不带多余斜杠）', () => {
+    renderAt('zh-CN', '/zh-CN')
+
+    expect(screen.getByRole('link', { name: 'EN' })).toHaveAttribute('href', '/en')
+    expect(screen.getByRole('link', { name: '中文' })).toHaveAttribute('href', '/zh-CN')
+    expect(screen.getByRole('link', { name: '中文' })).toHaveAttribute('aria-current', 'true')
+  })
+
   it('两个标签都是语言自称（EN / 中文），不随界面语言翻译', () => {
     // 语言名的自称不译：英文界面与中文界面下两个链接的可及名必须一致，
     // 否则读屏用户在中文界面里找不到「EN」这条出口。
@@ -120,7 +128,10 @@ describe('在 AppBar 里的落位（裁决 R39）', () => {
     expect(groups[0].closest('nav')?.getAttribute('aria-label')).toBe('移动端')
 
     expect(groups[1].closest('details')).toBeNull()
-    expect(groups[1].parentElement).toHaveClass('hidden', 'md:flex')
+    // 找最近的带 `hidden` 的祖先，而不是 `parentElement`：这里要钉的是「头部实例被
+    // `<md` 隐藏、`≥md` 显示」这条不变量，而不是它的嵌套层数——将来合法重构多包一层
+    // 会让 `parentElement` 误红，而不变量并未被破坏。
+    expect(groups[1].closest('div.hidden')).toHaveClass('hidden', 'md:flex')
 
     // 两个实例指向同一组目标：切语言不丢上下文，且不双重前缀。
     for (const group of groups) {
@@ -130,5 +141,45 @@ describe('在 AppBar 里的落位（裁决 R39）', () => {
         '/zh-CN/shop',
       )
     }
+  })
+})
+
+describe('移动菜单的语言链接收起面板（P2-1）', () => {
+  /** 移动实例的语言链接必须与同层四个导航链接一样在导航前收起 `<details>`：
+   * 语言切换是 `next/link` 的客户端导航，AppBar 挂在共享 layout 上不会重挂，
+   * 面板留着会在新页面上继续展开并遮挡内容。收起由 AppBar 通过 `onNavigate` 传入，
+   * 所以这里只能渲染 AppBar 才测得到（纯 `LanguageSwitcher` 没有面板可收）。 */
+  function renderAppBar() {
+    nav.pathname = '/zh-CN/shop'
+    render(
+      <WishlistProvider>
+        <LocaleProvider locale="zh-CN" messages={messages('zh-CN')}>
+          <AppBar />
+        </LocaleProvider>
+      </WishlistProvider>,
+    )
+    const groups = screen.getAllByRole('group', { name: '切换语言' })
+    const menu = groups[0].closest('details')
+    expect(menu).not.toBeNull()
+    return { groups, menu: menu as HTMLDetailsElement }
+  }
+
+  it('点移动实例的语言链接触发收起（`open` 被移除）', () => {
+    const { groups, menu } = renderAppBar()
+    menu.open = true
+    expect(menu).toHaveAttribute('open')
+
+    fireEvent.click(within(groups[0]).getByRole('link', { name: 'EN' }))
+
+    expect(menu).not.toHaveAttribute('open')
+  })
+
+  it('桌面实例不传 onNavigate（那里没有可收起的面板）', () => {
+    const { groups, menu } = renderAppBar()
+    menu.open = true
+
+    fireEvent.click(within(groups[1]).getByRole('link', { name: '中文' }))
+
+    expect(menu).toHaveAttribute('open')
   })
 })
