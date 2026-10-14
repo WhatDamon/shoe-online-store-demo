@@ -11,15 +11,18 @@ import matter from 'gray-matter'
  * - 查找只经目录条目比对，slug 从不拼进文件路径 → 无路径穿越面；
  * - YAML 语法错误 → 抛错（作者笔误要响亮）；缺必填/坏日期 → 跳过并告警（半成品草稿不拖垮全站）。
  * 全站构建期为 SSG（新增/修改文章需重建，与 seed/产品表同约定）。
+ *
+ * **本层只产出事实（`date`），不产出展示标签**：曾经的 `BlogPost.dateLabel` 由 `parsePostFile`
+ * 在只有日期字符串时算好（那时不知道 locale），渲染层直接取用 → 中文页必然显示英文日期，
+ * 且没有任何类型或测试能发现。现在日期标签一律在渲染点用 `formatPostDate(post.date, locale)`
+ * 现算（定义在 `src/lib/format.ts`，本文件既不复算也不 re-export）。
  */
 
 export interface BlogPost {
   slug: string
   title: string
-  /** ISO 日期 'YYYY-MM-DD'（frontmatter date，UTC 语义） */
+  /** ISO 日期 'YYYY-MM-DD'（frontmatter date，UTC 语义）——渲染层按 locale 格式化的输入 */
   date: string
-  /** 展示用，如 'Sep 7, 2026'（与日期解析同源，避免双份格式逻辑） */
-  dateLabel: string
   description: string | null
   /** 封面（可选）：public 根相对路径，如 '/blog/covers/x.webp'；无封面时索引页用品牌渐变替图 */
   cover: string | null
@@ -42,15 +45,6 @@ const isValidISODate = (s: string): boolean => {
 }
 
 const defaultDir = (): string => path.join(process.cwd(), 'content', 'blog')
-
-export function formatPostDate(dateISO: string): string {
-  return new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'UTC',
-  }).format(new Date(`${dateISO}T00:00:00Z`))
-}
 
 const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null)
 const strList = (v: unknown): string[] =>
@@ -87,7 +81,6 @@ function parsePostFile(filePath: string, slug: string): BlogPost | null {
     slug,
     title,
     date,
-    dateLabel: formatPostDate(date),
     description: str(parsed.data.description),
     cover: cover && cover.startsWith('/') ? cover : null,
     tags: strList(parsed.data.tags),

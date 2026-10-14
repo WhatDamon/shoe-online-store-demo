@@ -6,6 +6,9 @@ import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { LocaleLink } from '@/components/i18n/locale-link'
 import { getPost, listPosts } from '@/lib/blog'
+// 日期标签在渲染点现算：唯一来源是 `formatPostDate`（locale 必填），
+// 不在内容层预先算出（那时不知道 locale）。
+import { formatPostDate } from '@/lib/format'
 import { absoluteUrl, pageMetadata } from '@/lib/seo'
 import { DEFAULT_LOCALE, isLocale } from '@/i18n/locales'
 import { messages } from '@/i18n/messages'
@@ -90,7 +93,7 @@ export default async function BlogPostPage(props: {
       ) : null}
 
       <header className="mt-8">
-        <p className="text-sm text-neutral-500">{post.dateLabel}</p>
+        <p className="text-sm text-neutral-500">{formatPostDate(post.date, locale)}</p>
         <h1 className="mt-2 font-heading text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
           {post.title}
         </h1>

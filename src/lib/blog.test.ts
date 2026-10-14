@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { formatPostDate, getPost, listPosts } from './blog'
+import { getPost, listPosts } from './blog'
+import { formatPostDate } from './format'
 
 // Blog 内容层测试：真实 content/blog/ 单篇示例 + tmpdir 夹具验证容错分支。
 describe('blog content layer', () => {
@@ -13,7 +14,8 @@ describe('blog content layer', () => {
     expect(post.slug).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
     expect(post.title.length).toBeGreaterThan(0)
     expect(post.date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
-    expect(post.dateLabel).toMatch(/^[A-Z][a-z]+ \d{1,2}, \d{4}$/)
+    // 日期标签不再由内容层预算（`BlogPost.dateLabel` 已删）：在渲染点按 locale 现算。
+    expect(formatPostDate(post.date, 'en')).toMatch(/^[A-Z][a-z]+ \d{1,2}, \d{4}$/)
     // Markdown 正文原样保留（含标题与表格等演示结构）
     expect(post.content).toContain('#')
   })
@@ -62,7 +64,14 @@ describe('blog content layer', () => {
   })
 
   it('formats dates as en-US labels', () => {
-    expect(formatPostDate('2026-09-07')).toBe('Sep 7, 2026')
-    expect(formatPostDate('2026-01-03')).toBe('Jan 3, 2026')
+    expect(formatPostDate('2026-09-07', 'en')).toBe('Sep 7, 2026')
+    expect(formatPostDate('2026-01-03', 'en')).toBe('Jan 3, 2026')
+  })
+
+  it('同一篇文章在 en 与 zh-CN 下得到不同的日期标签（locale 必填，不是摆设）', () => {
+    const post = listPosts().find((p) => p.slug === 'finding-your-evoloop-size')
+    if (!post) throw new Error('fixture post finding-your-evoloop-size is missing')
+    expect(formatPostDate(post.date, 'en')).toBe('Sep 6, 2026')
+    expect(formatPostDate(post.date, 'zh-CN')).toBe('2026年9月6日')
   })
 })

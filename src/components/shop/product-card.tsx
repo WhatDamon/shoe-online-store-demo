@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import { LocaleLink } from '@/components/i18n/locale-link'
+import { useLocale } from '@/components/i18n/locale-provider'
 import { formatPrice } from '@/lib/format'
 import { sizeRangeLabel } from '@/lib/size-range'
 import type { ProductView } from '@/domain/product'
@@ -12,6 +13,9 @@ import { useOptionalWishlist } from './wishlist-provider'
 export function ProductCard({ product }: { product: ProductView }) {
   const href = `/product/${product.handle}`
   const sizeHint = sizeRangeLabel(product.sizeOptions)
+  // 价格排版随界面语言（货币仍由市场决定）；卡片是客户端组件，locale 取自上下文
+  // （未挂 Provider 时回退 DEFAULT_LOCALE，见 locale-provider）。
+  const locale = useLocale()
   // Provider 存在时才渲染收藏角标：收藏功能依赖上下文，缺失（如 SSR 首帧/孤立渲染）
   // 时静默隐藏而不是让 useWishlist 抛错。
   const hasWishlist = useOptionalWishlist() !== null
@@ -42,6 +46,7 @@ export function ProductCard({ product }: { product: ProductView }) {
               name={product.title}
               construction={product.construction}
               view="side"
+              locale={locale}
               className="aspect-square w-full"
             />
           )}
@@ -53,7 +58,7 @@ export function ProductCard({ product }: { product: ProductView }) {
           ) : null}
           <div className="mt-auto flex items-baseline justify-between gap-2 pt-2">
             <p className="text-[15px] font-semibold text-neutral-900">
-              {formatPrice(product.price.amount)}
+              {formatPrice(product.price.amount, locale)}
             </p>
             {sizeHint ? <p className="text-xs text-neutral-500">{sizeHint}</p> : null}
           </div>

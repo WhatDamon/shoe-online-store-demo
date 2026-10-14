@@ -10,6 +10,7 @@ import { useWishlist } from '@/components/shop/wishlist-provider'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { localePath } from '@/i18n/locales'
+import { plural } from '@/lib/format'
 import { cn } from 'cn'
 
 /**
@@ -59,10 +60,12 @@ export function AppBar({
   // 搜索行常驻桌面（lg+）；手机展开态只在 <lg 显示。
 
   const searchSolid = scrolled || tone === 'solid'
-  // 计数与量词按语言的复数规则组合（本阶段只有 en，用词典里的 item/items 两形）。
-  const wishlistLabel = `${t['marketing.appBar.wishlist']}, ${count} ${
-    count === 1 ? t['marketing.appBar.wishlistItem'] : t['marketing.appBar.wishlistItems']
-  }`
+  // 计数与量词按语言的复数规则组合：英文 1 → 单数形、0/2+ → 复数形；中文两形同值（无形态差异）。
+  // 判定交给 `plural` / `Intl.PluralRules`，调用点不写 `count === 1`。
+  const wishlistLabel = `${t['marketing.appBar.wishlist']}, ${count} ${plural(count, locale, {
+    one: t['marketing.appBar.wishlistItem'],
+    other: t['marketing.appBar.wishlistItems'],
+  })}`
   // 头部触控目标统一 ≥44px（Apple/Android 触控命中区规范下限）：真机手指出手偏
   // 离 36px 图标外沿即落空（表现为“点了没反应”），44px + 图标居中保证命中。
   const iconLinkClass =

@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { LocaleLink } from '@/components/i18n/locale-link'
-import { useMessages } from '@/components/i18n/locale-provider'
+import { useLocale, useMessages } from '@/components/i18n/locale-provider'
 import { useWishlist } from './wishlist-provider'
 import { ProductVisual } from './product-visual'
 import { WishlistHeart } from './wishlist-icon'
@@ -23,6 +23,8 @@ const EMPTY_ROWS: LoadedRow[] = []
  */
 export function SavedPairs() {
   const t = useMessages()
+  // 无图收藏项回落到 SVG 视觉：可及名（`— printed shoe`）随界面语言，必须显式传 locale。
+  const locale = useLocale()
   const { items, toggle } = useWishlist()
   const [rows, setRows] = useState<LoadedRow[] | null>(null) // null = 加载中
   const [failed, setFailed] = useState(false)
@@ -111,6 +113,7 @@ export function SavedPairs() {
                   <ProductVisual
                     name={row.title}
                     view="side"
+                    locale={locale}
                     className="h-full w-full"
                     visual={{
                       palette: ['#111111', '#0f766e'],

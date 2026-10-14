@@ -70,7 +70,6 @@ const POST: BlogPost = {
   slug: 'finding-your-size',
   title: 'Finding your size',
   date: '2026-09-06',
-  dateLabel: 'Sep 6, 2026',
   description: 'How we size a pair.',
   cover: null,
   tags: ['Sizing', 'Guide'],

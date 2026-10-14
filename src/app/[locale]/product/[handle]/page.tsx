@@ -131,7 +131,7 @@ export default async function ProductPage(props: {
               {/* 商店直购形态：demo $ 价不显示（价格仅由 Buy Button 以店币呈现，决策：不并存误导） */}
               {buyConfig == null ? (
                 <p className="text-2xl font-semibold text-ink">
-                  {formatPrice(product.price.amount)}
+                  {formatPrice(product.price.amount, locale)}
                 </p>
               ) : null}
 

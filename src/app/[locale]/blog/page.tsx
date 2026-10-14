@@ -2,6 +2,9 @@ import type { Metadata } from 'next'
 import Image from 'next/image'
 import { LocaleLink } from '@/components/i18n/locale-link'
 import { listPosts, type BlogPost } from '@/lib/blog'
+// 日期标签在渲染点现算：唯一来源是 `formatPostDate`（locale 必填），
+// 不在内容层预先算出（那时不知道 locale）。
+import { formatPostDate } from '@/lib/format'
 import { pageMetadata } from '@/lib/seo'
 import { DEFAULT_LOCALE, isLocale } from '@/i18n/locales'
 import { messages } from '@/i18n/messages'
@@ -90,7 +93,7 @@ export default async function BlogPage(props: { params: Promise<{ locale: string
             >
               <CoverSlot post={post} label={`${post.title} ${t['blog.coverLabel']}`} />
               <div className="flex min-w-0 flex-col">
-                <p className="text-sm text-neutral-500">{post.dateLabel}</p>
+                <p className="text-sm text-neutral-500">{formatPostDate(post.date, locale)}</p>
                 <h2 className="mt-1.5 font-heading text-xl font-semibold tracking-tight text-ink transition-colors group-hover:text-brand">
                   {post.title}
                 </h2>

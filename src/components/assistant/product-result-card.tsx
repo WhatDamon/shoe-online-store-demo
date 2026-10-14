@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import { LocaleLink } from '@/components/i18n/locale-link'
-import { useMessages } from '@/components/i18n/locale-provider'
+import { useLocale, useMessages } from '@/components/i18n/locale-provider'
 import { ProductVisual } from '@/components/shop/product-visual'
 import { useOptionalWishlist } from '@/components/shop/wishlist-provider'
 import { WishlistHeart } from '@/components/shop/wishlist-icon'
@@ -29,6 +29,8 @@ const metaOf = (item: ProductCardEvent, t: Messages): string | null => {
 
 export function ProductResultCard({ item }: { item: ProductCardEvent }) {
   const t = useMessages()
+  // 无图结果卡回落到 SVG 色卡：可及名（`— printed shoe`）随界面语言，必须显式传 locale。
+  const locale = useLocale()
   const href = `/product/${item.handle}`
   const meta = metaOf(item, t)
   const wishlist = useOptionalWishlist()
@@ -54,6 +56,7 @@ export function ProductResultCard({ item }: { item: ProductCardEvent }) {
               <ProductVisual
                 name={item.title}
                 view="side"
+                locale={locale}
                 className="h-full w-full"
                 visual={{ palette: item.palette, accent: item.palette[1], views: 3 }}
               />

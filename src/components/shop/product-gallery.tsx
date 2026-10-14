@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import { useState } from 'react'
 import type { ProductView } from '@/domain/product'
-import { useMessages } from '@/components/i18n/locale-provider'
+import { useLocale, useMessages } from '@/components/i18n/locale-provider'
 import type { Messages } from '@/i18n/messages'
 import { ProductVisual, type ProductVisualView } from './product-visual'
 import { useOptionalProductColorSelection } from './product-color-selection'
@@ -21,6 +21,9 @@ const VIEW_LABELS = [
 // 缩略图按钮 aria-hidden 内联图，可访问名由按钮自身的 label 承担，避免重复播报。
 export function ProductGallery({ product }: { product: ProductView }) {
   const t = useMessages()
+  // 无图产品回落到 SVG 视觉：可及名（`— printed shoe`）由本组件的 `locale` 决定，
+  // 必须显式传下去，否则中文页会静默留英文（`ProductVisual` 的缺省值是默认语言）。
+  const locale = useLocale()
   const photos = product.images ?? []
   const hasPhotos = photos.length > 0
   const [photoIdx, setPhotoIdx] = useState(0)
@@ -60,6 +63,7 @@ export function ProductGallery({ product }: { product: ProductView }) {
             construction={product.construction}
             view={active}
             idSalt="gallery-main"
+            locale={locale}
             className="mx-auto h-full w-full max-w-xl"
           />
         )}
@@ -126,6 +130,7 @@ export function ProductGallery({ product }: { product: ProductView }) {
                       construction={product.construction}
                       view={view}
                       idSalt={`gallery-thumb-${view}`}
+                      locale={locale}
                       className="h-full w-full"
                     />
                   </span>
