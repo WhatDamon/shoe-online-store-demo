@@ -73,7 +73,7 @@ export const baseMetadata: Metadata = {
  * OGP 的 `og:locale` 用下划线形态（`en_US`），不是 BCP-47 的连字符形态。
  * `Record<Locale, string>` 是刻意的：`LOCALES` 加语言而这里缺一项即编译错误。
  */
-const OG_LOCALES: Record<Locale, string> = { en: 'en_US' }
+const OG_LOCALES: Record<Locale, string> = { en: 'en_US', 'zh-CN': 'zh_CN' }
 
 /** OG 图由 `/og` route handler 生成；`?locale=` 由本模块带上（proxy 不替它加前缀）。 */
 const ogImage = (locale: Locale): string => `/og?locale=${locale}`

@@ -30,6 +30,15 @@ describe('messages', () => {
     expect(messages('en')['notFound.title']).toBe("We couldn't find that page")
     expect(messages('en')['notFound.cta']).toBe('Browse the shop')
   })
+  it('每个 locale 的词典都与 en 键集完全一致（双向）', () => {
+    // 审查重点 5：`satisfies Messages` 只保证「en 的键都在该语言里」（单向，缺键是 TS2741）；
+    // 「该语言多出 en 没有的键」类型系统抓不到，只有运行期相等断言能抓。因此这里遍历
+    // `LOCALES` 而不是只比 `en`——阶段 1 的盲点正是后者。
+    const enKeys = Object.keys(messages('en')).sort()
+    for (const locale of LOCALES) {
+      expect(Object.keys(messages(locale)).sort(), `${locale} 的键集与 en 不一致`).toEqual(enKeys)
+    }
+  })
 })
 
 // 用 process.cwd() 而非 import.meta.url：vitest 把 import.meta.url 转成非 file: 协议，

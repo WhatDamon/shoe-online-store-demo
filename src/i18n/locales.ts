@@ -5,7 +5,7 @@
  * 本模块必须保持纯：`src/server/**`（服务端产生的消费端文案）与客户端组件都要导入同一份定义，
  * 因此不导入 React、不导入 `src/server/**`、不做 IO、不读 `process.env`。
  */
-export const LOCALES = ['en'] as const
+export const LOCALES = ['en', 'zh-CN'] as const
 export type Locale = (typeof LOCALES)[number]
 export const DEFAULT_LOCALE: Locale = 'en'
 

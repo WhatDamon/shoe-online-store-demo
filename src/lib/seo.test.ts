@@ -86,10 +86,12 @@ describe('alternatesFor', () => {
     expect(alternatesFor('en', '/shop').canonical).toBe(`${site.url}/en/shop`)
   })
 
-  it('输出成对 hreflang 与 x-default', async () => {
+  it('为每种已声明语言成对输出 hreflang 与 x-default', async () => {
     const { alternatesFor } = await import('./seo')
+    // 期望值随 `LOCALES` 变化（裁决 R35）：「每一种已声明语言」现在是 en 与 zh-CN。
     expect(alternatesFor('en', '/shop').languages).toEqual({
       en: `${site.url}/en/shop`,
+      'zh-CN': `${site.url}/zh-CN/shop`,
       'x-default': `${site.url}/en/shop`,
     })
   })

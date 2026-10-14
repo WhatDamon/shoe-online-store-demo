@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_LOCALE, LOCALES, isLocale, localePath, resolveLocale } from './locales'
 
 describe('LOCALES', () => {
-  it('阶段 1 只声明 en', () => {
-    expect(LOCALES).toEqual(['en'])
+  // 语言集合的期望值随 `LOCALES` 本身变化（裁决 R35：改语言集合的那个任务承担这类机械后果）。
+  it('en 与 zh-CN 均已声明', () => {
+    expect(LOCALES).toEqual(['en', 'zh-CN'])
     expect(DEFAULT_LOCALE).toBe('en')
   })
 })
@@ -11,7 +12,7 @@ describe('LOCALES', () => {
 describe('isLocale', () => {
   it.each([
     ['en', true],
-    ['zh-CN', false],
+    ['zh-CN', true],
     ['', false],
     ['EN', false],
     [null, false],
@@ -30,11 +31,11 @@ describe('resolveLocale', () => {
   })
   it.each([
     ['en-US,en;q=0.9', 'en'],
-    ['zh-CN,zh;q=0.9', 'en'], // zh-CN 尚未在 LOCALES 中 → 默认
+    ['zh-CN,zh;q=0.9', 'zh-CN'], // 首段全串精确命中，优先于主语言前缀
     ['*', 'en'],
     ['', 'en'],
     ['   ', 'en'],
-    ['zh-CN;q=abc', 'en'], // 审查重点 1：畸形 q 值不抛错
+    ['zh-CN;q=abc', 'zh-CN'], // 审查重点 1：畸形 q 值按 1 处理且不抛错，仍是首段
     [';;;', 'en'],
     ['<script>alert(1)</script>', 'en'], // 审查重点 1：不回显、不抛错
     ['a'.repeat(10_000), 'en'], // 审查重点 1：超长头不抛错
