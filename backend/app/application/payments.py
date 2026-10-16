@@ -15,7 +15,10 @@ spells that set once, and every order view reports the money axis as ``payment_s
 no client has to infer it from the fulfilment axis. Which of the two refund states is
 written comes from Stripe's own answer: only a Refund reported as ``succeeded`` completes
 the refund, and every other status keeps the debt at ``refund_pending`` for the
-compensation pass to finish.
+compensation pass to finish. Writing that debt belongs to the request, not to Stripe: it
+lands on the rows before the gateway is asked, so a request that dies around the outbound
+call still leaves ``refund_pending`` -- the only state the pass selects -- instead of a
+``succeeded`` payment nothing looks at again.
 
 All four ``payments/session`` codes are machine-readable HTTP 200 outcomes rather than
 errors: ``payment_disabled`` (Stripe is off), ``payment_ready``, ``order_not_payable`` and
@@ -31,6 +34,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
 from sqlalchemy import func, select, update
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.application.audit import audit
@@ -85,6 +89,10 @@ REFUNDABLE_PAYMENT_STATUSES: tuple[str, ...] = ("succeeded", "refund_pending", "
 # ``refund_attempts`` counts them without a counter column on ``payments``.
 REFUND_FAILED_EVENT = "refund_failed"
 REFUND_SUCCEEDED_EVENT = "refund_succeeded"
+
+# The request itself, recorded on the rows before the gateway is asked, so a request that dies
+# between the outbound call and its settlement still leaves the debt behind.
+REFUND_REQUESTED_EVENT = "refund_requested"
 
 # The only refund status that has moved the money. Every other value Stripe can report
 # (``pending``, ``requires_action``, ``failed``, ``canceled``) means the money is still the
@@ -551,6 +559,22 @@ def refund_attempts(db: Session, payment_id: str) -> int:
     )
 
 
+def _record_refund_intent(db: Session, order: Order, payment: Payment) -> None:
+    """Put the debt on the rows before the gateway is asked for the money.
+
+    Stripe's answer is the point of no return: once the Refund exists the money is on its
+    way back whatever happens to this request afterwards. So the intent is written first --
+    ``refund_pending`` on the money axis and the request on the attempt rows -- and the
+    settlement only ever comes from Stripe's own answer. A request that dies in between
+    leaves the ``refund_pending`` payment the compensation pass selects, instead of a
+    ``succeeded`` payment nothing looks at again.
+    """
+    payment.status = "refund_pending"
+    db.flush()
+    db.add(PaymentEvent(payment_id=payment.id, event=REFUND_REQUESTED_EVENT))
+    audit(db, order.id, REFUND_REQUESTED_EVENT, status="refund_pending")
+
+
 def _record_refund_success(
     db: Session, order: Order, payment: Payment, refund_reference: str
 ) -> None:
@@ -625,7 +649,16 @@ def _attempt_refund(db: Session, order: Order, payment: Payment, gateway: Stripe
         # compensation pass selects, so nothing would ever finish it.
         _record_refund_failure(db, order, payment, reason="refund_not_settled", refund=refund)
         return "refund_pending"
-    _record_refund_success(db, order, payment, refund.id)
+    try:
+        _record_refund_success(db, order, payment, refund.id)
+    except SQLAlchemyError:
+        # Stripe has the money and this store could not write the settlement down. The intent
+        # recorded before the call is what keeps that recoverable: the payment stays
+        # ``refund_pending``, so the retry with the same key reaches Stripe for the refund it
+        # already made and finishes the job, instead of raising into a 500 that leaves the
+        # money reading ``succeeded`` for nobody to find.
+        _record_refund_failure(db, order, payment, reason="settlement_not_recorded", refund=refund)
+        return "refund_pending"
     return "refunded"
 
 
@@ -687,8 +720,14 @@ def refund_order(
     if not settings.stripe_ready:
         # Refunds leave through the same channel as payments. A switched-off channel leaves
         # the money owed and refundable for a later pass, which is not the same statement as
-        # "this payment can never be refunded".
+        # "this payment can never be refunded". No intent is written for a channel that
+        # cannot move any money.
         return RefundRefused(RefundsUnavailable())
+    # On the rows before the call, never after it: the debt this store holds has to outlive
+    # whatever happens to this request once Stripe has been asked for the money. This is the
+    # only place a ``succeeded`` payment starts a refund, so the intent is written here
+    # unconditionally and the compensation pass never rewrites an existing debt.
+    _record_refund_intent(db, order, payment)
     refunds = gateway if gateway is not None else default_gateway()
     if _attempt_refund(db, order, payment, refunds) != "refunded":
         return RefundRefused(RefundFailed())
@@ -712,8 +751,13 @@ def refund_pending_payments(
     The pass owns its sessions and commits each attempt on its own, exactly like
     ``expire_due_orders``: it shares no transaction with its caller, so a failed attempt
     stays recorded even though the pass reports the failure, and one candidate's failure
-    rolls back nothing else.
+    rolls back nothing else. Each candidate is re-read under the cart write lock every other
+    order state change takes, so two passes over one debt serialize instead of both paying
+    it out.
     """
+    # Imported inside the function: commerce re-exports from this module (circular).
+    from app.application.commerce import lock_cart
+
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
         raise ValueError("Refund batch size must be an integer from 1 to 1000")
     if not settings.stripe_ready:
@@ -726,7 +770,7 @@ def refund_pending_payments(
     # Stripe is being asked, and every attempt below commits separately.
     with sessions() as db, db.begin():
         candidates = db.execute(
-            select(Payment.id, Payment.order_id)
+            select(Payment.id, Payment.order_id, Order.cart_id)
             .join(Order, Payment.order_id == Order.id)
             .where(Payment.status == "refund_pending")
             .order_by(Payment.id)
@@ -735,8 +779,13 @@ def refund_pending_payments(
     refunded = 0
     failed = 0
     dropped = 0
-    for payment_id, order_id in candidates:
+    for payment_id, order_id, cart_id in candidates:
         with sessions() as db, db.begin():
+            # The same write lock every other order state change takes, and it is taken
+            # before the candidate is re-read: two passes over one debt serialize here, so
+            # the loser re-reads what the winner committed, drops the row and never asks
+            # Stripe for the refund the winner has already opened.
+            lock_cart(db, cart_id)
             payment = db.get(Payment, payment_id)
             order = db.get(Order, order_id)
             if payment is None or order is None or payment.status != "refund_pending":

@@ -8,6 +8,13 @@ recorded; stock never goes back on sale either way.
 Every attempt reaches Stripe through the same deterministic idempotency key, so re-running
 the request or the compensation command cannot refund twice.
 
+The debt itself is written before the gateway is asked for the money: a request that cannot
+record its settlement leaves ``refund_pending`` behind rather than ``succeeded``, which is
+the one money state the compensation command cannot see, and a request whose whole
+transaction is discarded is recovered by the retry that reaches Stripe under the same key.
+That command takes the same cart write lock every other writer takes before re-reading a
+candidate, so two passes over one debt serialize instead of both paying it out.
+
 Every outbound call goes to the fake gateways defined in ``conftest.py``: no test in this
 file performs network access.
 """
@@ -15,10 +22,13 @@ file performs network access.
 import contextlib
 import io
 import runpy
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event
 from uuid import uuid4
 
 import pytest
 from sqlalchemy import select, update
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.application import payments
@@ -27,13 +37,40 @@ from app.config import settings
 from app.dependencies import database
 from app.domain.models import AuditLog, Inventory, Order, Payment, PaymentEvent, Reservation
 from app.main import app
-from tests.conftest import place_order, session_post
+from tests.conftest import FailingStripeGateway, FakeStripeGateway, place_order, session_post
 
 # dc-1001's first variant holds this many sellable units in the seeded catalog.
 SEEDED_AVAILABLE = 10
 NOT_REFUNDABLE = "This payment cannot be refunded"
 REFUND_FAILED = "The refund could not be completed"
 REFUNDS_UNAVAILABLE = "Refunds are not available right now. Please try again later."
+
+
+class BlockingRefundGateway(FakeStripeGateway):
+    """A refund that waits for the test, so a second pass can be started while it runs."""
+
+    def __init__(self, entered: Event, proceed: Event) -> None:
+        super().__init__()
+        self._entered = entered
+        self._proceed = proceed
+
+    def refund(self, *, payment_intent: str, idempotency_key: str):
+        self._entered.set()
+        # Bounded: a wedged wait must fail the test, not hang the suite.
+        assert self._proceed.wait(timeout=10), "the blocked refund was never released"
+        return super().refund(payment_intent=payment_intent, idempotency_key=idempotency_key)
+
+
+class SignallingFailingGateway(FailingStripeGateway):
+    """A gateway that records and announces any attempt: the loser must never reach it."""
+
+    def __init__(self, attempted: Event) -> None:
+        super().__init__()
+        self._attempted = attempted
+
+    def refund(self, *, payment_intent: str, idempotency_key: str):
+        self._attempted.set()
+        return super().refund(payment_intent=payment_intent, idempotency_key=idempotency_key)
 
 
 def refund(client, order_id, **kwargs):
@@ -186,6 +223,9 @@ def test_refund_marks_the_order_and_the_payment_refunded(
     assert event_names(engine, paid_order["id"]) == [
         "payment_session_created",
         "payment_succeeded",
+        # The intent is on the rows before Stripe is asked, so the debt this store holds
+        # survives whatever happens to the request after the money moved.
+        "refund_requested",
         "refund_succeeded",
     ]
     assert "refund_succeeded" in audit_actions(engine, paid_order["id"])
@@ -264,6 +304,143 @@ def test_refund_uses_a_deterministic_key_derived_from_the_order(
     # the key is derivable from the order alone: no stored secret, no random suffix.
     assert stripe_checkout.refunds == [
         {"payment_intent": "pi_test_paid", "idempotency_key": f"refund:{paid_order['id']}"}
+    ]
+
+
+def test_the_debt_is_on_the_rows_before_the_gateway_is_asked(
+    commerce, paid_order, stripe_checkout, monkeypatch
+):
+    """Stripe's answer is the point of no return, so the intent has to precede the call.
+
+    The window this closes is the one after the money left: a settlement write that never
+    lands must leave ``refund_pending`` -- the only state the compensation pass selects --
+    and the failed attempt behind, instead of a ``succeeded`` payment nothing looks at
+    again. Reading through the request's own transaction from inside the gateway call is
+    what proves the order of the two writes: the money axis already says
+    ``refund_pending`` and the attempt is already recorded when Stripe is asked.
+    """
+    client, engine = commerce
+    live: dict = {}
+    seen: list[tuple[str, list[str]]] = []
+
+    def capturing_transaction():
+        with Session(engine) as db, db.begin():
+            live["db"] = db
+            yield db
+
+    class SeeingRefundGateway(FakeStripeGateway):
+        def refund(self, *, payment_intent: str, idempotency_key: str):
+            db = live["db"]
+            payment = db.scalar(select(Payment).where(Payment.payment_intent == payment_intent))
+            seen.append(
+                (
+                    payment.status,
+                    sorted(
+                        db.scalars(
+                            select(PaymentEvent.event).where(PaymentEvent.payment_id == payment.id)
+                        )
+                    ),
+                )
+            )
+            return super().refund(payment_intent=payment_intent, idempotency_key=idempotency_key)
+
+    owner = app.dependency_overrides[database]
+    app.dependency_overrides[database] = capturing_transaction
+    monkeypatch.setattr(payments, "default_gateway", SeeingRefundGateway)
+    try:
+        assert refund(client, paid_order["id"]).status_code == 200
+    finally:
+        app.dependency_overrides[database] = owner
+
+    assert seen == [
+        (
+            "refund_pending",
+            ["payment_session_created", "payment_succeeded", "refund_requested"],
+        )
+    ]
+
+
+def test_a_settlement_that_cannot_be_recorded_stays_a_debt_the_command_finishes(
+    commerce, paid_order, stripe_checkout, monkeypatch
+):
+    """Money Stripe has already given back must never read ``succeeded`` locally.
+
+    The intent is written before the gateway is asked, so a settlement write that fails
+    leaves ``refund_pending`` behind: the pass selects that row, re-asks with the same
+    idempotency key (Stripe answers with the refund it already made) and records the
+    settlement. Before this fix the request answered 500 and the money stayed ``succeeded``
+    -- the one state neither the pass nor an operator could find.
+    """
+    client, engine = commerce
+    real_record_success = payments._record_refund_success
+
+    def unrecordable(db, order, payment, refund_reference):
+        raise SQLAlchemyError("simulated settlement write failure")
+
+    monkeypatch.setattr(payments, "_record_refund_success", unrecordable)
+
+    response = refund(client, paid_order["id"])
+
+    # The refusal is about the record this store holds, and it is returned as data so the
+    # transaction that owns the debt commits instead of unwinding it.
+    assert response.status_code == 409
+    assert response.json() == {"code": "refund_failed", "detail": REFUND_FAILED}
+    assert stripe_checkout.refunds == [
+        {"payment_intent": "pi_test_paid", "idempotency_key": f"refund:{paid_order['id']}"}
+    ]
+    money = money_state(engine, paid_order["id"])
+    assert (money["status"], money["refunded_at"]) == ("refund_pending", None)
+    assert attempts_of(engine, paid_order["id"]) == 1
+
+    monkeypatch.setattr(payments, "_record_refund_success", real_record_success)
+
+    assert run_compensation_pass(engine, stripe_checkout) == 1
+
+    assert money_state(engine, paid_order["id"])["status"] == "refunded"
+    assert order_state(engine, paid_order["id"])["status"] == "refunded"
+    # One order, one key: the retry cannot move money Stripe has already returned.
+    assert [call["idempotency_key"] for call in stripe_checkout.refunds] == [
+        f"refund:{paid_order['id']}",
+        f"refund:{paid_order['id']}",
+    ]
+
+
+def test_a_request_that_is_thrown_away_is_recovered_by_the_same_key(
+    commerce, paid_order, stripe_checkout
+):
+    """The window the transaction boundary cannot close, and how it is still repaid.
+
+    A caller that discards the whole transaction -- the shape of a crash between Stripe's
+    answer and this request's commit -- takes the intent down with it, so nothing is left
+    for the pass to discover; the cell below states that honestly. What makes it
+    recoverable is the key: the retry asks Stripe for the same refund and the settlement is
+    recorded from Stripe's own answer, never from a second money movement.
+    """
+    client, engine = commerce
+
+    def abandoned_transaction():
+        with Session(engine) as db:
+            db.begin()
+            try:
+                yield db
+            finally:
+                db.rollback()
+
+    owner = app.dependency_overrides[database]
+    app.dependency_overrides[database] = abandoned_transaction
+    try:
+        assert refund(client, paid_order["id"]).status_code == 200
+        # Stripe refunded and this store kept nothing: no pass can select this row.
+        assert money_state(engine, paid_order["id"])["status"] == "succeeded"
+    finally:
+        app.dependency_overrides[database] = owner
+
+    assert refund(client, paid_order["id"]).status_code == 200
+
+    assert money_state(engine, paid_order["id"])["status"] == "refunded"
+    assert [call["idempotency_key"] for call in stripe_checkout.refunds] == [
+        f"refund:{paid_order['id']}",
+        f"refund:{paid_order['id']}",
     ]
 
 
@@ -493,6 +670,52 @@ def test_compensation_pass_refunds_pending_money_and_is_repeatable(
     # Running the command again finds nothing left to do and never refunds twice.
     assert run_compensation_pass(engine, stripe_checkout) == 0
     assert len(stripe_checkout.refunds) == 1
+
+
+def test_two_compensation_passes_never_both_refund_one_payment(
+    commerce, refund_pending_order, stripe_checkout
+):
+    """Two passes over one debt: the loser waits on the cart lock and finds it settled.
+
+    A pass re-reads each candidate in its own transaction, but without the write lock both
+    passes can read the same ``refund_pending`` row, ask Stripe for it and write a second
+    terminal state -- the same refund twice by key, but two ``refund_succeeded`` rows and
+    two audits locally. Taking the lock every other writer takes (``commerce.lock_cart``)
+    before the re-read serializes them: the loser re-reads what the winner committed, drops
+    the candidate and never reaches the gateway.
+    """
+    _, engine = commerce
+    entered = Event()
+    proceed = Event()
+    attempted = Event()
+    winner = BlockingRefundGateway(entered, proceed)
+    loser = SignallingFailingGateway(attempted)
+    outcomes: dict[str, int] = {}
+
+    def run(name, gateway) -> None:
+        outcomes[name] = run_compensation_pass(engine, gateway)
+
+    try:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            first = pool.submit(run, "first", winner)
+            assert entered.wait(timeout=10), "the first pass never reached Stripe"
+            second = pool.submit(run, "second", loser)
+            # The loser may not reach the gateway at all: it is waiting for the row lock.
+            attempted.wait(timeout=1.0)
+            proceed.set()
+            first.result(timeout=30)
+            second.result(timeout=30)
+    finally:
+        proceed.set()
+
+    assert loser.calls == []
+    assert attempted.is_set() is False
+    assert outcomes == {"first": 1, "second": 0}
+    assert len(winner.refunds) == 1
+    assert money_state(engine, refund_pending_order["id"])["status"] == "refunded"
+    # One terminal write, one event, one audit: the loser wrote nothing at all.
+    assert event_names(engine, refund_pending_order["id"]).count("refund_succeeded") == 1
+    assert audit_actions(engine, refund_pending_order["id"]).count("refund_succeeded") == 1
 
 
 def test_compensation_pass_records_every_failed_attempt(
