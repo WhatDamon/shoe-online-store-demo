@@ -114,6 +114,26 @@ def owned_order(db: Session, session_id: str, order_id: str) -> Order:
     return order
 
 
+def payment_message(order_status: str, payment_status: str | None) -> str:
+    """The money sentence shown with an order, derived from the same two axes the client reads.
+
+    A store with Stripe off keeps the historical sentence verbatim, because both the order page
+    and the support copy key off it. An enabled store must not say payments are unavailable:
+    that would contradict the ``payment_enabled`` flag travelling in the same response.
+    """
+    if not settings.stripe_ready:
+        return "Payments are not available yet."
+    if payment_status == "refund_pending":
+        return "A refund for this order is being processed."
+    if order_status == "refunded" or payment_status == "refunded":
+        return "This order has been refunded."
+    if order_status == "paid":
+        return "Payment received."
+    if order_status == "cancelled":
+        return "No payment has been taken."
+    return "No payment has been taken yet."
+
+
 def order_view(db: Session, order: Order) -> dict:
     items = db.scalars(select(OrderItem).where(OrderItem.order_id == order.id)).all()
     # The money axis travels with the order on purpose. ``order.status`` answers only the
@@ -130,7 +150,7 @@ def order_view(db: Session, order: Order) -> dict:
         total=str(order.total),
         currency=order.currency,
         payment_enabled=settings.stripe_ready,
-        message="Payments are not available yet.",
+        message=payment_message(order.status, money),
         items=[
             dict(
                 id=i.id,

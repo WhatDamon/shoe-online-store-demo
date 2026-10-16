@@ -8,7 +8,7 @@ export const POLICY_PRODUCTION =
   'Every pair is printed to order in our studio, so nothing sits in a warehouse — we only print what you buy.'
 
 export const POLICY_RETURNS =
-  "Because each pair is made to your order, custom-printed items can't be returned or refunded. If your pair arrives faulty or the fit is not as promised, message us within 30 days and we'll sort it out."
+  "Because each pair is printed to order, custom-printed items can't be returned or refunded. If you have paid for an order and we have not made or shipped it yet, you can cancel it and we will refund you in full. If your pair arrives faulty or the fit is not as promised, message us within 30 days and we'll sort it out."
 
 /**
  * 护理指引 —— 内容逐条来自 ProductCareInstructions 护理海报（OCR 提取，

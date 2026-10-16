@@ -269,7 +269,7 @@ export function CommercePanel({
         <div className="space-y-3">
           <p className="text-sm text-neutral-600">
             Your total is recalculated when you place the order. This local demo does not add
-            shipping or tax. Payments are not available yet.
+            shipping or tax.
           </p>
           <Button
             disabled={busy || ((!cart?.items.length || hasUnavailableItems) && !retryPending)}
