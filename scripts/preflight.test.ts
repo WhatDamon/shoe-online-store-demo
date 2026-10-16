@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -196,5 +196,94 @@ describe('parseEnvironment', () => {
   it('falls back to NODE_ENV and then to development', () => {
     expect(parseEnvironment([], { NODE_ENV: 'production' })).toBe('production')
     expect(parseEnvironment([], {})).toBe('development')
+  })
+})
+
+/**
+ * Stripe 只有「全配好」和「全没配」两种可接受状态：只填一半比完全不填更危险，
+ * 因为它会让人以为支付已经开启。以下口径与 backend/app/config.py 的
+ * validate_stripe_configuration 保持一致。
+ */
+const enabledStripeEnv = {
+  STRIPE_ENABLED: 'true',
+  STRIPE_SECRET_KEY: 'sk_test_placeholder',
+  STRIPE_WEBHOOK_SECRET: 'whsec_placeholder',
+  PUBLIC_SITE_URL: 'https://shop.example',
+}
+
+describe('preflight Stripe readiness', () => {
+  it('passes with Stripe disabled and no Stripe keys at all', () => {
+    expect(evaluatePreflight({}, 'development')).toEqual([])
+    expect(evaluatePreflight({ STRIPE_ENABLED: 'false' }, 'production').join(' ')).not.toMatch(
+      /STRIPE/,
+    )
+  })
+
+  it('fails when Stripe is enabled without a secret key', () => {
+    const failures = evaluatePreflight(
+      { ...enabledStripeEnv, STRIPE_SECRET_KEY: '   ' },
+      'development',
+    )
+    expect(failures.join(' ')).toContain('STRIPE_SECRET_KEY')
+  })
+
+  it('fails when Stripe is enabled without a site url', () => {
+    const failures = evaluatePreflight({ ...enabledStripeEnv, PUBLIC_SITE_URL: '' }, 'development')
+    expect(failures.join(' ')).toContain('PUBLIC_SITE_URL')
+  })
+
+  it('fails when the site url is relative or not https in production', () => {
+    expect(
+      evaluatePreflight({ ...enabledStripeEnv, PUBLIC_SITE_URL: '/checkout' }, 'development').join(
+        ' ',
+      ),
+    ).toContain('PUBLIC_SITE_URL')
+    expect(
+      evaluatePreflight(
+        { ...enabledStripeEnv, PUBLIC_SITE_URL: 'http://shop.example' },
+        'production',
+      ).join(' '),
+    ).toContain('PUBLIC_SITE_URL')
+  })
+
+  it('fails when Stripe is enabled in production without a webhook secret', () => {
+    const failures = evaluatePreflight(
+      { ...verifiableProductionEnv, ...enabledStripeEnv, STRIPE_WEBHOOK_SECRET: '' },
+      'production',
+    )
+    expect(failures.join(' ')).toContain('STRIPE_WEBHOOK_SECRET')
+  })
+
+  it('accepts a complete Stripe configuration', () => {
+    expect(evaluatePreflight({ ...enabledStripeEnv }, 'development')).toEqual([])
+    expect(
+      evaluatePreflight({ ...verifiableProductionEnv, ...enabledStripeEnv }, 'production'),
+    ).toEqual([])
+  })
+})
+
+/**
+ * 根 .env 是 Stripe 密钥的单一真源（Python 与 Next 都读它），但它只被 .gitignore 覆盖、
+ * 不在 secrets 扫描的放行名单里——真密钥写进去会被反复报为阻塞项。同时不能放宽到
+ * 连 .env.example 也放行，否则模板里的占位符失去意义。
+ */
+describe('gitleaks allowlist', () => {
+  const allowlisted = (candidate: string): boolean => {
+    const toml = readFileSync(path.join(repoRoot, '.gitleaks.toml'), 'utf8')
+    const array = /paths\s*=\s*\[([^\]]*)\]/m.exec(toml)?.[1] ?? ''
+    const patterns = [...array.matchAll(/'''([^']+)'''|"([^"]*)"|'([^']*)'/g)].map(
+      (match) => match[1] ?? match[2] ?? match[3] ?? '',
+    )
+    return patterns.some((pattern) => new RegExp(pattern).test(candidate))
+  }
+
+  it('lets the root .env and .env.local be scanned away', () => {
+    expect(allowlisted('/repo/.env')).toBe(true)
+    expect(allowlisted('/repo/.env.local')).toBe(true)
+  })
+
+  it('still scans the committed examples', () => {
+    expect(allowlisted('/repo/.env.example')).toBe(false)
+    expect(allowlisted('/repo/backend/.env.example')).toBe(false)
   })
 })

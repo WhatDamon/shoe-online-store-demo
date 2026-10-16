@@ -1,12 +1,15 @@
 # Local gitleaks config (extended by pi-lens' scoped scan config).
 #
-# .env.local deliberately holds the developer's REAL ModelScope credentials for local
-# runs. It is covered by .gitignore (.env*) and never committed; allowlist it so the
-# secrets scanner does not keep flagging a file that cannot reach the repo.
+# The root .env is the single source for shared local configuration (Stripe secrets included):
+# both the Python service and Next.js read it. .env.local holds the developer's machine-local
+# overrides. Both are covered by .gitignore (.env*) and never committed; allowlist them so the
+# secrets scanner does not keep flagging real credentials in files that cannot reach the repo.
+# .env.example stays scannable on purpose: it is committed, so it must only ever hold placeholders.
 [extend]
 useDefault = true
 
 [allowlist]
 paths = [
   '''\.env\.local$''',
+  '''\.env$''',
 ]

@@ -55,7 +55,7 @@ command is identical because `npm run py` resolves the interpreter
 
 ```bash
 python3.12 -m venv backend/.venv        # Windows: py -3.12 -m venv backend/.venv
-cp backend/.env.example backend/.env    # do not overwrite an existing backend/.env
+cp backend/.env.example backend/.env    # optional: only for backend-only overrides
 npm run py -- -m pip install -r requirements-dev.lock
 npm run db:migrate:python
 npm run py -- -m app.seed

@@ -47,9 +47,13 @@ stock; the TypeScript display/search catalog is a separate data source.
 
 ```bash
 npm ci
-cp .env.example .env.local      # defaults are fine — empty AI_API_KEY = Mock mode
+cp .env.example .env           # single source; the Python service reads the same file
 npm run dev               # http://localhost:3000
 ```
+
+`.env` is the shared file: Next.js reads it (plus `.env.local` on top for machine-local overrides)
+and so does the Python service. Keys both sides need — `COMMERCE_PROXY_SECRET`, and the Stripe
+keys when payments are on — must therefore live in `.env`, not `.env.local`.
 
 > **Node runtime throughout.** The `next` CLI and every gate script run on Node; the SQLite driver is
 > `better-sqlite3`, which ships **N-API prebuilds** — no compiler or build step required.
@@ -86,7 +90,7 @@ other command is identical on macOS, Linux and Windows because `npm run py` reso
 
 ```bash
 python3.12 -m venv backend/.venv        # Windows: py -3.12 -m venv backend/.venv
-cp backend/.env.example backend/.env    # only if backend/.env does not exist yet
+cp backend/.env.example backend/.env    # optional: only for backend-only overrides
 npm run py -- -m pip install -r requirements-dev.lock
 npm run db:migrate:python
 npm run py -- -m app.seed
@@ -196,12 +200,17 @@ See [`.env.example`](.env.example) for the annotated template. Summary:
 | `AI_DISABLE_REAL` | `0` | `1` forces Mock mode even with a key (abuse kill switch) |
 | `DB_DRIVER` | `sqlite` | `sqlite` (default) or `postgres` — selects the app DB driver |
 | `CATALOG_SOURCE` | `db` | Runtime catalog source: `db` = `products` table (default, auto-seeded when empty); `seed` = in-memory import layer (tests). Any other value falls back to the table |
-| `DATABASE_URL` | `./data/local.db` | sqlite: local file; postgres: `postgres://…` connection string |
+| `DATABASE_URL` | `./data/local.db` | Next/Drizzle display+AI database: sqlite local file, or `postgres://…` |
+| `COMMERCE_DATABASE_URL` | `sqlite:///./commerce.db` | The Python trading boundary's own database. Deliberately **not** `DATABASE_URL`: the two sides must never share one SQLite file |
 | `PG_SSL` | *(verified TLS in production)* | `1`/`verify-full` verifies certificates; plaintext `0` is development-only |
 | `PG_SSL_CA_FILE` | *(system roots)* | Optional readable PEM CA bundle, never committed |
 | `NODE_TLS_REJECT_UNAUTHORIZED` | *(unset)* | `0` is rejected in production before a PostgreSQL client is created; do not use it as a TLS workaround |
 | `PYTHON_API_URL` | `http://127.0.0.1:8000` | Server-only commerce endpoint; not exposed to browser JavaScript |
 | `COMMERCE_PROXY_SECRET` | *(empty for local demo)* | Shared server-only credential for Next → Python; production requires at least 32 random bytes |
+| `STRIPE_ENABLED` | `false` | Payments stay off unless `true`; while off nothing is charged and no order can reach `paid` |
+| `STRIPE_SECRET_KEY` | *(empty)* | Stripe API key, read by the Python service only — never by browser code. Required once `STRIPE_ENABLED=true`, otherwise start-up fails |
+| `STRIPE_WEBHOOK_SECRET` | *(empty)* | Signing secret for the public webhook route (Next side only); required in production once `STRIPE_ENABLED=true` |
+| `PUBLIC_SITE_URL` | `http://localhost:3000` | Absolute origin used for Stripe success/cancel URLs; falls back to `NEXT_PUBLIC_SITE_URL`. Must be https in production |
 
 Before a production build is started, set `APP_ENV=production` and run
 `npm run preflight -- --environment production` (the legacy PowerShell spelling
@@ -210,6 +219,9 @@ required so a production build cannot silently inherit the local development mod
 The preflight checks the deployment boundary without printing secrets: PostgreSQL is selected,
 TLS verification is enabled, the AI session secret is long enough, Python is not
 exposed as a loopback production URL, and the Next → Python proxy secret is long enough.
+When `STRIPE_ENABLED=true` it additionally requires a complete Stripe configuration: a secret
+key, an absolute `PUBLIC_SITE_URL` (https in production) and, in production, a webhook secret.
+Half-configured payments fail the preflight rather than looking enabled.
 Development defaults remain compatible with the local SQLite/Mock setup.
 The AI Route Handler also rejects bodies above 16 KiB and invalid fields before
 creating a session or reserving budget; its `X-Request-ID` is server-owned correlation
