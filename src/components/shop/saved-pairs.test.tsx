@@ -55,7 +55,10 @@ describe('SavedPairs (/saved)', () => {
     const fetchMock = stubFetch()
     renderSaved()
     expect(screen.getByText('Nothing saved yet')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Browse the shop' })).toHaveAttribute('href', '/shop')
+    expect(screen.getByRole('link', { name: 'Browse the shop' })).toHaveAttribute(
+      'href',
+      '/en/shop',
+    )
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
@@ -66,7 +69,7 @@ describe('SavedPairs (/saved)', () => {
     expect(await screen.findByText('Urban Bloom')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Urban Bloom/ })).toHaveAttribute(
       'href',
-      '/product/dc-1001',
+      '/en/product/dc-1001',
     )
     expect(screen.getByText(/US 4.5–9.5/)).toBeInTheDocument()
     expect(screen.getByText(/5 colors/)).toBeInTheDocument()

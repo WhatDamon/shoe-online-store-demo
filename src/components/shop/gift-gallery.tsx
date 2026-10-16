@@ -6,10 +6,12 @@ import { XIcon } from 'lucide-react'
 import type { GiftItem } from '@/server/catalog/gifts'
 import { GIFT_OFFER } from '@/lib/gift-offer'
 import { useModalDismiss } from '@/lib/use-modal'
+import { useMessages } from '@/components/i18n/locale-provider'
 
 // 赠品画廊：满 $50 赠一的边角料小件 —— 仅展示（不售卖、无 PDP）。
 // 点击任一小件打开灯箱轮播该件全部图片；Esc/背景/关闭按钮退出。
 export function GiftGallery({ gifts }: { gifts: GiftItem[] }) {
+  const t = useMessages()
   const [active, setActive] = useState<{ gift: GiftItem; idx: number } | null>(null)
   const dialogRef = useRef<HTMLDivElement | null>(null)
 
@@ -38,15 +40,20 @@ export function GiftGallery({ gifts }: { gifts: GiftItem[] }) {
       id="free-gifts"
       className="mt-16 scroll-mt-24 border-t border-neutral-200 pt-10"
     >
-      <p className="text-xs font-medium uppercase tracking-[0.18em] text-brand">Free gifts</p>
+      <p className="text-xs font-medium uppercase tracking-[0.18em] text-brand">
+        {t['shop.gift.kicker']}
+      </p>
       <h2
         id="free-gifts-heading"
         className="mt-2 font-heading text-2xl font-semibold tracking-tight text-ink"
       >
-        {`With any order over $${GIFT_OFFER.thresholdUsd}`}
+        {/* 门槛、赠品名与材质是 `src/lib/gift-offer.ts` 的事实单源，故词典只承载句子片段。 */}
+        {t['shop.gift.headingLead']}
+        {GIFT_OFFER.thresholdUsd}
       </h2>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">
-        {`Pick one of these ${GIFT_OFFER.plural} — pressed from ${GIFT_OFFER.material}, so nothing goes to waste. Just add one when you check out.`}
+        {t['shop.gift.pickLead']} {GIFT_OFFER.plural} {t['shop.gift.pickMid']} {GIFT_OFFER.material}
+        {t['shop.gift.pickTail']}
       </p>
 
       <ul className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
@@ -55,7 +62,7 @@ export function GiftGallery({ gifts }: { gifts: GiftItem[] }) {
             <button
               type="button"
               onClick={() => setActive({ gift, idx: 0 })}
-              aria-label={`View ${gift.title} photos`}
+              aria-label={`${t['shop.gift.viewPhotosLead']} ${gift.title} ${t['shop.gift.viewPhotosTail']}`}
               className="group flex w-full flex-col rounded-2xl border border-neutral-200 bg-surface text-left transition-shadow hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
             >
               <span className="relative aspect-square w-full overflow-hidden rounded-t-2xl bg-white">
@@ -70,7 +77,9 @@ export function GiftGallery({ gifts }: { gifts: GiftItem[] }) {
               <span className="flex flex-col gap-1 p-3">
                 <span className="text-sm font-medium text-neutral-900">{gift.title}</span>
                 <span className="text-xs text-neutral-500">
-                  {gift.images.length > 1 ? `${gift.images.length} photos · ` : ''}
+                  {gift.images.length > 1
+                    ? `${gift.images.length} ${t['shop.gift.photos']} · `
+                    : ''}
                   {gift.colors.slice(0, 2).join(' / ')}
                   {gift.colors.length > 2 ? ' / …' : ''}
                 </span>
@@ -85,7 +94,7 @@ export function GiftGallery({ gifts }: { gifts: GiftItem[] }) {
           ref={dialogRef}
           role="dialog"
           aria-modal="true"
-          aria-label={`${active.gift.title} photos`}
+          aria-label={`${active.gift.title} ${t['shop.gift.photos']}`}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
           onClick={() => dismiss()}
         >
@@ -96,7 +105,7 @@ export function GiftGallery({ gifts }: { gifts: GiftItem[] }) {
             <button
               type="button"
               onClick={() => dismiss()}
-              aria-label="Close gallery"
+              aria-label={t['shop.gift.close']}
               className="absolute right-3 top-3 z-10 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
             >
               <XIcon aria-hidden="true" className="size-4" />
@@ -104,7 +113,7 @@ export function GiftGallery({ gifts }: { gifts: GiftItem[] }) {
             <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-white">
               <Image
                 src={active.gift.images[active.idx]}
-                alt={`${active.gift.title} photo ${active.idx + 1}`}
+                alt={`${active.gift.title} ${t['shop.gift.photo']} ${active.idx + 1}`}
                 fill
                 sizes="(min-width:640px) 672px, 100vw"
                 className="object-contain"

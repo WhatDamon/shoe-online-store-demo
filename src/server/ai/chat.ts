@@ -6,6 +6,8 @@ import type { SessionMessage } from '@/server/guardrails/session-state'
 import { estTokens, maxOutputTokens, truncateMessage } from '@/server/guardrails/text'
 import { today } from '@/server/guardrails/budget'
 import { envStr } from '@/config'
+import { DEFAULT_LOCALE, type Locale } from '@/i18n/locales'
+import { messages } from '@/i18n/messages'
 import { createDefaultRepository } from '@/server/search/repository'
 import { EmbeddingDispatchBlockedError } from '@/server/search/embedder'
 import type { ChatEvent } from '@/domain/chat-events'
@@ -30,8 +32,15 @@ export interface ChatOptions {
   requestId?: string
 }
 
-/** 流内异常的统一文案；`/api/ai/chat` 的兜底 catch 也用它（单一来源）。 */
-export const FALLBACK_ERROR_TEXT = 'Something went wrong — please try again.'
+/** 流内异常的统一文案，按**请求语言**取用（键名单源）。
+ * `/api/ai/chat` 的兜底 catch 与 `toErrorEvent` 读同一条键；Route Handler 拿不到 URL 段语言，
+ * 只能从请求体拿到（经 `isLocale` 校验，见 ADR 0008 决策 5）。 */
+export const fallbackErrorMessage = (locale: Locale): string =>
+  messages(locale)['assistant.fallbackError']
+
+/** 默认语言的兜底文案：形态由既有测试钉住（`copy-contract.test.ts` 逐字断言 `assistant.fallbackError`），
+ * 不得改成函数；服务端事件生成只用上面的 `fallbackErrorMessage`。 */
+export const FALLBACK_ERROR_TEXT = fallbackErrorMessage(DEFAULT_LOCALE)
 
 const validUsage = (usage: AiUsage | undefined): AiUsage | undefined =>
   usage &&
@@ -54,7 +63,12 @@ const logAi = (
   console[level](JSON.stringify({ event, ...fields }))
 }
 
-const toErrorEvent = (e: unknown, requestId: string, elapsedMs: number): ChatEvent => {
+const toErrorEvent = (
+  e: unknown,
+  requestId: string,
+  elapsedMs: number,
+  locale: Locale,
+): ChatEvent => {
   if (e instanceof GuardrailError) {
     // 护栏拒绝（rate_limited/budget/turns）是设计内软拒绝：仅记录 code（不携带会话/内容/访客信息），
     // 便于 Vercel 端区分「配置误伤（如空 env 把预算打成 0）」与真实滥用；UI 仍只显示温和文案。
@@ -67,7 +81,7 @@ const toErrorEvent = (e: unknown, requestId: string, elapsedMs: number): ChatEve
   }
   // Provider/database exceptions can include credentials, URLs or request bodies.
   logAi('error', 'ai_provider_failure', { request_id: requestId, elapsed_ms: elapsedMs })
-  return { type: 'error', code: 'provider', message: FALLBACK_ERROR_TEXT }
+  return { type: 'error', code: 'provider', message: fallbackErrorMessage(locale) }
 }
 
 /** 护栏顺序：rate → budget → turns；被 rate/budget 拒的请求不消耗回合（回合 claim 最后执行）。
@@ -86,13 +100,13 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
   let history: SessionMessage[]
   try {
     opts.signal?.throwIfAborted()
-    guardrails.assertRate(req.ip, req.sessionKey)
+    guardrails.assertRate(req.ip, req.sessionKey, req.locale)
     // Fast-fail an already exhausted day. The authoritative decision is the
     // atomic reservation immediately before provider work below.
-    await guardrails.assertBudget(budgetDay)
-    history = guardrails.assertTurn(req.sessionKey)
+    await guardrails.assertBudget(budgetDay, req.locale)
+    history = guardrails.assertTurn(req.sessionKey, req.locale)
   } catch (e) {
-    yield toErrorEvent(e, traceId, elapsed())
+    yield toErrorEvent(e, traceId, elapsed(), req.locale)
     return
   }
 
@@ -112,7 +126,7 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
     )
     const embeddingRequestId = crypto.randomUUID()
     const embeddingModel = envStr('AI_EMBEDDING_MODEL', 'embedding')
-    await guardrails.reserveBudget(embeddingRequestId, tokens, budgetDay)
+    await guardrails.reserveBudget(embeddingRequestId, tokens, budgetDay, req.locale)
     try {
       const result = await operation()
       if (result instanceof Response && !result.ok) {
@@ -156,6 +170,7 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
       budgetRequestId,
       estTokens(prompt) + maxOutputTokens(),
       budgetDay,
+      req.locale,
     )
     activeReservation = true
   }
@@ -169,6 +184,7 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
         budgetRequestId,
         estTokens(prompt) + estTokens(assistantText),
         budgetDay,
+        req.locale,
       )
       activeReservation = true
     }
@@ -203,6 +219,8 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
       maxTokens: maxOutputTokens(),
       messages,
       signal: opts.signal,
+      // Mock 用它选词典；真实模型忽略（其语言由 system 尾部的语言指令决定）。
+      locale: req.locale,
     })) {
       opts.signal?.throwIfAborted()
       if (typeof chunk === 'string') {
@@ -228,7 +246,7 @@ export async function* chat(req: ChatRequest, opts: ChatOptions = {}): AsyncGene
     })
   } catch (e) {
     // provider 运行期失败 → 显式 error + UI 重试（P3：绝不静默降级到 Mock）
-    yield toErrorEvent(e, traceId, elapsed())
+    yield toErrorEvent(e, traceId, elapsed(), req.locale)
   } finally {
     if (activeReservation) {
       try {

@@ -1,12 +1,16 @@
 'use client'
 
-import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { HeartIcon, MenuIcon, SearchIcon, ShoppingBagIcon, XIcon } from 'lucide-react'
 import { site } from '@/lib/site'
+import { LanguageSwitcher } from '@/components/i18n/language-switcher'
+import { LocaleLink } from '@/components/i18n/locale-link'
+import { useLocale, useMessages } from '@/components/i18n/locale-provider'
 import { useWishlist } from '@/components/shop/wishlist-provider'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { localePath } from '@/i18n/locales'
+import { plural } from '@/lib/format'
 import { cn } from 'cn'
 
 /**
@@ -15,8 +19,8 @@ import { cn } from 'cn'
  * tone 决定未滚动时的表现：
  * - overlay：顶部透明 + 白色文字，压在深色 Hero 全出血图上（Landing 专用）；
  * - solid（默认）：canvas 实底 + ink 文字，用于普通内容页。
- * 滚动 > 8px 后统一变为磨砂底。纯交互客户端组件，数据来自 site 配置与
- * WishlistProvider，无自有状态数据源。
+ * 滚动 > 8px 后统一变为磨砂底。纯交互客户端组件，数据来自 site 配置、WishlistProvider 与
+ * locale 上下文（切换器），无自有状态数据源。
  *
  * 搜索对齐桌面/移动可用：lg+ 显示内联输入框；<lg 用搜索按钮展开整行输入
  * （autoFocus + Enter 提交到 /shop?q= + Escape/取消关闭），保证手机与桌面
@@ -29,6 +33,10 @@ export function AppBar({
 } = {}) {
   const { items } = useWishlist()
   const count = items.length
+  const t = useMessages()
+  // 搜索表单提交到 /shop：原生 GET 表单不经 Router，必须在渲染时带上 locale 前缀。
+  const locale = useLocale()
+  const shopPath = localePath(locale, '/shop')
   const [scrolled, setScrolled] = useState(false)
   // 移动菜单/搜索均用原生 <details>（零 JS 也可展开，见菜单注释）。
   const mobileMenuRef = useRef<HTMLDetailsElement>(null)
@@ -52,7 +60,12 @@ export function AppBar({
   // 搜索行常驻桌面（lg+）；手机展开态只在 <lg 显示。
 
   const searchSolid = scrolled || tone === 'solid'
-  const wishlistLabel = `Wishlist, ${count} ${count === 1 ? 'item' : 'items'}`
+  // 计数与量词按语言的复数规则组合：英文 1 → 单数形、0/2+ → 复数形；中文两形同值（无形态差异）。
+  // 判定交给 `plural` / `Intl.PluralRules`，调用点不写 `count === 1`。
+  const wishlistLabel = `${t['marketing.appBar.wishlist']}, ${count} ${plural(count, locale, {
+    one: t['marketing.appBar.wishlistItem'],
+    other: t['marketing.appBar.wishlistItems'],
+  })}`
   // 头部触控目标统一 ≥44px（Apple/Android 触控命中区规范下限）：真机手指出手偏
   // 离 36px 图标外沿即落空（表现为“点了没反应”），44px + 图标居中保证命中。
   const iconLinkClass =
@@ -70,9 +83,9 @@ export function AppBar({
       )}
     >
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4">
-        <Link href="/cart" aria-label="Cart" className={iconLinkClass}>
+        <LocaleLink href="/cart" aria-label={t['marketing.appBar.cart']} className={iconLinkClass}>
           <ShoppingBagIcon className="size-5" />
-        </Link>
+        </LocaleLink>
         {/* 左：移动菜单（md 隐藏）+ 品牌 */}
         <div className="flex flex-1 items-center gap-2">
           {/* 移动导航：原生 <details> 披露，不依赖任何 JS/组件库/门户/焦点陷阱。
@@ -81,47 +94,67 @@ export function AppBar({
               JS 可用时额外提供：点击链接收起 + 打开态图标切换 Menu→✕（纯 CSS）。 */}
           <details ref={mobileMenuRef} className="group relative md:hidden">
             <summary
-              aria-label="Open menu"
+              aria-label={t['marketing.appBar.openMenu']}
               className="flex h-11 w-11 list-none cursor-pointer select-none items-center justify-center rounded-full text-current transition-opacity hover:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current [&::-webkit-details-marker]:hidden"
             >
               <MenuIcon className="size-5 group-open:hidden" />
               <XIcon className="hidden size-5 group-open:block" />
-              <span className="sr-only">Menu</span>
+              <span className="sr-only">{t['marketing.appBar.menu']}</span>
             </summary>
             <nav
-              aria-label="Mobile"
+              aria-label={t['marketing.appBar.mobileNav']}
               className="absolute left-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-ink/10 bg-popover text-popover-foreground shadow-lg"
             >
               {site.nav.map((item) => (
-                <Link
+                <LocaleLink
                   key={item.href}
                   href={item.href}
                   onClick={() => mobileMenuRef.current?.removeAttribute('open')}
                   className="block px-4 py-3 text-[15px] font-medium text-foreground transition-colors hover:bg-muted"
                 >
-                  {item.label}
-                </Link>
+                  {t[item.key]}
+                </LocaleLink>
               ))}
+              {/* 语言切换器（裁决 R39）：移动端放在这个已有 <nav> 里，头部宽度增量因此为 0。
+                  本仓库没有 headless 浏览器、jsdom 不做布局，溢出只能靠「构造上不增宽」保证，
+                  不能靠尺寸估算。
+
+                  断点相接规则（R39 扩充）：AppBar 的断点并不统一（移动菜单 `md:hidden`、
+                  中央导航 `hidden md:flex`、头部内联搜索 `hidden lg:flex`、移动搜索卡 `lg:hidden`）。
+                  任何用响应式可见性把同一个功能在多个位置之间切换的改动，必须逐条核对断点是否相接，
+                  否则会在两个断点之间留下功能空档（按 `lg` 分界会让 768–1024px 一台切换器都没有）。
+                  不变量：两个实例的可见性并集覆盖整个宽度区间且交集为空——此处以 **md** 为界，
+                  `<md` 只有本实例，`≥md` 只有右侧操作区那个。 */}
+              <div className="border-t border-ink/10 px-4 py-3">
+                {/* `onNavigate` 收起上面的 `<details>`：语言切换是客户端导航，AppBar 不会重挂，
+                    不收起就会在新页面上继续遮住内容（与同层四个 `LocaleLink` 的 onClick 同理）。 */}
+                <LanguageSwitcher
+                  onNavigate={() => mobileMenuRef.current?.removeAttribute('open')}
+                />
+              </div>
             </nav>
           </details>
-          <Link
+          <LocaleLink
             href="/"
             className="text-lg font-semibold tracking-tight transition-opacity hover:opacity-80"
           >
             {site.name}
-          </Link>
+          </LocaleLink>
         </div>
 
         {/* 中：桌面导航 */}
-        <nav aria-label="Main" className="hidden flex-1 justify-center gap-8 md:flex">
+        <nav
+          aria-label={t['marketing.appBar.mainNav']}
+          className="hidden flex-1 justify-center gap-8 md:flex"
+        >
           {site.nav.map((item) => (
-            <Link
+            <LocaleLink
               key={item.href}
               href={item.href}
               className="text-sm font-medium text-current transition-opacity hover:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-current"
             >
-              {item.label}
-            </Link>
+              {t[item.key]}
+            </LocaleLink>
           ))}
         </nav>
 
@@ -130,9 +163,9 @@ export function AppBar({
           {/* 桌面内联搜索：图标以输入框为锚绝对定位，垂直水平严格居中（不再用
               relative 硬推，避免偏移）；输入框 pl-10 让文字让出图标。 */}
           <form
-            action="/shop"
+            action={shopPath}
             role="search"
-            aria-label="Search products"
+            aria-label={t['marketing.appBar.searchProducts']}
             className="relative hidden items-center lg:flex"
           >
             <SearchIcon
@@ -142,8 +175,8 @@ export function AppBar({
             <Input
               name="q"
               type="search"
-              placeholder="Search"
-              aria-label="Search products"
+              placeholder={t['marketing.appBar.search']}
+              aria-label={t['marketing.appBar.searchProducts']}
               className={cn(
                 'h-9 w-44 rounded-full pl-10 text-sm transition-colors',
                 searchSolid
@@ -159,31 +192,31 @@ export function AppBar({
               生切换。JS 可用时点击链接/回车即提交（原生 form GET）。 */}
           <details className="group relative lg:hidden">
             <summary
-              aria-label="Search"
+              aria-label={t['marketing.appBar.search']}
               className="flex h-11 w-11 list-none cursor-pointer select-none items-center justify-center rounded-full text-current transition-opacity hover:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current [&::-webkit-details-marker]:hidden"
             >
               <SearchIcon className="size-5 group-open:hidden" />
               <XIcon className="hidden size-5 group-open:block" />
-              <span className="sr-only">Search</span>
+              <span className="sr-only">{t['marketing.appBar.search']}</span>
             </summary>
             <div
               role="search"
-              aria-label="Search products"
+              aria-label={t['marketing.appBar.searchProducts']}
               className="absolute right-0 top-full z-50 mt-2 w-[min(26rem,calc(100vw-3.5rem))] border border-ink/10 bg-canvas p-2 text-ink shadow-lg"
             >
-              <form action="/shop" className="flex items-center gap-2">
+              <form action={shopPath} className="flex items-center gap-2">
                 <Input
                   name="q"
                   type="search"
-                  placeholder="Search styles"
-                  aria-label="Search products"
+                  placeholder={t['marketing.appBar.searchStyles']}
+                  aria-label={t['marketing.appBar.searchProducts']}
                   className="h-10 min-w-0 flex-1 rounded-full border-neutral-300 bg-surface pl-4 text-ink placeholder:text-neutral-500"
                 />
                 <button
                   type="submit"
                   className="h-10 shrink-0 rounded-full bg-ink px-4 text-sm font-medium text-canvas transition-opacity hover:opacity-80"
                 >
-                  Search
+                  {t['marketing.appBar.search']}
                 </button>
               </form>
             </div>
@@ -191,7 +224,11 @@ export function AppBar({
 
           {/* 愿望单入口（决策：/saved 清单页）——心形徽标直达 Saved pairs；
               纯 <a> 链接（零 JS 也可达），count 读 WishlistProvider 快照。 */}
-          <Link href="/saved" aria-label={wishlistLabel} className={cn(iconLinkClass, 'relative')}>
+          <LocaleLink
+            href="/saved"
+            aria-label={wishlistLabel}
+            className={cn(iconLinkClass, 'relative')}
+          >
             <HeartIcon className="size-5" />
             <Badge
               variant="secondary"
@@ -199,7 +236,14 @@ export function AppBar({
             >
               {count}
             </Badge>
-          </Link>
+          </LocaleLink>
+
+          {/* 语言切换器（裁决 R39）：≥md 留在右侧操作区；<md 的实例在左侧移动菜单里，
+              故移动端（<md）头部宽度增量为 0。md 是移动菜单自身的断点，两边相接不留空档
+              （不变量与断点相接规则见移动菜单内的注释）。 */}
+          <div className="hidden items-center md:flex">
+            <LanguageSwitcher />
+          </div>
         </div>
       </div>
 

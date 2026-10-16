@@ -5,9 +5,12 @@ import { AI_SESSION_COOKIE } from '@/server/guardrails/request'
 const { chat } = vi.hoisted(() => ({ chat: vi.fn() }))
 vi.mock('@/server/ai/chat', () => ({
   chat,
-  FALLBACK_ERROR_TEXT: 'fallback',
+  // 既有的 503 断言期望消息为 'fallback'：mock 保持同一取值，只换成按语言取用的入口。
+  fallbackErrorMessage: () => 'fallback',
 }))
 
+import { messages } from '@/i18n/messages'
+import type { Locale } from '@/i18n/locales'
 import { POST } from './route'
 
 const now = new Date('2026-09-29T10:00:00Z')
@@ -336,5 +339,72 @@ describe('AI chat route session boundary', () => {
     )
     expect(response.status).toBe(403)
     expect(chat).not.toHaveBeenCalled()
+  })
+})
+
+// ── 请求语言（任务 7）─────────────────────────────────────────────────────────────
+// Route Handler 拿不到 URL 段语言（`next/root-params` 在 vitest 下不可用，ADR 0008 决策 5），
+// 语言只能来自请求体，缺失/非法时回落 `Accept-Language`。chat 本身被 mock，所以下面的断言针对
+// **入口解析**：转交给 chat 的 `locale` 与产出的事件文案。真实 provider/mock/handlers 的端到端
+// 行为由 `copy-contract.test.ts` 与生产抽查覆盖。
+describe('请求语言从入口贯穿到事件文案', () => {
+  // mock 出的 chat 用**收到的 locale** 取词典——事件文案里的语言因此能反过来证明入口的解析结果。
+  const localizedReply = (locale: Locale) =>
+    (async function* () {
+      yield { type: 'delta' as const, text: messages(locale)['assistant.noMatch'] }
+      yield { type: 'done' as const }
+    })()
+
+  const post = async (body: unknown, headers: Record<string, string> = {}) => {
+    chat.mockImplementation((request: { locale: Locale }) => localizedReply(request.locale))
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/ai/chat', {
+        method: 'POST',
+        body: JSON.stringify(body),
+        headers: { 'content-type': 'application/json', ...headers },
+      }),
+    )
+    return {
+      status: response.status,
+      text: await response.text(),
+      locale: chat.mock.calls[chat.mock.calls.length - 1]?.[0].locale as Locale,
+    }
+  }
+
+  it('body 带合法 locale 时按该语言产出事件文案', async () => {
+    const { status, text, locale } = await post({ text: 'hello', locale: 'zh-CN' })
+    expect(status).toBe(200)
+    expect(locale).toBe('zh-CN')
+    expect(text).toContain(messages('zh-CN')['assistant.noMatch'])
+    expect(text).not.toContain(messages('en')['assistant.noMatch'])
+  })
+
+  it('缺失 locale 时按 Accept-Language 回落', async () => {
+    const { text, locale } = await post({ text: 'hello' }, { 'accept-language': 'zh-CN,zh;q=0.9' })
+    expect(locale).toBe('zh-CN')
+    expect(text).toContain(messages('zh-CN')['assistant.noMatch'])
+  })
+
+  it('非法 locale 不 500：回落默认语言', async () => {
+    const { status, text, locale } = await post({ text: 'hello', locale: 'xx' })
+    expect(status).toBe(200)
+    expect(locale).toBe('en')
+    expect(text).toContain(messages('en')['assistant.noMatch'])
+  })
+
+  it('locale 是非字符串时不崩溃，回落默认语言', async () => {
+    const { status, text, locale } = await post({ text: 'hello', locale: 123 })
+    expect(status).toBe(200)
+    expect(locale).toBe('en')
+    expect(text).toContain(messages('en')['assistant.noMatch'])
+  })
+
+  it('新增 locale 字段没有放宽未知字段校验：evil:1 仍然是 invalid_request', async () => {
+    const { status, text } = await post({ text: 'hello', locale: 'zh-CN', evil: 1 })
+    expect(status).toBe(422)
+    expect(JSON.parse(text)).toEqual({
+      code: 'invalid_request',
+      message: 'Request validation failed',
+    })
   })
 })

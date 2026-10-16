@@ -2,11 +2,19 @@ import type { BudgetRepository, BudgetUsage } from './budget-contract'
 import { tokenBucket } from './rate-limit'
 import { createSessionStore, type SessionMessage } from './session-state'
 import { dailyTokenCap, reservationStaleMs, underDailyBudget, today } from './budget'
+import { DEFAULT_LOCALE, type Locale } from '@/i18n/locales'
+import { messages } from '@/i18n/messages'
 
 /** IP/会话双维内存令牌桶限流速率（默认 10 次/分）。 */
 export const RATE_PER_MIN = 10
-/** 护栏温和文案（消费端措辞，绝不暴露 "rate limited"）。 */
-export const GUARDRAIL_MESSAGE = 'The assistant is taking a short break — try again in a moment.'
+
+/** 护栏温和文案（消费端措辞，绝不暴露 "rate limited"），按请求语言取用。 */
+const cooldownMessage = (locale: Locale): string => messages(locale)['guardrail.cooldown']
+
+/** 默认语言的护栏文案：既有测试（`index.test.ts` / `copy-contract.test.ts`）钉住的
+ * `export const`，形态不得改成函数；按请求语言取用的那份是上面的 `cooldownMessage`
+ * （由各断言方法传入 `req.locale` 得到）。 */
+export const GUARDRAIL_MESSAGE = cooldownMessage(DEFAULT_LOCALE)
 
 export class GuardrailError extends Error {
   constructor(
@@ -49,15 +57,16 @@ export function createGuardrails(
     }
   }
 
-  const deny = (code: GuardrailError['code']): never => {
-    throw new GuardrailError(code, GUARDRAIL_MESSAGE)
+  const deny = (code: GuardrailError['code'], locale: Locale): never => {
+    throw new GuardrailError(code, cooldownMessage(locale))
   }
 
   return {
-    /** 领取一个回合；超限抛 code='turns'，否则返回裁剪后的会话历史供上下文注入。 */
-    assertTurn(sessionKey: string): SessionMessage[] {
+    /** 领取一个回合；超限抛 code='turns'，否则返回裁剪后的会话历史供上下文注入。
+     * `locale` 只决定文案（默认值服务于直接构造的调用点——测试）。 */
+    assertTurn(sessionKey: string, locale: Locale = DEFAULT_LOCALE): SessionMessage[] {
       const { allowed, history } = sessions.claim(sessionKey, nowMs())
-      if (!allowed) deny('turns')
+      if (!allowed) deny('turns', locale)
       return history
     },
     /**
@@ -70,18 +79,23 @@ export function createGuardrails(
       sessions.push(sessionKey, role, content)
     },
     /** IP+session 双维令牌桶；任一维度超限抛 code='rate_limited'。 */
-    assertRate(ip: string, sessionKey: string): void {
+    assertRate(ip: string, sessionKey: string, locale: Locale = DEFAULT_LOCALE): void {
       // Reject at the IP boundary before allocating a fresh session bucket.
       if (!ipBuckets.allow(ip, nowMs()) || !sessionBuckets.allow(sessionKey, nowMs())) {
-        deny('rate_limited')
+        deny('rate_limited', locale)
       }
     },
     /** 当日用量达到 AI_DAILY_TOKEN_CAP 后抛 code='budget'。 */
-    async assertBudget(day = today()): Promise<void> {
-      if (!(await underDailyBudget(repo, day))) deny('budget')
+    async assertBudget(day = today(), locale: Locale = DEFAULT_LOCALE): Promise<void> {
+      if (!(await underDailyBudget(repo, day))) deny('budget', locale)
     },
     /** Atomically reserve an estimated prompt+completion budget for one request. */
-    async reserveBudget(requestId: string, tokens: number, day = today()): Promise<void> {
+    async reserveBudget(
+      requestId: string,
+      tokens: number,
+      day = today(),
+      locale: Locale = DEFAULT_LOCALE,
+    ): Promise<void> {
       await recoverBudget()
       const accepted = await repo.reserveDailyBudget({
         requestId,
@@ -89,7 +103,7 @@ export function createGuardrails(
         tokens,
         cap: dailyTokenCap(),
       })
-      if (!accepted) deny('budget')
+      if (!accepted) deny('budget', locale)
     },
     /** Account for completed usage even if its estimate exceeded the admission cap. */
     async settleBudget(requestId: string, usage: BudgetUsage): Promise<void> {

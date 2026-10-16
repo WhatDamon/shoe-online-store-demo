@@ -10,7 +10,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default="http://127.0.0.1:3000")
     base_url = parser.parse_args().base_url.rstrip("/")
-    with httpx.Client(base_url=base_url, timeout=25) as client:
+    # follow_redirects: the paths below are the legacy unprefixed URLs real users still hold;
+    # the app answers them with a 308 to the localized route, so the check must assert the whole
+    # user-visible chain (old URL -> 308 -> localized page -> 200), not bypass it.
+    with httpx.Client(base_url=base_url, timeout=25, follow_redirects=True) as client:
 
         def request(method: str, path: str, **kwargs) -> dict:
             response = client.request(method, f"/api/commerce/{path}", **kwargs)

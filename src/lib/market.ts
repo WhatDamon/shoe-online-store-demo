@@ -16,7 +16,6 @@ export const market = {
     return envStr('SITE_MARKET', 'US')
   },
   currency: 'USD' as const,
-  locale: 'en-US',
   get sizeSystem(): SizeSystem {
     return MARKET_SIZE_SYSTEM[this.code as keyof typeof MARKET_SIZE_SYSTEM] ?? 'US'
   },

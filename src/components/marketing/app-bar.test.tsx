@@ -22,25 +22,25 @@ describe('AppBar', () => {
       </WishlistProvider>,
     )
 
-    expect(screen.getByRole('link', { name: 'Evoloop' })).toHaveAttribute('href', '/')
+    expect(screen.getByRole('link', { name: 'Evoloop' })).toHaveAttribute('href', '/en')
 
     // 桌面主导航（Main）：移动菜单（原生 details）的链接在 jsdom 无 CSS/UA
     // 隐藏语义，会与 Main 重复，故按导航作用域断言，避免歧义。
     const mainNav = screen.getByRole('navigation', { name: 'Main' })
     const shop = within(mainNav).getByRole('link', { name: 'Shop' })
-    expect(shop).toHaveAttribute('href', '/shop')
+    expect(shop).toHaveAttribute('href', '/en/shop')
 
     const collections = within(mainNav).getByRole('link', { name: 'Collections' })
-    expect(collections).toHaveAttribute('href', '/#collections')
+    expect(collections).toHaveAttribute('href', '/en#collections')
 
     const story = within(mainNav).getByRole('link', { name: 'Our Story' })
-    expect(story).toHaveAttribute('href', '/#story')
+    expect(story).toHaveAttribute('href', '/en#story')
 
     const blog = within(mainNav).getByRole('link', { name: 'Blog' })
-    expect(blog).toHaveAttribute('href', '/blog')
+    expect(blog).toHaveAttribute('href', '/en/blog')
 
     const wishlist = screen.getByRole('link', { name: /wishlist/i })
-    expect(wishlist).toHaveAttribute('href', '/saved')
+    expect(wishlist).toHaveAttribute('href', '/en/saved')
     expect(within(wishlist).getByText('0')).toBeInTheDocument()
   })
 
@@ -65,10 +65,10 @@ describe('AppBar', () => {
     expect(details).toHaveAttribute('open')
     const nav = screen.getByRole('navigation', { name: 'Mobile' })
     for (const [label, href] of [
-      ['Shop', '/shop'],
-      ['Collections', '/#collections'],
-      ['Our Story', '/#story'],
-      ['Blog', '/blog'],
+      ['Shop', '/en/shop'],
+      ['Collections', '/en#collections'],
+      ['Our Story', '/en#story'],
+      ['Blog', '/en/blog'],
     ] as const) {
       const link = within(nav).getByRole('link', { name: label })
       expect(link).toHaveAttribute('href', href)
@@ -77,6 +77,26 @@ describe('AppBar', () => {
     // JS 增强：点击导航链接后收起面板（removeAttribute('open')）
     await user.click(within(nav).getByRole('link', { name: 'Collections' }))
     expect(details).not.toHaveAttribute('open')
+  })
+
+  it('submits both search forms to the localized shop path', () => {
+    const { container } = render(
+      <WishlistProvider>
+        <AppBar />
+      </WishlistProvider>,
+    )
+
+    // 两处搜索表单的原生 GET 目标是 localePath(locale, '/shop')（变量），AST 守卫
+    // 看不见它；原生表单不经 Router，前缀必须在渲染时补上，故在此钉住渲染值。
+    // 桌面内联框与 <lg 的 details 卡在 jsdom 都在可及树内（无 UA 隐藏），
+    // 故按 search 地标逐个取其中的 form。
+    const searches = screen.getAllByRole('search', { name: 'Search products' })
+    expect(searches).toHaveLength(2)
+    for (const search of searches) {
+      const form = search.tagName === 'FORM' ? search : search.querySelector('form')
+      expect(form).toHaveAttribute('action', '/en/shop')
+    }
+    expect(container.querySelectorAll('form')).toHaveLength(2)
   })
 
   it('shows an updated wishlist count when an item is added', async () => {

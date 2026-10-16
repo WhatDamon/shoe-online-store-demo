@@ -6,6 +6,8 @@ import { MessageCircleIcon } from 'lucide-react'
 import type { Mode } from '@/domain/chat-events'
 import type { ProductView } from '@/domain/product'
 import { getPageProductSnapshot, type PageProductRef } from '@/lib/page-product'
+import { useLocale, useMessages } from '@/components/i18n/locale-provider'
+import { localePath } from '@/i18n/locales'
 
 // 由 AssistantProvider 注入的控制器（结构化契约：避免 provider↔fab 运行时/类型循环导入）。
 export interface AssistantFabHandle {
@@ -16,8 +18,13 @@ export interface AssistantFabHandle {
 // 不在落地页出现（P1：Landing 零导购痕迹）；usePathname 消费点用 Suspense 包裹，
 // 保证静态页预渲染不受影响（fallback null，水合后才按路径决定显隐）。
 function AssistantFab({ assistant }: { assistant: AssistantFabHandle | null }) {
+  const t = useMessages()
   const pathname = usePathname()
-  if (!assistant || pathname === '/') return null
+  const locale = useLocale()
+  // 落地页判定必须拿「当前语言下的落地页路径」比较，而不是字面量 '/'：locale 是 URL 的
+  // 一段，应用路由下移到 [locale] 后落地页是 /en（写死 '/' 会让导购入口重新出现在落地页，
+  // 破坏「Landing 零导购痕迹」；回归防线见 fab-landing.test.tsx）。
+  if (!assistant || pathname === localePath(locale, '/')) return null
   // PDP 锚定（page-product store）：在商品详情页上打开即带上当前鞋（轻引用 handle+title，
   // 服务端按 handle 回取全量事实注入）。关键：必须在 onClick 回调内读锚点，而非渲染时——
   // 锚点在水合后才由 PDP 注册，渲染期读取会让闭包永远持有 null（生产页不重渲染）。
@@ -25,11 +32,11 @@ function AssistantFab({ assistant }: { assistant: AssistantFabHandle | null }) {
     <button
       type="button"
       onClick={() => assistant.open('shopping', getPageProductSnapshot())}
-      aria-label="Open shopping assistant"
+      aria-label={t['assistant.fab.open']}
       className="fixed bottom-5 right-5 z-40 inline-flex h-12 items-center gap-2 rounded-full bg-ink px-4 text-sm font-medium text-canvas shadow-lg transition-transform hover:scale-[1.03] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
     >
       <MessageCircleIcon className="size-5" aria-hidden="true" />
-      <span className="hidden sm:inline">Need a hand?</span>
+      <span className="hidden sm:inline">{t['assistant.fab.label']}</span>
     </button>
   )
 }

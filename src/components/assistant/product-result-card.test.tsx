@@ -23,7 +23,7 @@ describe('ProductResultCard wishlist (Save pair)', () => {
     render(<ProductResultCard item={card} />)
     expect(screen.getByRole('link', { name: /Urban Bloom/ })).toHaveAttribute(
       'href',
-      '/product/dc-1001',
+      '/en/product/dc-1001',
     )
   })
 

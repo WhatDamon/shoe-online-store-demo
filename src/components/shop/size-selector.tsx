@@ -1,6 +1,7 @@
 'use client'
 
 import type { CanonicalSize } from '@/domain/product'
+import { useMessages } from '@/components/i18n/locale-provider'
 
 interface SizeOption {
   value: CanonicalSize
@@ -20,9 +21,10 @@ interface SizeSelectorProps {
 // peer-focus-visible 提供可见轮廓。match（我的码）命中项以品牌色描边区分，
 // 选中态仍以 ink 底反白覆盖，二者可叠加不冲突。
 export function SizeSelector({ sizeOptions, selected, onChange, match = null }: SizeSelectorProps) {
+  const t = useMessages()
   return (
     <fieldset>
-      <legend className="mb-2.5 text-sm font-medium text-ink">Select size</legend>
+      <legend className="mb-2.5 text-sm font-medium text-ink">{t['pdp.size.legend']}</legend>
       <div className="flex flex-wrap gap-2">
         {sizeOptions.map((option) => {
           const active = selected === option.value
@@ -35,7 +37,9 @@ export function SizeSelector({ sizeOptions, selected, onChange, match = null }: 
                 value={option.value}
                 checked={active}
                 onChange={() => onChange(option.value)}
-                aria-label={isMatch ? `${option.label} (your size)` : option.label}
+                aria-label={
+                  isMatch ? `${option.label} ${t['pdp.size.yourSizeSuffix']}` : option.label
+                }
                 className="peer sr-only"
               />
               <span
@@ -49,7 +53,7 @@ export function SizeSelector({ sizeOptions, selected, onChange, match = null }: 
                 {option.label}
                 {isMatch ? (
                   <span className="ml-1.5 rounded-full bg-brand px-1.5 py-0.5 align-middle text-[10px] font-medium text-canvas">
-                    Your size
+                    {t['pdp.size.yourSize']}
                   </span>
                 ) : null}
               </span>

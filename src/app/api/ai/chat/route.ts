@@ -1,8 +1,9 @@
 // POST /api/ai/chat → SSE 流。匿名开放，成本护栏在 chat() 内全链执行。
 // 每帧 = encodeEvent 输出（data: {…}\n\n）；客户端 parseEvent 消费。
-import { chat, FALLBACK_ERROR_TEXT } from '@/server/ai/chat'
+import { chat, fallbackErrorMessage } from '@/server/ai/chat'
 import { encodeEvent } from '@/domain/chat-events'
 import type { ChatEvent, Mode } from '@/domain/chat-events'
+import { isLocale, resolveLocale, type Locale } from '@/i18n/locales'
 import { maxMessageChars } from '@/server/guardrails/text'
 import { readRequestBody } from '@/server/guardrails/request-body'
 import {
@@ -30,6 +31,9 @@ type Body = {
   text?: unknown
   product?: unknown
   footMm?: unknown
+  /** 界面语言：Route Handler 拿不到 URL 段语言（`next/root-params` 也不可用），
+   * 只能由客户端在请求体里显式传入（ADR 0008 决策 5）。 */
+  locale?: unknown
   /** Legacy client field is accepted for compatibility but never trusted. */
   sessionKey?: unknown
 }
@@ -39,16 +43,17 @@ type ParsedBody = {
   text: string
   product: { handle: string; title: string } | null
   footMm: number | null
+  locale: Locale
 }
 
 const hasControlCharacter = (value: string): boolean => /[\u0000-\u001f\u007f]/.test(value)
 
-function parseBody(value: unknown): ParsedBody | null {
+function parseBody(value: unknown, acceptLanguage: string | null): ParsedBody | null {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return null
   const body = value as Body
   if (
     Object.keys(body).some(
-      (key) => !['mode', 'text', 'product', 'footMm', 'sessionKey'].includes(key),
+      (key) => !['mode', 'text', 'product', 'footMm', 'locale', 'sessionKey'].includes(key),
     )
   ) {
     return null
@@ -97,6 +102,12 @@ function parseBody(value: unknown): ParsedBody | null {
     text: body.text ?? '',
     product,
     footMm: body.footMm ?? null,
+    // 非法/缺失的 `locale` **不**拒绝请求：它是展示语言，不是安全边界，回落到
+    // `Accept-Language`（再落到默认语言）。只有通过 `isLocale` 校验的值才能进 `messages()`。
+    locale:
+      typeof body.locale === 'string' && isLocale(body.locale)
+        ? body.locale
+        : resolveLocale(acceptLanguage, null),
   }
 }
 
@@ -104,7 +115,7 @@ async function readBody(req: NextRequest): Promise<ParsedBody | null> {
   try {
     const bytes = await readRequestBody(req, MAX_BODY_BYTES)
     const raw = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
-    return parseBody(JSON.parse(raw))
+    return parseBody(JSON.parse(raw), req.headers.get('accept-language'))
   } catch {
     return null
   }
@@ -134,17 +145,17 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     if (!(error instanceof SessionConfigurationError)) throw error
     return NextResponse.json(
-      { code: 'session_unavailable', message: FALLBACK_ERROR_TEXT },
+      { code: 'session_unavailable', message: fallbackErrorMessage(body.locale) },
       { status: 503, headers: { 'cache-control': 'no-store', 'x-request-id': requestId } },
     )
   }
   const ip = requestIp(req)
-  const { mode, text, product, footMm } = body
+  const { mode, text, product, footMm, locale } = body
 
   const cancellation = new AbortController()
   const signal = AbortSignal.any([req.signal, cancellation.signal])
   const iterator = chat(
-    { sessionKey: session.id, ip, mode, text, product, footMm },
+    { sessionKey: session.id, ip, mode, text, product, footMm, locale },
     { signal, requestId },
   )
   const enc = new TextEncoder()
@@ -178,7 +189,7 @@ export async function POST(req: NextRequest) {
         const event: ChatEvent = {
           type: 'error',
           code: 'provider',
-          message: FALLBACK_ERROR_TEXT,
+          message: fallbackErrorMessage(locale),
         }
         controller.enqueue(enc.encode(encodeEvent(event)))
         controller.close()

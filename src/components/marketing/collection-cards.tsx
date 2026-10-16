@@ -1,5 +1,7 @@
 import Image from 'next/image'
-import Link from 'next/link'
+import { LocaleLink } from '@/components/i18n/locale-link'
+import type { Locale } from '@/i18n/locales'
+import { messages } from '@/i18n/messages'
 import { catalog } from '@/server/catalog/adapter'
 import { ProductVisual } from '@/components/shop/product-visual'
 
@@ -19,7 +21,8 @@ interface SeriesCard {
   } | null
 }
 
-export async function CollectionCards() {
+export async function CollectionCards({ locale }: { locale: Locale }) {
+  const t = messages(locale)
   const collections = await catalog().getCollections()
 
   const cards: SeriesCard[] = await Promise.all(
@@ -48,16 +51,18 @@ export async function CollectionCards() {
   return (
     <section id="collections" aria-labelledby="collections-heading" className="bg-surface">
       <div className="mx-auto w-full max-w-6xl px-4 py-20 md:py-28">
-        <p className="text-xs font-medium uppercase tracking-[0.18em] text-brand">Shop by series</p>
+        <p className="text-xs font-medium uppercase tracking-[0.18em] text-brand">
+          {t['marketing.collections.kicker']}
+        </p>
         <h2
           id="collections-heading"
           className="mt-3 font-heading text-3xl font-semibold tracking-tight text-ink sm:text-4xl"
         >
-          Find your everyday pair
+          {t['marketing.collections.title']}
         </h2>
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {cards.map((card) => (
-            <Link
+            <LocaleLink
               key={card.handle}
               href={`/shop?collection=${card.handle}`}
               className="group flex flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-surface transition-shadow hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
@@ -75,11 +80,14 @@ export async function CollectionCards() {
                       />
                     </div>
                   ) : (
+                    // RSC 手里就有 URL 语言：显式传下去，否则该 SVG 的可及名会落到
+                    // `ProductVisual` 的缺省语言而静默留英文（4 个客户端调用点在阶段 2 接线）。
                     <ProductVisual
                       visual={card.representative.visual}
                       name={card.representative.title}
                       construction={card.representative.construction}
                       view="side"
+                      locale={locale}
                       className="aspect-[4/3] w-full transition-transform duration-300 group-hover:scale-[1.03]"
                     />
                   )
@@ -89,7 +97,7 @@ export async function CollectionCards() {
                 <h3 className="text-[15px] font-medium text-neutral-900">{card.name}</h3>
                 <p className="text-[13px] leading-snug text-neutral-500">{card.description}</p>
               </div>
-            </Link>
+            </LocaleLink>
           ))}
         </div>
       </div>

@@ -1,7 +1,8 @@
 'use client'
 
-import Link from 'next/link'
 import { useState } from 'react'
+import { LocaleLink } from '@/components/i18n/locale-link'
+import { useLocale, useMessages } from '@/components/i18n/locale-provider'
 import { Button } from '@/components/ui/button'
 import type { CommerceVariant } from '@/domain/commerce'
 import { parseCartView } from '@/domain/commerce-response'
@@ -20,6 +21,10 @@ export function ProductBuyBar({
   loading: boolean
   error: string | null
 }) {
+  const t = useMessages()
+  // 错误文案按界面语言取（commerce-client 的错误码 → 文案映射需要它）；Provider 缺席时
+  // useLocale() 返回默认语言，故孤立渲染（含既有测试）仍是英文。
+  const locale = useLocale()
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   async function add() {
@@ -30,10 +35,11 @@ export function ProductBuyBar({
       await commerceRequest('cart/items', parseCartView, {
         method: 'POST',
         body: JSON.stringify({ variant_id: variant.id, quantity: 1 }),
+        locale,
       })
-      setMessage('Added to cart.')
+      setMessage(t['pdp.buy.added'])
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : 'Could not add this item to your cart.')
+      setMessage(e instanceof Error ? e.message : t['pdp.buy.addFailed'])
     } finally {
       setBusy(false)
     }
@@ -42,7 +48,7 @@ export function ProductBuyBar({
     <div className="flex flex-col gap-2">
       {variant && (
         <p className="text-sm">
-          {variant.currency} {variant.price} · {variant.available} available
+          {variant.currency} {variant.price} · {variant.available} {t['pdp.buy.available']}
         </p>
       )}
       <Button
@@ -51,22 +57,22 @@ export function ProductBuyBar({
         disabled={loading || busy || !variant || variant.available < 1}
         onClick={add}
       >
-        {busy ? 'Adding...' : 'Add to cart'}
+        {busy ? t['pdp.buy.adding'] : t['pdp.buy.addToCart']}
       </Button>
       <p role="status" className="min-h-4 text-xs leading-5 text-neutral-500">
         {message ||
           error ||
           (loading
-            ? 'Loading available options...'
+            ? t['pdp.buy.loading']
             : !selectedLabel
-              ? 'Choose a color and size.'
+              ? t['pdp.buy.chooseOptions']
               : !variant
-                ? 'This color and size are unavailable.'
-                : `${colorName} · ${selectedLabel} selected`)}
+                ? t['pdp.buy.unavailable']
+                : `${colorName} · ${selectedLabel} ${t['pdp.buy.selected']}`)}
       </p>
-      <Link href="/cart" className="text-sm underline underline-offset-4">
-        View cart
-      </Link>
+      <LocaleLink href="/cart" className="text-sm underline underline-offset-4">
+        {t['pdp.buy.viewCart']}
+      </LocaleLink>
     </div>
   )
 }

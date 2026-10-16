@@ -1,8 +1,9 @@
 'use client'
 
 import Image from 'next/image'
-import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import { LocaleLink } from '@/components/i18n/locale-link'
+import { useLocale, useMessages } from '@/components/i18n/locale-provider'
 import { useWishlist } from './wishlist-provider'
 import { ProductVisual } from './product-visual'
 import { WishlistHeart } from './wishlist-icon'
@@ -21,6 +22,9 @@ const EMPTY_ROWS: LoadedRow[] = []
  * fetch 的 setState 全部发生在异步 continuation / 事件回调内（react-hooks 规则）。
  */
 export function SavedPairs() {
+  const t = useMessages()
+  // 无图收藏项回落到 SVG 视觉：可及名（`— printed shoe`）随界面语言，必须显式传 locale。
+  const locale = useLocale()
   const { items, toggle } = useWishlist()
   const [rows, setRows] = useState<LoadedRow[] | null>(null) // null = 加载中
   const [failed, setFailed] = useState(false)
@@ -58,9 +62,7 @@ export function SavedPairs() {
   if (failed) {
     return (
       <div className="rounded-xl border border-neutral-200 bg-surface px-4 py-10 text-center">
-        <p className="text-sm text-neutral-600">
-          We couldn&apos;t load your saved pairs — check your connection and try again.
-        </p>
+        <p className="text-sm text-neutral-600">{t['shop.saved.loadError']}</p>
       </div>
     )
   }
@@ -68,7 +70,7 @@ export function SavedPairs() {
   if (rows === null && items.length > 0) {
     return (
       <div className="rounded-xl border border-neutral-200 bg-surface px-4 py-10 text-center">
-        <p className="text-sm text-neutral-500">Loading your saved pairs…</p>
+        <p className="text-sm text-neutral-500">{t['shop.saved.loading']}</p>
       </div>
     )
   }
@@ -76,16 +78,16 @@ export function SavedPairs() {
   if (empty) {
     return (
       <div className="rounded-xl border border-neutral-200 bg-surface px-4 py-12 text-center">
-        <p className="text-base font-medium text-neutral-900">Nothing saved yet</p>
+        <p className="text-base font-medium text-neutral-900">{t['shop.saved.emptyTitle']}</p>
         <p className="mx-auto mt-1.5 max-w-sm text-sm leading-6 text-neutral-500">
-          Tap the heart on any pair — in the shop or on a product page — and it will show up here.
+          {t['shop.saved.emptyBody']}
         </p>
-        <Link
+        <LocaleLink
           href="/shop"
           className="mt-5 inline-flex items-center justify-center rounded-lg bg-ink px-4 py-2 text-sm font-medium text-canvas transition-opacity hover:opacity-85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
         >
-          Browse the shop
-        </Link>
+          {t['shop.saved.emptyCta']}
+        </LocaleLink>
       </div>
     )
   }
@@ -98,7 +100,7 @@ export function SavedPairs() {
           key={row.handle}
           className="relative flex items-center gap-3 rounded-xl border border-neutral-200 bg-surface p-2.5 transition-colors hover:border-neutral-400"
         >
-          <Link
+          <LocaleLink
             href={`/product/${row.handle}`}
             className="flex min-w-0 flex-1 items-center gap-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
           >
@@ -111,6 +113,7 @@ export function SavedPairs() {
                   <ProductVisual
                     name={row.title}
                     view="side"
+                    locale={locale}
                     className="h-full w-full"
                     visual={{
                       palette: ['#111111', '#0f766e'],
@@ -125,18 +128,19 @@ export function SavedPairs() {
               <span className="block text-sm font-medium text-neutral-900">{row.title}</span>
               <span className="mt-0.5 block text-xs text-neutral-500">{row.subtitle}</span>
               <span className="mt-1 block text-[11px] text-neutral-500">
-                {row.sizeRange ? row.sizeRange : 'Size to confirm'}
+                {/* `sizeRange` 是领域事实（`src/lib/size-range.ts` 产出），不进词典。 */}
+                {row.sizeRange ? row.sizeRange : t['shop.saved.sizeToConfirm']}
                 {row.colorCount > 0
-                  ? ` · ${row.colorCount} color${row.colorCount === 1 ? '' : 's'}`
+                  ? ` · ${row.colorCount} ${row.colorCount === 1 ? t['shop.saved.color'] : t['shop.saved.colors']}`
                   : ''}
-                {row.storeAvailable ? ' · On the store' : ''}
+                {row.storeAvailable ? ` · ${t['shop.saved.onStore']}` : ''}
               </span>
             </span>
-          </Link>
+          </LocaleLink>
           <button
             type="button"
             onClick={() => toggle(row.handle)}
-            aria-label={`Remove ${row.title} from saved`}
+            aria-label={`${t['shop.saved.removeLead']} ${row.title} ${t['shop.saved.removeTail']}`}
             className="shrink-0 rounded-full p-2.5 text-neutral-500 transition-colors hover:text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
           >
             <WishlistHeart size={18} filled />

@@ -1,0 +1,212 @@
+import { notFound } from 'next/navigation'
+import type { Metadata } from 'next'
+import { ArrowLeft } from 'lucide-react'
+import { LocaleLink } from '@/components/i18n/locale-link'
+import { catalog } from '@/server/catalog/adapter'
+import { getProductForMarket, getRelatedProducts } from '@/server/catalog/service'
+import { shopifyBuyConfigFor } from '@/server/catalog/shopify-buy'
+import { ProductGallery } from '@/components/shop/product-gallery'
+import { ProductActions } from '@/components/shop/product-actions'
+import { ProductColorSelectionProvider } from '@/components/shop/product-color-selection'
+import { CareInstructionsButton } from '@/components/shop/care-instructions'
+import { PrintSpecSheetButton } from '@/components/shop/print-spec-sheet-button'
+import { PrintSpecSheet } from '@/components/shop/print-spec-sheet'
+import { ProductGrid } from '@/components/shop/product-grid'
+import { AssistantPageAnchor } from '@/components/assistant/assistant-page-anchor'
+import { WishlistButton } from '@/components/shop/wishlist-button'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion'
+import { formatPrice } from '@/lib/format'
+import { pageMetadata } from '@/lib/seo'
+import { absoluteUrl } from '@/lib/seo'
+import { DEFAULT_LOCALE, isLocale } from '@/i18n/locales'
+import { messages } from '@/i18n/messages'
+import { JsonLd } from '@/components/seo/json-ld'
+import { breadcrumbSchema, productSchema } from '@/lib/structured-data'
+
+export async function generateStaticParams() {
+  const products = await catalog().getProducts()
+  return products.map((p) => ({ handle: p.handle }))
+}
+
+export async function generateMetadata(props: {
+  params: Promise<{ locale: string; handle: string }>
+}): Promise<Metadata> {
+  const { handle } = await props.params
+  const product = await getProductForMarket(handle)
+  // 未知 handle：由页面级 notFound() 决定 404，元数据仅回退默认品牌态。
+  if (!product) return {}
+  // 阶段 2 的**有意口径**：界面文案已中文化，但商品文案（标题/描述/特性）属阶段 3，所以
+  // /zh-CN/product/<handle> 是**回退页**——canonical 指向 /en/product/<handle>、不发成对
+  // hreflang（`availableLocales` 只留默认语言），与 sitemap 商品段同口径（规格 §8.2/§8.3，
+  // CONTEXT.md「内容回退状态」）。因此内容语言恒为 `DEFAULT_LOCALE`，不再读 URL 段语言。
+  // 阶段 3 商品译文落地后，改为按商品文案的实际可用语言判断。
+  return pageMetadata(DEFAULT_LOCALE, {
+    title: product.title,
+    description: product.description,
+    path: `/product/${product.handle}`,
+    availableLocales: [DEFAULT_LOCALE],
+    keywords: [product.title, product.productType, ...product.tags],
+    openGraph: {
+      type: 'website',
+      description: product.description,
+      // 商品图是静态资源（不经 [locale] 路由），不加前缀
+      ...(product.images?.[0]
+        ? { images: [{ url: absoluteUrl(product.images[0]), alt: product.title }] }
+        : {}),
+    },
+  })
+}
+
+// PDP（SSG）：/product/[handle] 由 generateStaticParams 预渲染。
+// 未知 handle 在 dynamicParams=true（默认）下走按需渲染 → getProductForMarket null → notFound()，
+// 实测返回品牌化 not-found 壳（HTTP 200 + robots noindex）；若将来需要真 404 再设 dynamicParams=false。
+export default async function ProductPage(props: {
+  params: Promise<{ locale: string; handle: string }>
+}) {
+  const { locale: raw, handle } = await props.params
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE
+  const t = messages(locale)
+  // 结构化数据（JSON-LD）属**内容语言**（R49 / ADR 0009 决策 4），故面包屑的名必须与
+  // `breadcrumbSchema` 按内容语言产出的 `item` URL 同语言。阶段 2 商品文案只有英文 ⇒ 内容语言
+  // 恒为 `DEFAULT_LOCALE`，与 `generateMetadata` / `productSchema` 同一口径（阶段 3 译文落地后改）。
+  const contentT = messages(DEFAULT_LOCALE)
+  const product = await getProductForMarket(handle)
+  if (!product) notFound()
+
+  // 商店直购（2026-09-06 全目录映射）：商店有同 handle 商品且 SHOPIFY_BUY_* env 已配 →
+  // 该 PDP 由 Shopify Buy Button 接管变体选择与结算（隐藏 demo 价与选择器）；否则维持 demo 购买条。
+  const buyConfig = shopifyBuyConfigFor(product.handle)
+  const [buyUrl, related] = await Promise.all([
+    catalog().getBuyUrl(product),
+    getRelatedProducts(product.handle, 3),
+  ])
+
+  return (
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:py-8">
+      {/* 结构化数据的 `locale` 是**内容语言**，不是 URL 段语言：阶段 2 的商品文案（标题/描述/
+        `additionalProperty` 标签）只有英文，`/zh-CN/product/<handle>` 是回退页，故与
+        `generateMetadata` 同一口径传 `DEFAULT_LOCALE`——`@id` / URL 前缀与 canonical 同源
+        （规格 §8.3，`structured-data.ts` 的模块注释）。阶段 3 商品译文落地后改传实际内容语言。
+        面包屑的 `name` 同样取内容语言（`contentT`）：`item` 已是 `/en/...`，名若取 URL 语言
+        就会发出「中文 crumb 名 + 英文地址」的自相矛盾节点——名与地址必须同语言。页面**可见**
+        的返回链接仍按 URL 语言（`t['pdp.backToShop']`，R49）。 */}
+      <JsonLd
+        data={breadcrumbSchema(DEFAULT_LOCALE, [
+          { name: contentT['nav.home'], path: '/' },
+          { name: contentT['nav.shop'], path: '/shop' },
+          { name: product.title, path: `/product/${product.handle}` },
+        ])}
+      />
+      <JsonLd data={productSchema(DEFAULT_LOCALE, product)} />
+      {/* 页面锚点（渲染 null）：FAB 打开时把当前鞋带给助手（设计：PDP 针对性介绍）。 */}
+      <AssistantPageAnchor handle={product.handle} title={product.title} />
+      {/* 打印规格说明：可交互主体包 .print-hidden，@media print 只保留 .print-spec-sheet。 */}
+      <div className="print-hidden">
+        <LocaleLink
+          href="/shop"
+          className="inline-flex items-center gap-1.5 text-sm text-neutral-500 transition-colors hover:text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
+        >
+          <ArrowLeft aria-hidden="true" className="size-4 shrink-0" />
+          {t['pdp.backToShop']}
+        </LocaleLink>
+
+        {/* 网格基础列显式 minmax(0,1fr)：无 lg 双列时若省略列模板，隐式 auto 轨道会按内容
+          max-content 撑宽（缩略图条等不可折内容 → 窄屏横向滚动），显式约束让轨道尊重容器宽度。 */}
+        <ProductColorSelectionProvider key={product.handle} product={product}>
+          <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-14">
+            <ProductGallery product={product} />
+
+            <div className="flex flex-col gap-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h1 className="font-heading text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
+                    {product.title}
+                  </h1>
+                  {/* 真实货号：import.py 以 slugify(code) 生成 handle（29/29 code === handle.toUpperCase()），
+                  故展示层由 handle 回大写即得供应商货号（如 DC-1001 / 26016-M）。原副标题
+                  （"Unisex · 5 colorways"）与描述首句重复且无货号价值，替换为货号行更疏朗。
+                  若未来 handle 不再由货号派生（如 Shopify 商品），此推导需改为显式 code 字段。 */}
+                  <p className="mt-1.5 text-[13px] uppercase tracking-wider text-neutral-500">
+                    {product.handle.toUpperCase()}
+                  </p>
+                </div>
+                {/* 工具类动作角落：收藏心形 + 打印规格图标（用户 2026-09-06：打印入口
+                 由详情区移至此，轻量图标、不挤占详情区）。 */}
+                <div className="flex shrink-0 items-center gap-1">
+                  <WishlistButton handle={product.handle} />
+                  <PrintSpecSheetButton />
+                </div>
+              </div>
+
+              {/* 商店直购形态：demo $ 价不显示（价格仅由 Buy Button 以店币呈现，决策：不并存误导） */}
+              {buyConfig == null ? (
+                <p className="text-2xl font-semibold text-ink">
+                  {formatPrice(product.price.amount, locale)}
+                </p>
+              ) : null}
+
+              <p className="text-[15px] leading-7 text-neutral-600">{product.description}</p>
+
+              <ProductActions product={product} buyUrl={buyUrl} buyConfig={buyConfig}>
+                <div className="flex flex-col gap-3">
+                  {/* 详情手风琴分区标题：base-ui AccordionHeader 固定渲染 h3，
+                  需 h2 祖先承接 h1 → h3 的标题层级（heading-order 修复）。 */}
+                  <h2 className="sr-only">{t['pdp.details.hidden']}</h2>
+                  <Accordion className="border-t border-neutral-200">
+                    <AccordionItem value="materials-fit">
+                      <AccordionTrigger>{t['pdp.accordion.materials']}</AccordionTrigger>
+                      <AccordionContent>
+                        <ul className="mb-4 list-disc space-y-1 pl-4 text-neutral-600">
+                          {product.features.map((feature) => (
+                            <li key={feature}>{feature}</li>
+                          ))}
+                        </ul>
+                        <p className="text-neutral-600">{product.fitNotes}</p>
+                      </AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="shipping">
+                      <AccordionTrigger>{t['pdp.accordion.shipping']}</AccordionTrigger>
+                      <AccordionContent>
+                        {/* 店务政策是**句子级 UI 文案**，按**URL 语言**取（与同页手风琴标题共用这份 `t`）。
+                          它与上方「内容语言」不矛盾：canonical / JSON-LD 指向的是**内容实际可用的
+                          语言**（商品文案只有英文 → `DEFAULT_LOCALE`，阶段 3 才改），而界面句子的
+                          语言是 URL 语言；`/zh-CN` 显示中文政策、SEO 信号指向 `/en`，三者各司其职
+                          （裁决 R49）。事实（阈值／材质／期限）仍单源在 `lib/store-policy.ts`。 */}
+                        <p className="mb-3 text-neutral-600">{t['pdp.policy.production']}</p>
+                        <p className="text-neutral-600">{t['pdp.policy.returns']}</p>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+                  {/* 护理说明海报入口：每 PDP 通用，弹窗查看，不占首屏。 */}
+                  <CareInstructionsButton />
+                </div>
+              </ProductActions>
+            </div>
+          </div>
+        </ProductColorSelectionProvider>
+
+        {related.length > 0 ? (
+          <section aria-labelledby="related-heading" className="mt-16 sm:mt-20">
+            <h2
+              id="related-heading"
+              className="font-heading text-2xl font-semibold tracking-tight text-ink"
+            >
+              {t['pdp.related']}
+            </h2>
+            <div className="mt-5">
+              <ProductGrid products={related} />
+            </div>
+          </section>
+        ) : null}
+      </div>
+
+      {/* 打印规格（决策：PDP 内打印区块）：屏幕上隐藏，@media print 只显示此 sheet。 */}
+      <PrintSpecSheet product={product} locale={locale} />
+    </div>
+  )
+}

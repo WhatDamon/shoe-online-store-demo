@@ -1,5 +1,6 @@
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { parseCartView, parseCommerceProduct, parseOrderView } from '@/domain/commerce-response'
+import { messages } from '@/i18n/messages'
 import { commerceRequest } from './commerce-client'
 
 const line = {
@@ -145,3 +146,89 @@ it.each([{ detail: 'variant_unavailable' }, { code: 'variant_unavailable', messa
     )
   },
 )
+
+// 错误码是 snake_case（跨语言机器契约，不改名），词典键的叶子不允许下划线
+// （`src/i18n/messages.test.ts` 的键名守卫），故两者由 `commerce-client.ts` 的显式映射连接。
+// 这里逐条钉住映射两侧，再用真实请求路径证明每个码真的取到了它自己的文案——映射少一条就会
+// 落到 generic 兜底串，第二条断言即红（不会静默渲染出 `undefined`）。
+const localizedErrors = [
+  ['variant_unavailable', 'errors.variantUnavailable'],
+  ['insufficient_stock', 'errors.insufficientStock'],
+  ['empty_cart', 'errors.emptyCart'],
+  ['order_not_found', 'errors.orderNotFound'],
+  ['backend_unavailable', 'errors.backendUnavailable'],
+] as const
+
+describe('commerce 错误文案本地化', () => {
+  it.each(localizedErrors)('%s 在词典里有文案', (_code, key) => {
+    expect(typeof messages('en')[key]).toBe('string')
+  })
+
+  it.each(localizedErrors)('%s 的响应带着该文案报错', async (code, key) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, json: async () => ({ code }) }))
+    await expect(commerceRequest('cart', parseCartView)).rejects.toThrowError(
+      new Error(messages('en')[key]),
+    )
+  })
+
+  // `invalid_origin`（Route Handler 对跨站 POST 的 403）**本轮刻意不覆盖**：给它加键等于新增
+  // 一句抽取前不存在的用户可见英文，而阶段 1 的验收线建立在「输出与改造前等价」上。这条断言
+  // 把「今天走通用兜底串」这个事实钉住，阶段 2 给它专门文案时它会（也应当）变红——变更可见，
+  // 不是被绕过。移交项见 `.superpowers/sdd/2026-10-13-i18n-phase1-locale-routing/task-8-report.md`。
+  it('invalid_origin 今天仍走通用兜底串（阶段 2 补专门文案）', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, json: async () => ({ code: 'invalid_origin' }) }),
+    )
+    await expect(commerceRequest('cart', parseCartView)).rejects.toThrowError(
+      new Error(messages('en')['errors.unknown']),
+    )
+  })
+})
+
+// 文案按 `locale` 现取（任务 9）。语言由调用组件用 `useLocale()` 传入：本模块不能要求挂
+// Provider（`'use client'` 组件也导入它），但缺省值仍是默认语言，故孤立渲染与阶段 1 逐字相同。
+describe('commerce 错误文案按界面语言取', () => {
+  /** 一次失败请求的错误文案（`code` 走结构化字段，与后端契约同形）。 */
+  const rethrow = async (code: string, options?: { locale: 'en' | 'zh-CN' }) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, json: async () => ({ code }) }))
+    try {
+      await commerceRequest('cart', parseCartView, options)
+    } catch (error) {
+      return (error as Error).message
+    }
+    throw new Error('应当报错')
+  }
+
+  it('同一个错误码在 en 与 zh-CN 下拿到不同文案', async () => {
+    const en = await rethrow('insufficient_stock', { locale: 'en' })
+    const zh = await rethrow('insufficient_stock', { locale: 'zh-CN' })
+    expect(en).toBe(messages('en')['errors.insufficientStock'])
+    expect(zh).toBe(messages('zh-CN')['errors.insufficientStock'])
+    expect(zh).not.toBe(en)
+  })
+
+  it.each(['en', 'zh-CN'] as const)('5 个既有码在 %s 下逐条拿到该语言的文案', async (locale) => {
+    for (const [code, key] of localizedErrors) {
+      const text = await rethrow(code, { locale })
+      expect(text, code).toBe(messages(locale)[key])
+      expect(text.trim(), code).not.toBe('')
+    }
+  })
+
+  it.each(['en', 'zh-CN'] as const)('未知错误码在 %s 下回落到该语言的通用文案', async (locale) => {
+    // 新增语言**不得**改变回落语义：联合里没有的码一律走 `errors.unknown`（不是英文副本）。
+    expect(await rethrow('brand_new_code', { locale })).toBe(messages(locale)['errors.unknown'])
+  })
+
+  it('locale 只用于取文案，不会漏进 fetch 的 init', async () => {
+    const fetcher = vi.fn().mockResolvedValue(ok(cart))
+    vi.stubGlobal('fetch', fetcher)
+    await commerceRequest('cart', parseCartView, { method: 'GET', locale: 'zh-CN' })
+    expect(fetcher).toHaveBeenCalledWith(
+      '/api/commerce/cart',
+      expect.objectContaining({ method: 'GET', cache: 'no-store' }),
+    )
+    expect(fetcher.mock.calls[0][1]).not.toHaveProperty('locale')
+  })
+})

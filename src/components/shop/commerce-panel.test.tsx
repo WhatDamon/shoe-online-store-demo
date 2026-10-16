@@ -70,7 +70,7 @@ it('blocks checkout for an unavailable line and restores checkout after removing
   fireEvent.click(screen.getByRole('button', { name: 'Remove Urban Bloom' }))
   expect(await screen.findByRole('link', { name: 'Review checkout' })).toHaveAttribute(
     'href',
-    '/checkout',
+    '/en/checkout',
   )
   expect(screen.queryByText('Urban Bloom')).not.toBeInTheDocument()
   expect(screen.getByText('Coastal Run')).toBeInTheDocument()
@@ -104,7 +104,7 @@ it('explains an unavailable preview and blocks a fresh order request', async () 
     'This item is no longer available. Remove it from your cart to continue.',
   )
   expect(screen.getByRole('button', { name: 'Create pending order' })).toBeDisabled()
-  expect(screen.getByRole('link', { name: 'Back to cart' })).toHaveAttribute('href', '/cart')
+  expect(screen.getByRole('link', { name: 'Back to cart' })).toHaveAttribute('href', '/en/cart')
   expect(fetcher).toHaveBeenCalledTimes(1)
 })
 

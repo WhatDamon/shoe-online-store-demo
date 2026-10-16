@@ -4,6 +4,8 @@ import Image from 'next/image'
 import { useRef, useState } from 'react'
 import { XIcon } from 'lucide-react'
 import { useModalDismiss } from '@/lib/use-modal'
+import { useLocale, useMessages } from '@/components/i18n/locale-provider'
+import { DEFAULT_LOCALE } from '@/i18n/locales'
 import carePoster from '@/assets/product-care-instructions.webp'
 
 // 护理说明海报：站点通用资产，每个 PDP 详情区提供查看入口。
@@ -15,6 +17,11 @@ const POSTER_WIDTH = 1240
 const POSTER_HEIGHT = 1754
 
 export function CareInstructionsButton() {
+  const t = useMessages()
+  // 卡面（`carePoster` 与 `POLICY_CARE` 原文）是**英文印刷品**：护理文案按语言翻译会与包装内
+  // 的实物矛盾，所以卡面保持英文，只在**非英文界面**加一句说明。
+  // 默认语言即英文，故未挂 `LocaleProvider` 的孤立渲染（含既有测试）不出现这句提示。
+  const showEnglishCardNote = useLocale() !== DEFAULT_LOCALE
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const dialogRef = useRef<HTMLDivElement | null>(null)
@@ -32,15 +39,18 @@ export function CareInstructionsButton() {
         aria-expanded={open}
         className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-600 underline decoration-neutral-300 underline-offset-4 transition-colors hover:text-ink hover:decoration-neutral-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
       >
-        Care instructions
+        {t['pdp.care.title']}
       </button>
+      {showEnglishCardNote ? (
+        <p className="text-xs leading-5 text-neutral-500">{t['pdp.policy.careSheetEnglish']}</p>
+      ) : null}
 
       {open ? (
         <div
           ref={dialogRef}
           role="dialog"
           aria-modal="true"
-          aria-label="Care instructions"
+          aria-label={t['pdp.care.title']}
           className="fixed inset-0 z-50 flex flex-col bg-black/70 p-4 sm:p-6"
           onClick={() => dismiss()}
         >
@@ -49,11 +59,11 @@ export function CareInstructionsButton() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between gap-3 border-b border-neutral-200 px-4 py-3 sm:px-5">
-              <h2 className="text-sm font-semibold text-ink">Care instructions</h2>
+              <h2 className="text-sm font-semibold text-ink">{t['pdp.care.title']}</h2>
               <button
                 type="button"
                 onClick={() => dismiss()}
-                aria-label="Close care instructions"
+                aria-label={t['pdp.care.close']}
                 className="rounded-full p-1.5 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
               >
                 <XIcon aria-hidden="true" className="size-4" />
@@ -62,7 +72,7 @@ export function CareInstructionsButton() {
             <div className="overflow-y-auto bg-white">
               <Image
                 src={POSTER_SRC}
-                alt="How to care for your shoes"
+                alt={t['pdp.care.posterAlt']}
                 width={POSTER_WIDTH}
                 height={POSTER_HEIGHT}
                 className="h-auto w-full"

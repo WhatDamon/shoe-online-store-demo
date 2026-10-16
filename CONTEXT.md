@@ -7,12 +7,18 @@
 
 | 层 | 可以依赖 | 不可以依赖 |
 |---|---|---|
-| `src/domain/` | 只依赖 `src/lib` 中的纯模块（`market`） | 不依赖 `src/server/**`、不依赖 React |
-| `src/server/` | `src/domain`、`src/lib`、`src/db` | 不被 `'use client'` 文件**运行时**导入 |
-| `src/components/` | `src/domain`、`src/lib` | 同上 |
+| `src/domain/` | 只依赖 `src/lib` 中的纯模块（`market`）与 `src/i18n/locales.ts` 的 **`Locale` 类型** | 不依赖 `src/server/**`、不依赖 React |
+| `src/i18n/` | 只依赖自身（`locales` / `dictionaries`） | **纯层**：无 React、无 `src/server/**`、无 `src/db`、无 IO、无 `process.env`；**不携带价格/库存/订单等交易事实**（ADR 0004） |
+| `src/server/` | `src/domain`、`src/lib`、`src/i18n`、`src/db` | 不被 `'use client'` 文件**运行时**导入 |
+| `src/components/` | `src/domain`、`src/lib`、`src/i18n` | 同上 |
+| `src/components/i18n/` | `src/i18n` | 同上；**React 适配器只能住在这里**，不得上移到 `src/i18n/`（否则破坏该层的 React-free 不变量） |
 
 `scripts/check-server-boundary.mjs` 在 `verify` 中强制最后一条：`'use client'` 文件可以有
 `import type`（类型擦除，不产生运行时依赖），但不能有运行时 `@/server/**` 导入。
+
+`src/i18n/` 之所以是纯层：它同时被 `src/server/**`（服务端取文案）与 `'use client'` 组件导入，
+任何一侧的依赖都会把它拖进另一侧。字典只装**展示文案**，取用的形状（服务端 `messages(locale)`、
+客户端 `useMessages()`）在 `src/components/i18n/`。
 
 ---
 
@@ -136,6 +142,56 @@ PDP 挂载时注册、卸载时（若仍指向自己）清空；FAB 据此在 `s
 - 只带 `handle` + `title`：服务端按 `handle` 回取全量事实，**客户端不传商品详情**（防篡改 + 防膨胀）。
 - 引用必须**按值**比较去重：每次渲染传入的是新对象字面量，`createStore` 的 `Object.is` 守卫
   拦不住，故去重逻辑写在 `registerPageProduct` 内部。
+
+---
+
+## Locale / Messages
+
+**定义：** `Locale` 是受支持的界面语言标识（`src/i18n/locales.ts`）；`Messages` 是该语言的**扁平点号键**
+文案表（`src/i18n/messages.ts`，键名形如 `nav.shop`）。
+
+#### 不变量
+
+- **`LOCALES` / `DEFAULT_LOCALE` 是语言集合的单一来源**，本文件**不得**预先展开这个集合
+  （不要写死 `Locale = 'en' | 'zh-CN'`）。阶段 1 只声明 `en`，`zh-CN` 在阶段 2 加入。
+  这样做的收益是类型系统强制配对：声明一个没有词典的语言是 **TS2741 编译错误**。
+- **语言与市场解耦**（ADR 0008）：`SITE_MARKET` / 币种 / 尺码体系决定**尺寸怎么显示**，
+  `Locale` 只决定**文案**。中文界面里显示 `US 8.5` 与 `$128.00` 是**刻意**的结果，不是缺陷。
+- **三者各司其职**（ADR 0009 决策 4）：**语言决定文案、市场决定价格与尺码体系、内容可用性
+  决定 SEO 信号**。**句子级 UI 文案用 URL 语言**（中文页的政策句就是中文）；
+  **canonical / hreflang / sitemap / JSON-LD 用内容语言**（把英文内容宣称成中文是发假信号）。
+  同页并存不矛盾：`/zh-CN/product/<h>` 的界面是中文，而 canonical 指向内容语言那一侧
+  （阶段 2 商品回退 ⇒ `/en`）。复用任何一侧的规则到另一侧都是缺陷。
+- 字典只装**展示文案**：不装价格、库存、订单状态或任何交易事实（ADR 0004）。
+- **面向用户的「输入解析规则」不是词典条目**：`parseSizeHint` 的语言分支、`OFF_TOPIC` 关键词表、
+  `estTokens` 的字符/token 比，都留在 domain/server 层作为**行为规则**，以 `Locale` 参数参与判断。
+  把规则塞进词典会把「翻译」与「行为」混为一谈。
+- 缺键必须**编译期**报错（`Messages` 是 `Record<keyof typeof en, string>`），不得在运行期渲染 `undefined`。
+
+---
+
+## 内容回退状态
+
+**定义：** 内容（目前是博客）按语言的可用性状态：`{ post, status: 'translated' | 'fallback', sourceLocale }`。
+
+#### 不变量
+
+- **回退优先于缺失**：目标语言没有该内容时，渲染**默认语言**的正文并给出显式提示，
+  **不是**留白、也不是 `noindex`（用户要求：宁可给英文原文也不要空页）。
+- **回退页不进 sitemap、不发 hreflang**，且 canonical 指向**默认语言**的同一 slug 地址；
+  已译页才自指 canonical 并成对发 hreflang。
+- hreflang 资格要求 status 为 `translated` **且** `source_hash` 与默认语言正文一致——
+  译文过期就不该声称是同一份内容。（`source_hash` 是规格 §8.2/§8.3 的**要求**与提示级判据，
+  判定单源见下条；改动前先复核 `src/lib/blog.ts` 是否已实现它。）
+- **可用必须与可渲染同义**：文件缺失、YAML 语法错、必填字段缺失都等同于**不可用并回退**；
+  判定只得写在一处——`src/i18n/content.ts`（纯词汇：`ContentStatus` / `LocalizedPost<T>`）+
+  `src/lib/blog.ts` 的 `availableLocalesFor` / `getLocalizedPost` / `listLocalizedPosts`（IO）。
+  页面与 `sitemap.ts` 只消费结果，不自己判断（否则 metadata 与 sitemap 会得到不同结论）。
+- **商品在阶段 2 按回退处理（ADR 0009 决策 3）**：商品文案（标题/描述/特性/`fitNotes`）的翻译
+  排在阶段 3，故 `/zh-CN/product/<handle>` 是回退页——canonical → `/en/...`、不发 zh-CN
+  hreflang、不进 zh-CN sitemap（`src/app/sitemap.ts` 商品段固定 `['en']`）。界面文案已中文化，
+  与内容语言是两件事（见上一节 `Locale / Messages`）。翻转判据是「商品文案确实有译文且可渲染」
+  （届时商品段改为与文章段同一写法），**不是日期到了**。
 
 ---
 

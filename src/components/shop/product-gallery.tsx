@@ -3,19 +3,27 @@
 import Image from 'next/image'
 import { useState } from 'react'
 import type { ProductView } from '@/domain/product'
+import { useLocale, useMessages } from '@/components/i18n/locale-provider'
+import type { Messages } from '@/i18n/messages'
 import { ProductVisual, type ProductVisualView } from './product-visual'
 import { useOptionalProductColorSelection } from './product-color-selection'
 
-const VIEW_LABELS: { view: ProductVisualView; label: string }[] = [
-  { view: 'side', label: 'Side' },
-  { view: 'sole', label: 'Sole' },
-  { view: 'detail', label: 'Detail' },
-]
+// 缩略图的**可及名整句**进词典（`Show side view`），不把 `Side` 小写化后再拼：对已译文本做
+// `toLowerCase()` 在部分语言里会变形（与 `promise-strip.tsx` 的键表同款写法）。
+const VIEW_LABELS = [
+  { view: 'side', labelKey: 'pdp.gallery.viewSide' },
+  { view: 'sole', labelKey: 'pdp.gallery.viewSole' },
+  { view: 'detail', labelKey: 'pdp.gallery.viewDetail' },
+] as const satisfies readonly { view: ProductVisualView; labelKey: keyof Messages }[]
 
 // PDP 画廊：有真实照片（public/products/…）时用照片相册（首图为主图，缩略切换）；
 // 无图产品回落到本地程序化 SVG 三视图（side/sole/detail）。
 // 缩略图按钮 aria-hidden 内联图，可访问名由按钮自身的 label 承担，避免重复播报。
 export function ProductGallery({ product }: { product: ProductView }) {
+  const t = useMessages()
+  // 无图产品回落到 SVG 视觉：可及名（`— printed shoe`）由本组件的 `locale` 决定，
+  // 必须显式传下去，否则中文页会静默留英文（`ProductVisual` 的缺省值是默认语言）。
+  const locale = useLocale()
   const photos = product.images ?? []
   const hasPhotos = photos.length > 0
   const [photoIdx, setPhotoIdx] = useState(0)
@@ -40,8 +48,8 @@ export function ProductGallery({ product }: { product: ProductView }) {
             src={activePhoto}
             alt={
               activeColor
-                ? `${product.title} in ${activeColor.name}`
-                : `${product.title} photo ${activePhotoIdx + 1}`
+                ? `${product.title} ${t['pdp.gallery.in']} ${activeColor.name}`
+                : `${product.title} ${t['pdp.gallery.photo']} ${activePhotoIdx + 1}`
             }
             fill
             loading="eager"
@@ -55,13 +63,18 @@ export function ProductGallery({ product }: { product: ProductView }) {
             construction={product.construction}
             view={active}
             idSalt="gallery-main"
+            locale={locale}
             className="mx-auto h-full w-full max-w-xl"
           />
         )}
       </div>
       {/* flex-wrap：照片多于 4 张时缩略图条的可折行宽度大于窄屏容器，
           换行而不是把页面撑出横向滚动（auto 轨道 min-content 防护）。 */}
-      <div className="flex flex-wrap gap-2" role="group" aria-label={`${product.title} views`}>
+      <div
+        className="flex flex-wrap gap-2"
+        role="group"
+        aria-label={`${product.title} ${t['pdp.gallery.views']}`}
+      >
         {hasPhotos
           ? photos.map((src, i) => {
               const current = activePhotoIdx === i
@@ -72,7 +85,11 @@ export function ProductGallery({ product }: { product: ProductView }) {
                   type="button"
                   onClick={() => selectPhoto(i)}
                   aria-pressed={current}
-                  aria-label={color ? `Show ${color.name}` : `Show photo ${i + 1}`}
+                  aria-label={
+                    color
+                      ? `${t['pdp.gallery.show']} ${color.name}`
+                      : `${t['pdp.gallery.show']} ${t['pdp.gallery.photo']} ${i + 1}`
+                  }
                   className={`rounded-xl border p-1 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400 ${
                     current
                       ? 'border-neutral-400 ring-1 ring-neutral-300'
@@ -88,7 +105,7 @@ export function ProductGallery({ product }: { product: ProductView }) {
                 </button>
               )
             })
-          : VIEW_LABELS.map(({ view, label }) => {
+          : VIEW_LABELS.map(({ view, labelKey }) => {
               const current = active === view
               return (
                 <button
@@ -96,7 +113,7 @@ export function ProductGallery({ product }: { product: ProductView }) {
                   type="button"
                   onClick={() => setActive(view)}
                   aria-pressed={current}
-                  aria-label={`Show ${label.toLowerCase()} view`}
+                  aria-label={t[labelKey]}
                   className={`rounded-xl border p-1 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400 ${
                     current
                       ? 'border-neutral-400 ring-1 ring-neutral-300'
@@ -113,6 +130,7 @@ export function ProductGallery({ product }: { product: ProductView }) {
                       construction={product.construction}
                       view={view}
                       idSalt={`gallery-thumb-${view}`}
+                      locale={locale}
                       className="h-full w-full"
                     />
                   </span>

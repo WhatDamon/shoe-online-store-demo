@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import type { CanonicalSize } from '@/domain/product'
+import { useMessages } from '@/components/i18n/locale-provider'
 import type { ChatMessage } from './use-chat-stream'
 import { MarkdownLite } from './markdown-lite'
 import { ProductResultCard } from './product-result-card'
@@ -26,13 +27,18 @@ function SizeFitBlock({
   rationale: string
   sizeLabelFor: (eu: CanonicalSize) => string
 }) {
+  const t = useMessages()
   const label = sizeLabelFor(recommended)
   const nearby = alternatives.slice(0, 3).map(sizeLabelFor)
   return (
     <div role="status" className="rounded-xl border border-brand/25 bg-brand/5 px-3.5 py-2.5">
-      <p className="text-[15px] font-semibold text-brand">Try {label}</p>
+      <p className="text-[15px] font-semibold text-brand">
+        {t['assistant.sizeFit.try']} {label}
+      </p>
       {nearby.length > 0 ? (
-        <p className="mt-0.5 text-xs text-neutral-500">Nearby sizes: {nearby.join(' · ')}</p>
+        <p className="mt-0.5 text-xs text-neutral-500">
+          {t['assistant.sizeFit.nearby']} {nearby.join(' · ')}
+        </p>
       ) : null}
       {rationale ? (
         <p className="mt-1.5 text-[13px] leading-5 text-neutral-700">{rationale}</p>
@@ -44,6 +50,7 @@ function SizeFitBlock({
 // 会话消息列：用户右侧、助手左侧；流式文本 + 可选结果卡/尺码块；
 // 自动贴底滚动，用户上翻时停止跟随。
 export function MessageList({ messages, isStreaming, sizeLabelFor, onRetry }: MessageListProps) {
+  const t = useMessages()
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const stickRef = useRef(true)
   const last = messages[messages.length - 1]
@@ -58,7 +65,7 @@ export function MessageList({ messages, isStreaming, sizeLabelFor, onRetry }: Me
       ref={scrollRef}
       role="log"
       aria-live="polite"
-      aria-label="Conversation"
+      aria-label={t['assistant.conversation']}
       onScroll={(e) => {
         const el = e.currentTarget
         stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
@@ -117,7 +124,7 @@ export function MessageList({ messages, isStreaming, sizeLabelFor, onRetry }: Me
             onClick={onRetry}
             className="rounded-lg border border-neutral-300 px-3 py-1.5 text-[13px] font-medium text-neutral-800 transition-colors hover:border-neutral-400 hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
           >
-            Try again
+            {t['assistant.retry']}
           </button>
         </div>
       ) : null}

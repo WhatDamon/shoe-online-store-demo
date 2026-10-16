@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useId, useRef, useState } from 'react'
+import { useMessages } from '@/components/i18n/locale-provider'
 import buyOptions from './shopify-buy-options.json'
 import type { ShopifyBuyConfig } from '@/server/catalog/shopify-buy'
 import './shopify-buy-host.css'
@@ -85,6 +86,7 @@ declare global {
 const SDK_URL = 'https://sdks.shopifycdn.com/buy-button/latest/buy-button-storefront.min.js'
 
 export function ShopifyBuyButton({ config }: { config: ShopifyBuyConfig }) {
+  const t = useMessages()
   const mountId = useId()
   const mountRef = useRef<HTMLDivElement>(null)
   const [started, setStarted] = useState(false)
@@ -145,7 +147,7 @@ export function ShopifyBuyButton({ config }: { config: ShopifyBuyConfig }) {
           disabled
           className="w-full rounded-full bg-ink py-2.5 text-base text-canvas opacity-60"
         >
-          Buy now
+          {t['pdp.shopify.buyNow']}
         </button>
       ) : null}
     </div>

@@ -7,18 +7,23 @@ import type { ShopFilter } from '@/lib/shop-search-params'
 import type { CanonicalSize } from '@/domain/product'
 import { footMmToEU } from '@/domain/size'
 import { mySize } from '@/lib/my-size'
+import { useLocale, useMessages } from '@/components/i18n/locale-provider'
+import { localePath } from '@/i18n/locales'
+import type { Messages } from '@/i18n/messages'
 
 export interface FilterOption {
   value: string
   label: string
 }
 
-const SORT_OPTIONS: { value: ShopFilter['sort']; label: string }[] = [
-  { value: 'featured', label: 'Featured' },
-  { value: 'price-asc', label: 'Price: Low to High' },
-  { value: 'price-desc', label: 'Price: High to Low' },
-  { value: 'newest', label: 'Newest' },
-]
+// 排序选项存**键**而非文案（与 `src/lib/site.ts` 的 nav 同款）：`value` 是 URL 参数契约，
+// 文案在词典里，渲染处解引用。
+const SORT_OPTIONS = [
+  { value: 'featured', labelKey: 'shop.filter.sortFeatured' },
+  { value: 'price-asc', labelKey: 'shop.filter.sortPriceAsc' },
+  { value: 'price-desc', labelKey: 'shop.filter.sortPriceDesc' },
+  { value: 'newest', labelKey: 'shop.filter.sortNewest' },
+] as const satisfies readonly { value: ShopFilter['sort']; labelKey: keyof Messages }[]
 
 // 价格分档 → min/max 区间；边界 100/150 与 seed 价格带无重合，整数即可无歧义表达。
 function applyPriceRange(value: string): Partial<ShopFilter> {
@@ -60,6 +65,10 @@ export function ProductFilterBar({
   sizeOptions: { label: string; canonical: CanonicalSize }[]
 }) {
   const router = useRouter()
+  const t = useMessages()
+  // 筛选改的是「当前语言下的 /shop」：裸 `/shop` 会先被 proxy 308 到 /en/shop，
+  // 每次改筛选多一次往返。
+  const locale = useLocale()
   const selectedSizes = new Set(initial.sizeLabels ?? [])
   const showClear = hasActiveFilters(initial)
   // 「我的尺码」命中：保存后所在码 chip 显示圆点 + aria（有码款即使未筛选也可辨识）。
@@ -88,7 +97,7 @@ export function ProductFilterBar({
   const update = (patch: Partial<ShopFilter>) => {
     const qs = serializeShopParams({ ...effectiveBase(), ...patch })
     baseRef.current = qs
-    router.replace(qs ? `/shop?${qs}` : '/shop')
+    router.replace(localePath(locale, qs ? `/shop?${qs}` : '/shop'))
   }
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
@@ -116,37 +125,37 @@ export function ProductFilterBar({
     })
 
   return (
-    <section aria-label="Shop filters" className="border-y border-neutral-200 py-4">
+    <section aria-label={t['shop.filter.label']} className="border-y border-neutral-200 py-4">
       <div className="flex flex-wrap items-center gap-2">
         <form
           role="search"
-          aria-label="Search within results"
+          aria-label={t['shop.filter.searchLabel']}
           onSubmit={handleSearch}
           className="flex min-w-0 flex-1 basis-64 items-center gap-2"
         >
           <input
             name="q"
             type="search"
-            aria-label="Search"
+            aria-label={t['shop.filter.search']}
             key={initial.q ?? ''}
             defaultValue={initial.q ?? ''}
-            placeholder="Search styles"
+            placeholder={t['shop.filter.searchPlaceholder']}
             className="h-9 w-full min-w-0 flex-1 rounded-lg border border-neutral-200 bg-surface px-3 text-sm text-neutral-900 placeholder:text-neutral-500 focus:border-neutral-400 focus:outline-none"
           />
           <button
             type="submit"
             className="h-9 shrink-0 rounded-lg border border-neutral-200 bg-surface px-3 text-sm text-neutral-700 transition-colors hover:bg-neutral-50"
           >
-            Search
+            {t['shop.filter.search']}
           </button>
         </form>
         <select
-          aria-label="Collection"
+          aria-label={t['shop.filter.collection']}
           value={initial.collection ?? ''}
           onChange={(e) => update({ collection: e.target.value || undefined })}
           className={selectClass}
         >
-          <option value="">All styles</option>
+          <option value="">{t['shop.allStyles']}</option>
           {collectionOptions.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
@@ -154,32 +163,32 @@ export function ProductFilterBar({
           ))}
         </select>
         <select
-          aria-label="Price"
+          aria-label={t['shop.filter.price']}
           value={currentPriceBand(initial)}
           onChange={(e) => update(applyPriceRange(e.target.value))}
           className={selectClass}
         >
-          <option value="">Any price</option>
-          <option value="u100">Under $100</option>
-          <option value="100-150">$100 – $150</option>
-          <option value="o150">Over $150</option>
+          <option value="">{t['shop.filter.anyPrice']}</option>
+          <option value="u100">{t['shop.filter.priceUnder100']}</option>
+          <option value="100-150">{t['shop.filter.price100To150']}</option>
+          <option value="o150">{t['shop.filter.priceOver150']}</option>
         </select>
         <select
-          aria-label="Sort"
+          aria-label={t['shop.filter.sort']}
           value={initial.sort ?? 'featured'}
           onChange={(e) => update({ sort: e.target.value as ShopFilter['sort'] })}
           className={selectClass}
         >
           {SORT_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>
-              {o.label}
+              {t[o.labelKey]}
             </option>
           ))}
         </select>
       </div>
 
       <fieldset className="mt-3">
-        <legend className="sr-only">Filter by size</legend>
+        <legend className="sr-only">{t['shop.filter.sizeLegend']}</legend>
         <div className="flex flex-wrap gap-1.5">
           {sizeOptions.map(({ label, canonical }) => {
             const checked = selectedSizes.has(label)
@@ -191,7 +200,7 @@ export function ProductFilterBar({
                   name="size"
                   value={label}
                   checked={checked}
-                  aria-label={isMySize ? `${label} (your size)` : label}
+                  aria-label={isMySize ? `${label} ${t['shop.filter.yourSize']}` : label}
                   onChange={(e) => toggleSize(label, e.target.checked)}
                   className="peer sr-only"
                 />
@@ -219,7 +228,7 @@ export function ProductFilterBar({
           onClick={clearAll}
           className="mt-3 text-xs font-medium text-neutral-500 underline-offset-2 hover:text-neutral-900 hover:underline"
         >
-          Clear all
+          {t['shop.filter.clearAll']}
         </button>
       ) : null}
     </section>

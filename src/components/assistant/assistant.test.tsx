@@ -191,7 +191,7 @@ describe('assistant FAB + panel', () => {
     await user.click(screen.getByRole('button', { name: 'Everyday sneakers' }))
 
     const link = await screen.findByRole('link', { name: /Daily Drift/i })
-    expect(link).toHaveAttribute('href', '/product/daily-drift')
+    expect(link).toHaveAttribute('href', '/en/product/daily-drift')
     // 真实元数据（货号 + 码段·色卡），绝不出现价格（AI 不带价）
     expect(within(link).getByText('DC-1001')).toBeInTheDocument()
     expect(within(link).getByText(/US 4.5–9.5 · 5 colors/)).toBeInTheDocument()

@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDb } from '@/db/client'
 import { createRepository } from '@/server/search/repository'
 import { aiBudgetReservations } from '@/db/schema'
@@ -8,6 +8,11 @@ import { maxTurns } from './session-state'
 import { GUARDRAIL_MESSAGE, GuardrailError, RATE_PER_MIN, createGuardrails } from './index'
 
 const fresh = () => createGuardrails(createRepository(createDb(':memory:')))
+
+// 本文件不断言日预算的值，但它必须先允许 10 token 级别的预留（恢复扫描用例）；
+// 日预算取自运行时 env，故 pin 默认值，避免外层 shell 的同名变量改变用例前提。
+beforeEach(() => vi.stubEnv('AI_DAILY_TOKEN_CAP', '1000000'))
+afterEach(() => vi.unstubAllEnvs())
 
 describe('createGuardrails', () => {
   it('shares one recovery scan, throttles it, and discovers stale work after a restart', async () => {

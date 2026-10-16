@@ -13,6 +13,8 @@ import { chat } from './chat'
 beforeEach(() => {
   vi.stubEnv('AI_API_KEY', 'public-test-key-never-a-real-credential')
   vi.stubEnv('AI_REQUEST_TIMEOUT_MS', '2000')
+  // 走真实编排的用例需要预算预留成功；日预算取自运行时 env，本文件不断言它的值，故 pin 默认值。
+  vi.stubEnv('AI_DAILY_TOKEN_CAP', '1000000')
 })
 afterEach(() => vi.unstubAllEnvs())
 
@@ -98,6 +100,7 @@ describe('real SDK against an isolated loopback gateway', () => {
           sessionKey: 'measured-usage',
           ip: '127.0.0.1',
           mode: 'support',
+          locale: 'en', // R47：必填字段
           text: 'store policy',
           product: null,
         },
@@ -194,6 +197,7 @@ describe('real SDK against an isolated loopback gateway', () => {
       sessionKey: 'sdk-timeout',
       ip: '127.0.0.1',
       mode: 'support' as const,
+      locale: 'en' as const, // R47：必填字段；本文件断言的是英文文案
       text: 'store policy',
       product: null,
     }

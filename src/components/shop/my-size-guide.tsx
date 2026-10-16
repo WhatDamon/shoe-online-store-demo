@@ -5,6 +5,7 @@ import type { SizeSystem } from '@/domain/product'
 import { market } from '@/lib/market'
 import { footMmToSystem, MY_SIZE_MAX_MM, MY_SIZE_MIN_MM } from '@/domain/size'
 import { mySize, MY_SIZE_UI_MAX_MM, MY_SIZE_UI_MIN_MM, setMySize } from '@/lib/my-size'
+import { useMessages } from '@/components/i18n/locale-provider'
 
 const SYSTEMS: SizeSystem[] = ['US', 'EU', 'UK', 'JP', 'CN']
 
@@ -17,6 +18,7 @@ const fmt = (v: number | null): string => (v == null ? '—' : String(v))
  * 消费同一快照。零 JS 也可展开（<details>）。
  */
 export function MySizeGuide() {
+  const t = useMessages()
   const savedMm = useSyncExternalStore(
     mySize.subscribe,
     mySize.getSnapshot,
@@ -36,15 +38,15 @@ export function MySizeGuide() {
         <span>
           {savedMm != null ? (
             <>
-              My size: {fmt(footMmToSystem(savedMm, marketSys))} {marketSys}
+              {t['pdp.mySize.saved']} {fmt(footMmToSystem(savedMm, marketSys))} {marketSys}
             </>
           ) : (
-            'My size'
+            t['pdp.mySize.trigger']
           )}
         </span>
         {/* 12px 真实文字：必须达 4.5:1，用仓库自订的正文下限 neutral-500（浅 4.74 / 深 4.66）。 */}
         <span className="text-xs font-normal text-neutral-500 group-open:hidden">
-          {savedMm != null ? 'Change or remove' : 'Get size-matched guidance'}
+          {savedMm != null ? t['pdp.mySize.change'] : t['pdp.mySize.guidance']}
         </span>
         <span
           aria-hidden="true"
@@ -60,7 +62,7 @@ export function MySizeGuide() {
           <svg
             viewBox="0 0 64 28"
             role="img"
-            aria-label="How to measure: stand, place your heel at the wall, and measure to your longest toe"
+            aria-label={t['pdp.mySize.measureAlt']}
             className="h-10 w-auto shrink-0 text-neutral-400"
             fill="none"
             stroke="currentColor"
@@ -70,16 +72,14 @@ export function MySizeGuide() {
             <path d="M6 22 L12 26 M6 22 L2 16" strokeLinecap="round" />
             <path d="M38 8 L38 26 M34 24 L44 24" strokeDasharray="2 2" />
           </svg>
-          <p className="text-xs leading-5 text-neutral-600">
-            Measure from your heel to your longest toe, standing. Pick the longer foot.
-          </p>
+          <p className="text-xs leading-5 text-neutral-600">{t['pdp.mySize.measureCopy']}</p>
         </div>
 
         <label className="flex flex-col gap-1.5">
           <span className="flex items-center justify-between text-xs text-neutral-600">
-            <span>Foot length</span>
+            <span>{t['pdp.mySize.footLength']}</span>
             <span className="font-medium tabular-nums text-ink">
-              {mm}mm{inTable ? '' : ' — outside adult sizes'}
+              {mm}mm{inTable ? '' : ` ${t['pdp.mySize.outsideAdult']}`}
             </span>
           </span>
           <span className="flex items-center gap-2">
@@ -89,7 +89,7 @@ export function MySizeGuide() {
               max={MY_SIZE_UI_MAX_MM}
               step={1}
               value={mm}
-              aria-label="Foot length in millimetres"
+              aria-label={t['pdp.mySize.footLengthAria']}
               onChange={(e) => setDraft(Number(e.target.value))}
               className="h-8 w-full accent-brand"
             />
@@ -99,14 +99,14 @@ export function MySizeGuide() {
               min={MY_SIZE_UI_MIN_MM}
               max={MY_SIZE_UI_MAX_MM}
               value={mm}
-              aria-label="Foot length in millimetres (number)"
+              aria-label={t['pdp.mySize.footLengthNumberAria']}
               onChange={(e) => setDraft(Number(e.target.value))}
               className="h-8 w-20 rounded-lg border border-neutral-200 bg-canvas px-2 text-sm text-ink focus:border-neutral-400 focus:outline-none"
             />
           </span>
         </label>
 
-        {/* 五体系换算行（表外显示 —，诚实不伪造） */}
+        {/* 五体系换算行（表外显示 —，诚实不伪造）。体系名 US/EU/UK/JP/CN 是领域事实，不翻译。 */}
         <dl className="grid grid-cols-5 gap-1.5 text-center">
           {SYSTEMS.map((s) => (
             <div key={s} className="rounded-lg border border-neutral-200 bg-canvas px-1 py-1.5">
@@ -119,8 +119,9 @@ export function MySizeGuide() {
         </dl>
         {!inTable ? (
           <p className="text-xs leading-5 text-neutral-500">
-            That foot length is outside our current size range (US 4.5–12.5). Pick a size in the
-            range to get matched guidance.
+            {/* 区间 `US 4.5–12.5` 是领域事实（尺码体系不得因语言漂移，ADR 0008 决策 6），
+                故留在组件里；它两侧的括号归句子片段（与 `shop.gift.*Lead/Tail` 同一口径）。 */}
+            {t['pdp.mySize.outOfRangeLead']}US 4.5–12.5{t['pdp.mySize.outOfRangeTail']}
           </p>
         ) : null}
 
@@ -130,7 +131,7 @@ export function MySizeGuide() {
             onClick={() => setMySize(mm)}
             className="inline-flex items-center justify-center rounded-lg bg-ink px-3 py-1.5 text-sm font-medium text-canvas transition-opacity hover:opacity-85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
           >
-            {savedMm != null ? 'Update my size' : 'Save my size'}
+            {savedMm != null ? t['pdp.mySize.update'] : t['pdp.mySize.save']}
           </button>
           {savedMm != null ? (
             <button
@@ -138,7 +139,7 @@ export function MySizeGuide() {
               onClick={() => setMySize(null)}
               className="text-sm text-neutral-500 underline-offset-2 hover:text-neutral-900 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
             >
-              Remove
+              {t['pdp.mySize.remove']}
             </button>
           ) : null}
         </div>

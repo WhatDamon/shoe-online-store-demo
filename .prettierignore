@@ -27,3 +27,4 @@ backend/.ruff_cache/
 backend/data/
 .uv-cache/
 *.log
+/.superpowers/
