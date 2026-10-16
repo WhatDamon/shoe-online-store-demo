@@ -13,7 +13,9 @@ record its settlement leaves ``refund_pending`` behind rather than ``succeeded``
 the one money state the compensation command cannot see, and a request whose whole
 transaction is discarded is recovered by the retry that reaches Stripe under the same key.
 That command takes the same cart write lock every other writer takes before re-reading a
-candidate, so two passes over one debt serialize instead of both paying it out.
+candidate, so two passes over one debt serialize instead of both paying it out, and it
+serves candidates by recorded attempt count rather than by id, so a debt that can never
+settle cannot occupy the batch forever.
 
 Every outbound call goes to the fake gateways defined in ``conftest.py``: no test in this
 file performs network access.
@@ -23,6 +25,7 @@ import contextlib
 import io
 import runpy
 from concurrent.futures import ThreadPoolExecutor
+from decimal import Decimal
 from threading import Event
 from uuid import uuid4
 
@@ -44,6 +47,11 @@ SEEDED_AVAILABLE = 10
 NOT_REFUNDABLE = "This payment cannot be refunded"
 REFUND_FAILED = "The refund could not be completed"
 REFUNDS_UNAVAILABLE = "Refunds are not available right now. Please try again later."
+
+# A payment id no generated uuid4 can beat, so a test can pin which candidate a batch of
+# ``limit`` one serves first. The payment state behind it is the one a confirmation writes
+# for money captured without a payment intent.
+STUCK_PAYMENT_ID = "00000000-0000-4000-8000-000000000000"
 
 
 class BlockingRefundGateway(FakeStripeGateway):
@@ -444,6 +452,54 @@ def test_a_request_that_is_thrown_away_is_recovered_by_the_same_key(
     ]
 
 
+def test_money_confirmed_without_an_intent_recovers_when_a_later_event_brings_it(
+    commerce, refund_pending_order, stripe_checkout
+):
+    """The projection may legally carry no payment intent, and there has to be a way back.
+
+    A confirmation without an intent cannot hand the money to the gateway, so the attempt
+    fails. Leaving it there would make ``missing_payment_intent`` a permanent state: every
+    later delivery carried the identifier and every one of them was discarded by the
+    idempotent early return. The confirmation now fills an identifier it is missing, which
+    is the only write a replayed delivery may still make -- the money axis never moves.
+    """
+    _, engine = commerce
+    set_money(engine, refund_pending_order["id"], payment_intent=None)
+
+    with pytest.raises(RuntimeError, match="Refund pass failed"):
+        run_compensation_pass(engine, stripe_checkout)
+
+    assert attempts_of(engine, refund_pending_order["id"]) == 1
+    assert stripe_checkout.refunds == []
+
+    with Session(engine) as db, db.begin():
+        outcome = payments.confirm_payment(
+            db,
+            order_id=refund_pending_order["id"],
+            provider_reference=stripe_checkout.session_id,
+            payment_intent="pi_test_late_recovered",
+        )
+
+    money = money_state(engine, refund_pending_order["id"])
+    assert outcome.status == "refund_pending"
+    assert (money["status"], money["payment_intent"]) == (
+        "refund_pending",
+        "pi_test_late_recovered",
+    )
+    assert event_names(engine, refund_pending_order["id"]).count("payment_intent_recorded") == 1
+
+    # With the identifier recorded, the pass can finally give the money back.
+    assert run_compensation_pass(engine, stripe_checkout) == 1
+
+    assert money_state(engine, refund_pending_order["id"])["status"] == "refunded"
+    assert stripe_checkout.refunds == [
+        {
+            "payment_intent": "pi_test_late_recovered",
+            "idempotency_key": f"refund:{refund_pending_order['id']}",
+        }
+    ]
+
+
 def test_refund_is_idempotent_on_repeat_delivery(commerce, paid_order, stripe_checkout):
     client, engine = commerce
     first = refund(client, paid_order["id"])
@@ -779,6 +835,47 @@ def test_refund_command_is_the_compensation_entry_point(
             "idempotency_key": f"refund:{refund_pending_order['id']}",
         }
     ]
+
+
+def test_a_refund_that_can_never_settle_cannot_starve_the_ones_behind_it(
+    commerce, variant, refund_pending_order, stripe_checkout
+):
+    """A batch of ``limit`` one must still serve the candidates a stuck debt is holding up.
+
+    Candidates used to be taken in ``payments.id`` order, so money that can never be
+    refunded -- here: captured without a payment intent, which the gateway cannot act on --
+    sat at the front of every batch and filled its only slot forever, and the refundable
+    debt behind it was never attempted. The queue is now ordered by the recorded attempt
+    count, so a row that keeps failing sinks behind every row that has been tried fewer
+    times. The debt stays visible and is still retried whenever nothing fresher is waiting.
+    """
+    client, engine = commerce
+    stuck = place_order(client, variant, key="stuck-money")
+    assert client.post(f"/api/v1/orders/{stuck['id']}/cancel").json()["status"] == "cancelled"
+    with Session(engine) as db, db.begin():
+        # Money captured with no identifier to refund: the row a confirmation writes for a
+        # late payment whose event carried no intent, pinned to the front of the queue.
+        db.add(
+            Payment(
+                id=STUCK_PAYMENT_ID,
+                order_id=stuck["id"],
+                provider="stripe",
+                status="refund_pending",
+                provider_reference="cs_test_stuck",
+                amount=Decimal("129.00"),
+                currency="USD",
+            )
+        )
+
+    for _ in range(3):
+        with contextlib.suppress(RuntimeError):
+            refund_pending_payments(sessions_of(engine), limit=1, gateway=stripe_checkout)
+
+    # The refundable debt was served within a bounded number of passes, and the one that
+    # cannot settle is still owed and still recorded rather than silently dropped.
+    assert money_state(engine, refund_pending_order["id"])["status"] == "refunded"
+    assert money_state(engine, stuck["id"])["status"] == "refund_pending"
+    assert attempts_of(engine, stuck["id"]) >= 1
 
 
 def test_refund_command_reports_nothing_to_do_for_a_disabled_store(

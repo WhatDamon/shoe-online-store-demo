@@ -207,6 +207,38 @@ def test_confirmation_is_idempotent_on_repeat_delivery(
     ]
 
 
+def test_a_confirmed_payment_learns_its_identifier_from_a_later_delivery(
+    commerce, paid_order, stripe_checkout
+):
+    """The identifier of an already-confirmed payment may still be missing, and can be filled.
+
+    The projection is allowed to carry no payment intent, and a confirmation that captured
+    money without one could never hand it to the gateway: every later delivery carried the
+    identifier and every one was dropped by the idempotent early return, so the debt had no
+    way out. Filling a missing identifier is the only write a replay may still make, and the
+    money axis never moves -- a ``succeeded`` payment stays ``succeeded``.
+    """
+    _, engine = commerce
+    set_money(engine, paid_order["id"], payment_intent=None)
+
+    outcome = confirm(
+        engine,
+        paid_order["id"],
+        provider_reference=stripe_checkout.session_id,
+        payment_intent="pi_test_backfilled",
+    )
+
+    assert outcome.status == "already_paid"
+    money = money_state(engine, paid_order["id"])
+    assert (money["status"], money["payment_intent"]) == ("succeeded", "pi_test_backfilled")
+    assert event_names(engine, paid_order["id"]) == [
+        "payment_intent_recorded",
+        "payment_session_created",
+        "payment_succeeded",
+    ]
+    assert audit_actions(engine, paid_order["id"]).count("payment_intent_recorded") == 1
+
+
 def test_confirmation_after_release_moves_payment_to_refund_pending(
     commerce, variant, payable_order, stripe_checkout
 ):

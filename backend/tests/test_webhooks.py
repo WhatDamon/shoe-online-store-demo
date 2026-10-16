@@ -15,7 +15,10 @@ these tests pin what Python does with it:
    attempt count, and answers non-2xx so the delivery is retried;
 5. only the projected fields are stored, so no personal data reaches the row or a log;
 6. the endpoint fails closed: without a configured ``COMMERCE_PROXY_SECRET`` it refuses
-   instead of inheriting the development passthrough that the rest of ``/api/v1`` keeps.
+   instead of inheriting the development passthrough that the rest of ``/api/v1`` keeps;
+7. money that arrives for an order whose stock was already released is refunded by the very
+   delivery that carried it, and a gateway that cannot take it leaves the debt for the
+   compensation command without ever turning the acknowledged delivery into a non-2xx.
 """
 
 import json
@@ -24,9 +27,10 @@ from uuid import uuid4
 
 import pytest
 from sqlalchemy import func, select, update
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
-from app.application import webhooks
+from app.application import payments, webhooks
+from app.application.payments import refund_pending_payments
 from app.config import settings
 from app.domain.models import (
     AuditLog,
@@ -68,6 +72,11 @@ def configured_proxy_credential(proxy_credential):
     """The webhook refuses to run without a configured credential (pinned below), so every
     test in this file walks the gate its own rejection tests assert."""
     return proxy_credential
+
+
+def sessions_of(engine):
+    """A sessionmaker shaped like the application's own: one session per pass attempt."""
+    return sessionmaker(engine, class_=Session, expire_on_commit=False)
 
 
 def order_total_minor(client, order_id):
@@ -669,13 +678,61 @@ def test_money_arriving_after_the_release_never_restores_a_buyable_order(
 
     assert response.status_code == 200
     assert response.json()["status"] == "processed"
-    # The order stays cancelled and the money becomes the one signal that this customer is
-    # owed a refund; the webhook never attempts the refund itself.
-    assert order_state(engine, payable_order["id"])["status"] == "cancelled"
+    # The delivery that carried the money also refunds it: money for an order whose stock
+    # went back on sale is a debt this store owes back, and leaving the two writes to an
+    # operator was a silent reduction of what the confirmation step promises (§7.2).
+    assert order_state(engine, payable_order["id"])["status"] == "refunded"
     assert reservation_statuses(engine, payable_order["id"]) == ["released"]
     assert stock_levels(engine, variant["id"]) == (SEEDED_AVAILABLE, 0)
-    assert money_state(engine, payable_order["id"])["status"] == "refund_pending"
+    assert money_state(engine, payable_order["id"])["status"] == "refunded"
     assert payment_event_names(engine, payable_order["id"]) == [
         "payment_after_release",
         "payment_session_created",
+        "refund_succeeded",
+    ]
+    assert "refund_succeeded" in audit_actions(engine, payable_order["id"])
+    assert [call["idempotency_key"] for call in stripe_checkout.refunds] == [
+        f"refund:{payable_order['id']}"
+    ]
+
+
+def test_a_late_payment_whose_automatic_refund_fails_is_acknowledged_and_stays_owed(
+    commerce, payable_order, stripe_checkout, failing_gateway, monkeypatch
+):
+    """A refund that could not leave must not turn the delivery into a non-2xx.
+
+    Stripe retries anything but a 2xx, so answering 5xx for a gateway outage would redeliver
+    the same money forever. The delivery is acknowledged, the money stays ``refund_pending``
+    -- which is the row the compensation command selects -- and the command finishes it once
+    the channel works again, under the same idempotency key.
+    """
+    client, engine = commerce
+    session_post(client, payable_order["id"])
+    # The channel worked while the session was created and broke before the money arrived:
+    # the refund is then the only outbound call this delivery may make.
+    monkeypatch.setattr(payments, "default_gateway", lambda: failing_gateway)
+    assert client.post(f"/api/v1/orders/{payable_order['id']}/cancel").json()["status"] == (
+        "cancelled"
+    )
+
+    response = webhook(
+        client,
+        completed_payload(
+            client, payable_order["id"], stripe_checkout.session_id, "evt_late_no_channel"
+        ),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "processed"
+    assert failing_gateway.calls == ["refund"]
+    assert money_state(engine, payable_order["id"])["status"] == "refund_pending"
+    assert order_state(engine, payable_order["id"])["status"] == "cancelled"
+    assert "refund_failed" in payment_event_names(engine, payable_order["id"])
+
+    # Still a candidate: the command gives the money back under the same key.
+    assert refund_pending_payments(sessions_of(engine), gateway=stripe_checkout) == 1
+
+    assert money_state(engine, payable_order["id"])["status"] == "refunded"
+    assert stripe_checkout.refunds == [
+        {"payment_intent": "pi_test_webhook", "idempotency_key": f"refund:{payable_order['id']}"}
     ]

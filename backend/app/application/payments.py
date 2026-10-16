@@ -94,6 +94,11 @@ REFUND_SUCCEEDED_EVENT = "refund_succeeded"
 # between the outbound call and its settlement still leaves the debt behind.
 REFUND_REQUESTED_EVENT = "refund_requested"
 
+# A replayed delivery may still fill an identifier the store never recorded. Money captured
+# without a payment intent can never be handed to the gateway, so without this write the
+# debt would have no way out at all.
+PAYMENT_INTENT_RECORDED_EVENT = "payment_intent_recorded"
+
 # The only refund status that has moved the money. Every other value Stripe can report
 # (``pending``, ``requires_action``, ``failed``, ``canceled``) means the money is still the
 # customer's, so the debt stays at ``refund_pending`` and stays a compensation candidate.
@@ -417,7 +422,9 @@ def confirm_payment(
         return ConfirmOutcome(status="ignored", order_id=order_id)
     payment = db.scalar(select(Payment).where(Payment.order_id == order_id))
     if order.status == "paid":
-        # Stripe redelivers, and the money is already recorded: nothing may change.
+        # Stripe redelivers, and the money is already recorded: nothing may change except an
+        # identifier a previous delivery could not carry.
+        _record_missing_payment_intent(db, order, payment, payment_intent)
         return ConfirmOutcome(status="already_paid", order_id=order_id)
     if order.status == "cancelled":
         return _payment_after_release(db, order, payment, provider_reference, payment_intent)
@@ -456,6 +463,30 @@ def _record_captured_payment(
     if payment.currency is None:
         payment.currency = (order.currency or "").upper()
     return payment
+
+
+def _record_missing_payment_intent(
+    db: Session, order: Order, payment: Payment | None, payment_intent: str | None
+) -> bool:
+    """Fill an identifier a replay brought for money this store already settled.
+
+    The projection is legally allowed to carry no payment intent, but money captured
+    without one can never be handed to the gateway. Every later delivery did carry the
+    identifier and every one of them was discarded by the idempotent early return, so
+    ``missing_payment_intent`` had no way back and the debt could never be finished. This is
+    the only write a replayed delivery may still make, and it never moves the money axis: a
+    ``succeeded`` payment stays ``succeeded`` and a ``refund_pending`` one stays owed.
+    """
+    if payment is None or payment_intent is None or payment.payment_intent is not None:
+        return False
+    if payment.status not in SETTLED_PAYMENT_STATUSES:
+        # Nothing was captured on this row, so there is no settlement to identify.
+        return False
+    payment.payment_intent = payment_intent
+    db.flush()
+    db.add(PaymentEvent(payment_id=payment.id, event=PAYMENT_INTENT_RECORDED_EVENT))
+    audit(db, order.id, PAYMENT_INTENT_RECORDED_EVENT, status=payment.status)
+    return True
 
 
 def _consume_and_confirm(
@@ -529,7 +560,9 @@ def _payment_after_release(
     """
     if payment is not None and payment.status == "refund_pending":
         # Stripe redelivers, and this money is already flagged as owed: like the ``paid``
-        # branch above, a repeat delivery must change nothing, event and audit included.
+        # branch above, a repeat delivery must change nothing -- except an identifier this
+        # store never recorded, which is the one thing the debt needs to become refundable.
+        _record_missing_payment_intent(db, order, payment, payment_intent)
         return ConfirmOutcome(status="refund_pending", order_id=order.id)
     payment = _record_captured_payment(db, order, payment, provider_reference, payment_intent)
     payment.status = "refund_pending"
@@ -537,6 +570,30 @@ def _payment_after_release(
     db.add(PaymentEvent(payment_id=payment.id, event="payment_after_release"))
     audit(db, order.id, "payment_after_release", status=order.status)
     return ConfirmOutcome(status="refund_pending", order_id=order.id)
+
+
+def settle_owed_refund(db: Session, order_id: str) -> str:
+    """One automatic attempt at money a delivery just made this store owe.
+
+    Called by the delivery that captured the money, right after the debt was recorded, so a
+    customer is not left waiting for an operator. The intent is already on the rows --
+    ``refund_pending`` plus the ``payment_after_release`` event -- so this only asks the
+    gateway and records its answer: no second intent is written, and an answer that is not a
+    settlement leaves the row exactly as the compensation pass expects to find it. Returns
+    the money state after the attempt.
+    """
+    if not settings.stripe_ready:
+        # Nothing can leave through a switched-off channel. The debt stays on the rows for an
+        # operator to replay, which is not the same statement as "this money cannot be
+        # returned".
+        return "refund_pending"
+    payment = db.scalar(select(Payment).where(Payment.order_id == order_id))
+    order = db.scalar(select(Order).where(Order.id == order_id))
+    if payment is None or order is None or payment.status != "refund_pending":
+        # The money moved between the confirmation and this attempt: repeating it would
+        # rewrite a terminal state.
+        return "refund_pending"
+    return _attempt_refund(db, order, payment, default_gateway())
 
 
 def refund_idempotency_key(order_id: str) -> str:
@@ -745,8 +802,8 @@ def refund_pending_payments(
     Entry three of the refund design: a table plus a repeatable command, no worker fleet.
     Each attempt reuses the same per-order idempotency key, so a replay after a crash can
     never refund twice, and money that reached ``refunded`` is no longer a candidate.
-    Candidates run in payment-id order, so a ``limit`` below the backlog still makes
-    progress instead of retrying the same rows forever.
+    Candidates are served by recorded attempt count rather than by id, so a ``limit`` below
+    the backlog still makes progress instead of retrying the same rows forever.
 
     The pass owns its sessions and commits each attempt on its own, exactly like
     ``expire_due_orders``: it shares no transaction with its caller, so a failed attempt
@@ -766,6 +823,21 @@ def refund_pending_payments(
         _log_event(logging.WARNING, "refund_pass_disabled")
         return 0
     refunds = gateway if gateway is not None else default_gateway()
+    # Candidates are served by recorded attempt count, never by payment id. An id order put a
+    # debt that can never settle -- money captured with no identifier to refund -- at the
+    # front of every batch, so a ``limit`` below the backlog retried that one row forever
+    # while the refundable debt behind it was never attempted once. Counting the attempts
+    # lets a row that keeps failing sink behind every row that has been tried fewer times;
+    # the money stays a candidate and is still retried when nothing fresher is waiting.
+    attempts = (
+        select(func.count())
+        .select_from(PaymentEvent)
+        .where(
+            PaymentEvent.payment_id == Payment.id,
+            PaymentEvent.event == REFUND_FAILED_EVENT,
+        )
+        .scalar_subquery()
+    )
     # Freeze the candidates in their own short transaction: no write lock is held while
     # Stripe is being asked, and every attempt below commits separately.
     with sessions() as db, db.begin():
@@ -773,7 +845,7 @@ def refund_pending_payments(
             select(Payment.id, Payment.order_id, Order.cart_id)
             .join(Order, Payment.order_id == Order.id)
             .where(Payment.status == "refund_pending")
-            .order_by(Payment.id)
+            .order_by(attempts, Payment.id)
             .limit(limit)
         ).all()
     refunded = 0

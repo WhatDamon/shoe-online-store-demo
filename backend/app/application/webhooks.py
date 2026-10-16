@@ -16,6 +16,10 @@ this module acts on. Two rules shape everything below:
   ``payment_status`` and only ``paid`` confirms the order: an asynchronous method completes
   the session before the money moves, so an ``unpaid`` completion is recorded, logged and
   acknowledged, and Stripe's own later outcome event decides what happens.
+* **Money for a released order is given back by the delivery that carried it.** The
+  confirmation records the debt and this module asks the gateway once for it, so a customer
+  is not left waiting for an operator. A gateway that cannot take it leaves the debt for the
+  compensation command; that is a debt this store still owes, never a failed delivery.
 
 The business action runs inside a savepoint and the event's own status is written outside
 it, so a business action that stopped halfway leaves no writes behind while the failed
@@ -35,7 +39,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
-from app.application.payments import confirm_payment
+from app.application.payments import confirm_payment, settle_owed_refund
 from app.domain.models import Payment, WebhookEvent
 from app.schemas.commerce import StripeEventProjection
 
@@ -184,6 +188,19 @@ def _confirm(db: Session, projection: StripeEventProjection) -> tuple[str, str |
         provider_reference=provider_reference,
         payment_intent=projection.payment_intent,
     )
+    if outcome.status == "refund_pending":
+        # The delivery that carried the money also gives it back: money for an order whose
+        # stock went back on sale is a debt this store owes, and leaving both writes to an
+        # operator was a silent reduction of what this step promises. A gateway that cannot
+        # take it is recorded on the attempt rows and the debt stays selectable -- this must
+        # never turn an otherwise correct delivery into a non-2xx, because Stripe would
+        # redeliver the same money forever.
+        _log_event(
+            logging.INFO,
+            "webhook_refund_attempted",
+            event_id=projection.id,
+            status=settle_owed_refund(db, order_id),
+        )
     # ``confirm_payment`` owns every branch, including the replayed session that belongs to
     # another order; this layer only records which one it took.
     return ("ignored" if outcome.status == "ignored" else "processed"), outcome.order_id
