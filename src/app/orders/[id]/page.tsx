@@ -9,11 +9,21 @@ export const metadata: Metadata = pageMetadata({
   robots: { index: false, follow: false },
 })
 
-export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function OrderPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ payment?: string }>
+}) {
   const { id } = await params
+  const { payment } = await searchParams
+  // The query parameter is forgeable, so it only ever selects a banner. The panel re-reads the
+  // order from the trading boundary and shows whatever that says.
+  const paymentNotice = payment === 'success' || payment === 'cancelled' ? payment : null
   return (
     <SiteShell>
-      <CommercePanel mode="order" orderId={id} />
+      <CommercePanel mode="order" orderId={id} paymentNotice={paymentNotice} />
     </SiteShell>
   )
 }

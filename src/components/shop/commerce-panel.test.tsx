@@ -231,3 +231,129 @@ it('keeps the checkout key when a successful HTTP response has an invalid order'
   )
   expect(sessionStorage.getItem('evoloop-pending-checkout')).toBeNull()
 })
+
+const payable = { ...order, payment_enabled: true, payment_status: null }
+
+function stubAssign() {
+  const assign = vi.fn()
+  Object.defineProperty(window, 'location', {
+    configurable: true,
+    value: { ...window.location, assign },
+  })
+  return assign
+}
+
+it('shows a pay button only when payments are enabled and the order is pending', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(payable)))
+  render(<CommercePanel mode="order" orderId="order-1" />)
+  expect(await screen.findByRole('button', { name: 'Pay now' })).toBeInTheDocument()
+})
+
+it('does not show a pay button when payments are disabled', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(order)))
+  render(<CommercePanel mode="order" orderId="order-1" />)
+  await screen.findByText('Order ID: order-1')
+  expect(screen.queryByRole('button', { name: 'Pay now' })).not.toBeInTheDocument()
+})
+
+it('redirects to the checkout url the session returns', async () => {
+  const assign = stubAssign()
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(ok(payable))
+    .mockResolvedValueOnce(
+      ok({
+        code: 'payment_ready',
+        payment_enabled: true,
+        provider: 'stripe',
+        order_id: 'order-1',
+        order_status: 'pending_payment',
+        redirect_url: 'https://checkout.stripe.com/c/pay/cs_test_a1',
+        message: 'Redirecting to the payment page.',
+      }),
+    )
+  vi.stubGlobal('fetch', fetcher)
+  render(<CommercePanel mode="order" orderId="order-1" />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Pay now' }))
+  await waitFor(() =>
+    expect(assign).toHaveBeenCalledWith('https://checkout.stripe.com/c/pay/cs_test_a1'),
+  )
+  expect(fetcher).toHaveBeenLastCalledWith(
+    '/api/commerce/payments/session',
+    expect.objectContaining({ method: 'POST', body: '{"order_id":"order-1"}' }),
+  )
+})
+
+it('explains a non-payable outcome instead of redirecting', async () => {
+  const assign = stubAssign()
+  vi.stubGlobal(
+    'fetch',
+    vi
+      .fn()
+      .mockResolvedValueOnce(ok(payable))
+      .mockResolvedValueOnce(
+        ok({
+          code: 'order_not_payable',
+          payment_enabled: true,
+          provider: 'stripe',
+          order_id: 'order-1',
+          order_status: 'pending_payment',
+          redirect_url: null,
+          message: 'This order can no longer be paid for.',
+        }),
+      ),
+  )
+  render(<CommercePanel mode="order" orderId="order-1" />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Pay now' }))
+  expect(await screen.findByRole('status')).toHaveTextContent(
+    'This order can no longer be paid for.',
+  )
+  expect(assign).not.toHaveBeenCalled()
+})
+
+it('never claims the order is paid from the success query parameter', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(payable)))
+  render(<CommercePanel mode="order" orderId="order-1" paymentNotice="success" />)
+  await screen.findByText('Order ID: order-1')
+  // The query parameter is forgeable, so the page must read the truth instead of echoing it.
+  expect(screen.getByText('Status: Pending payment')).toBeInTheDocument()
+  expect(screen.queryByText(/Payment received/i)).not.toBeInTheDocument()
+  expect(screen.getByText(/We haven't received a payment for this order yet/i)).toBeInTheDocument()
+})
+
+it('shows the paid state from the order itself', async () => {
+  const paid = { ...payable, status: 'paid', payment_status: 'succeeded', expires_at: null }
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(paid)))
+  render(<CommercePanel mode="order" orderId="order-1" paymentNotice="success" />)
+  expect(await screen.findByText('Status: Paid')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Pay now' })).not.toBeInTheDocument()
+})
+
+it('shows the refunded state and the refund-in-progress state separately', async () => {
+  const refunding = {
+    ...payable,
+    status: 'paid',
+    payment_status: 'refund_pending',
+    expires_at: null,
+  }
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(refunding)))
+  const first = render(<CommercePanel mode="order" orderId="order-1" />)
+  expect(await screen.findByText(/refund for this order is being processed/i)).toBeInTheDocument()
+  first.unmount()
+
+  const refunded = { ...payable, status: 'refunded', payment_status: 'refunded', expires_at: null }
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(refunded)))
+  render(<CommercePanel mode="order" orderId="order-1" />)
+  expect(await screen.findByText('Status: Refunded')).toBeInTheDocument()
+  expect(screen.queryByText(/being processed/i)).not.toBeInTheDocument()
+})
+
+it('reports a paid order that can no longer be cancelled', async () => {
+  const paid = { ...payable, status: 'paid', payment_status: 'succeeded', expires_at: null }
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(paid)))
+  render(<CommercePanel mode="order" orderId="order-1" />)
+  await screen.findByText('Status: Paid')
+  expect(
+    screen.queryByRole('button', { name: 'Cancel order and release inventory' }),
+  ).not.toBeInTheDocument()
+})
