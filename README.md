@@ -20,8 +20,7 @@ only, never "AI"-branded.
 The storefront has a **local commerce MVP**: choose a color and size, add the matching Python
 variant to the cart, preview server-calculated prices and create a `pending_payment` order.
 Orders reserve inventory and support cancellation and expiry. **Real payments are disabled**;
-the Mock provider never charges or marks an order paid. Shopify remains a compatibility path
-and requires explicit `SHOPIFY_ENABLED=true` plus its credentials; keep it disabled locally.
+the Mock provider never charges or marks an order paid.
 The display catalog has **29 supplier styles** and real product photos; prices, inventory and
 promotional copy are demo data, not verified live offers. Python owns transaction prices and
 stock; the TypeScript display/search catalog is a separate data source.
@@ -48,9 +47,13 @@ stock; the TypeScript display/search catalog is a separate data source.
 
 ```bash
 npm ci
-cp .env.example .env.local      # defaults are fine — empty AI_API_KEY = Mock mode
+cp .env.example .env           # single source; the Python service reads the same file
 npm run dev               # http://localhost:3000
 ```
+
+`.env` is the shared file: Next.js reads it (plus `.env.local` on top for machine-local overrides)
+and so does the Python service. Keys both sides need — `COMMERCE_PROXY_SECRET`, and the Stripe
+keys when payments are on — must therefore live in `.env`, not `.env.local`.
 
 > **Node runtime throughout.** The `next` CLI and every gate script run on Node; the SQLite driver is
 > `better-sqlite3`, which ships **N-API prebuilds** — no compiler or build step required.
@@ -87,7 +90,7 @@ other command is identical on macOS, Linux and Windows because `npm run py` reso
 
 ```bash
 python3.12 -m venv backend/.venv        # Windows: py -3.12 -m venv backend/.venv
-cp backend/.env.example backend/.env    # only if backend/.env does not exist yet
+cp backend/.env.example backend/.env    # optional: only for backend-only overrides
 npm run py -- -m pip install -r requirements-dev.lock
 npm run db:migrate:python
 npm run py -- -m app.seed
@@ -99,8 +102,8 @@ must set `APP_ENV=production` and use a PostgreSQL URL with
 `sslmode=verify-full`; the service rejects SQLite and weaker PostgreSQL modes before
 creating an engine. See [the Python PostgreSQL TLS boundary report](./docs/python-postgres-tls-2026-10-03.md).
 
-In a second terminal at the repository root, keep `SHOPIFY_ENABLED=false`, set
-`PYTHON_API_URL=http://127.0.0.1:8000` and `AI_DISABLE_REAL=1`, then run `npm run dev`.
+In a second terminal at the repository root, set `PYTHON_API_URL=http://127.0.0.1:8000`
+and `AI_DISABLE_REAL=1`, then run `npm run dev`.
 Open `/product/dc-1001`, choose a color/size, add to `/cart`, change quantity, create an
 order at `/checkout`, and cancel it from `/orders/<id>`. Payment remains unavailable.
 Existing environment files must not be overwritten. Stop on any install/migration failure.
@@ -112,7 +115,7 @@ It creates and cancels demo orders; run only against a disposable/demo database.
 **Catalog lives in the `products` table.** The catalog adapter defaults to reading the table;
 when it is empty the first request auto-seeds it from the import layer (supplier JSON +
 curation). `CATALOG_SOURCE=seed` switches back to the pure in-memory import layer (used by unit
-tests); the reserved Shopify adapter takes priority only with `SHOPIFY_ENABLED=true` and both catalog credentials.
+tests); any other `CATALOG_SOURCE` value, including historical ones, falls back to the table.
 
 ### What you can do without any setup
 
@@ -196,16 +199,18 @@ See [`.env.example`](.env.example) for the annotated template. Summary:
 | `TRUSTED_PROXY_IPS` | *(empty)* | Exact trusted immediate peer IPs; XFF is ignored without a verified peer |
 | `AI_DISABLE_REAL` | `0` | `1` forces Mock mode even with a key (abuse kill switch) |
 | `DB_DRIVER` | `sqlite` | `sqlite` (default) or `postgres` — selects the app DB driver |
-| `CATALOG_SOURCE` | `db` | Runtime catalog source: `db` = `products` table (default, auto-seeded when empty); `seed` = in-memory import layer (tests); explicitly enabled Shopify configuration takes priority |
-| `DATABASE_URL` | `./data/local.db` | sqlite: local file; postgres: `postgres://…` connection string |
+| `CATALOG_SOURCE` | `db` | Runtime catalog source: `db` = `products` table (default, auto-seeded when empty); `seed` = in-memory import layer (tests). Any other value falls back to the table |
+| `DATABASE_URL` | `./data/local.db` | Next/Drizzle display+AI database: sqlite local file, or `postgres://…` |
+| `COMMERCE_DATABASE_URL` | `sqlite:///./commerce.db` | The Python trading boundary's own database. Deliberately **not** `DATABASE_URL`: the two sides must never share one SQLite file |
 | `PG_SSL` | *(verified TLS in production)* | `1`/`verify-full` verifies certificates; plaintext `0` is development-only |
 | `PG_SSL_CA_FILE` | *(system roots)* | Optional readable PEM CA bundle, never committed |
 | `NODE_TLS_REJECT_UNAUTHORIZED` | *(unset)* | `0` is rejected in production before a PostgreSQL client is created; do not use it as a TLS workaround |
 | `PYTHON_API_URL` | `http://127.0.0.1:8000` | Server-only commerce endpoint; not exposed to browser JavaScript |
 | `COMMERCE_PROXY_SECRET` | *(empty for local demo)* | Shared server-only credential for Next → Python; production requires at least 32 random bytes |
-| `SHOPIFY_ENABLED` | `false` | Explicit compatibility purchase switch; keep disabled for the local MVP |
-| `SHOPIFY_DOMAIN`, `SHOPIFY_STOREFRONT_TOKEN` | *(empty)* | Reserved catalog stub; selected only with both credentials and `SHOPIFY_ENABLED=true`. It is not a working sync integration. |
-| `SHOPIFY_BUY_DOMAIN`, `SHOPIFY_BUY_TOKEN` | *(empty)* | Compatibility Buy Button credentials, independent of catalog credentials. Requires both plus `SHOPIFY_ENABLED=true`; disabled by default so PDPs use Python variants and cart. The external store was not tested in this integration. |
+| `STRIPE_ENABLED` | `false` | Payments stay off unless `true`; while off nothing is charged and no order can reach `paid` |
+| `STRIPE_SECRET_KEY` | *(empty)* | Stripe API key, read by the Python service only — never by browser code. Required once `STRIPE_ENABLED=true`, otherwise start-up fails |
+| `STRIPE_WEBHOOK_SECRET` | *(empty)* | Signing secret for the public webhook route (Next side only); required in production once `STRIPE_ENABLED=true` |
+| `PUBLIC_SITE_URL` | `http://localhost:3000` | Absolute origin used for Stripe success/cancel URLs; falls back to `NEXT_PUBLIC_SITE_URL`. Must be https in production |
 
 Before a production build is started, set `APP_ENV=production` and run
 `npm run preflight -- --environment production` (the legacy PowerShell spelling
@@ -213,9 +218,11 @@ Before a production build is started, set `APP_ENV=production` and run
 required so a production build cannot silently inherit the local development mode.
 The preflight checks the deployment boundary without printing secrets: PostgreSQL is selected,
 TLS verification is enabled, the AI session secret is long enough, Python is not
-exposed as a loopback production URL, the Next → Python proxy secret is long enough,
-and the unsupported Shopify purchase path is disabled. Development defaults remain
-compatible with the local SQLite/Mock setup.
+exposed as a loopback production URL, and the Next → Python proxy secret is long enough.
+When `STRIPE_ENABLED=true` it additionally requires a complete Stripe configuration: a secret
+key, an absolute `PUBLIC_SITE_URL` (https in production) and, in production, a webhook secret.
+Half-configured payments fail the preflight rather than looking enabled.
+Development defaults remain compatible with the local SQLite/Mock setup.
 The AI Route Handler also rejects bodies above 16 KiB and invalid fields before
 creating a session or reserving budget; its `X-Request-ID` is server-owned correlation
 data, not a session or idempotency credential. See the [AI request boundary report](./docs/ai-request-boundary-2026-10-03.md).
@@ -274,7 +281,7 @@ src/
     assistant/             # FAB + Sheet chat panel, SSE hook, chips, message list
     ui/                    # shadcn/ui primitives
   server/                  # Server-only layers (never imported by client code except `type`)
-    catalog/               # Seed/DB adapter + market-aware service + Shopify Buy map (handle → store id)
+    catalog/               # Seed/DB adapter + market-aware service
     search/                # embedder, keyword search, retrieval (embedding cache + cosine), vector
     ai/                    # providers (Mock/OpenAI-compatible), chat orchestration, SSE events, prompts
     guardrails/            # rate limit, session state (turns/TTL/trim), token budget, soft copy
@@ -293,14 +300,6 @@ src/
   `public/products/<handle>/`) and fall back to SVG visuals only when image-less. A separate
   `gifts.ts` module feeds the `/shop` free-gift gallery (gifts are display-only, never in the
   sellable catalog).
-- **Store buy channel** (2026-09): the repository retains mappings for 29 Shopify product
-  handles; current external store state is unverified. `src/server/catalog/shopify-buy.ts` is a **low-coupling static map** (local
-  `handle` → store numeric id, no Product/DB/schema changes) read by the PDP page; when
-  `SHOPIFY_BUY_DOMAIN` + `SHOPIFY_BUY_TOKEN` are set, the store-mapped PDP hides the demo
-  price/pickers and mounts one parameterized `ShopifyBuyButton` (SDK `createComponent` loading
-  the admin-generated options verbatim), letting the store own variants, price and checkout.
-  Both credentials also require `SHOPIFY_ENABLED=true`. Otherwise PDPs use the Python
-  variant/cart flow. No QR image or client action enables real payment.
 - **AI**: RAG-lite, zero tool-calling — every real/gateway model only needs chat completions.
   Retrieved product cards are injected into the system prompt; the model must answer from that
   injected content only. Modes: `shopping`, `size-fit` (deterministic), `outfit`, `find-shoes`,

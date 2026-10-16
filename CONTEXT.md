@@ -16,6 +16,62 @@
 
 ---
 
+## 履约 / 资金 / 预占 三轴
+
+**定义：** 一个订单的状态由**三条正交轴**回答三个不同问题，任何一条都不能推出另一条：
+
+| 轴 | 字段 | 回答的问题 | 取值 |
+|---|---|---|---|
+| 履约 | `orders.status` | 这笔买卖走到哪一步 | `pending_payment` / `paid` / `cancelled` / `refunded` |
+| 资金 | `payments.status` | 钱现在在哪 | `disabled` / `requires_payment` / `succeeded` / `refund_pending` / `refunded` |
+| 预占 | `inventory_reservations.status` | 这份库存被怎么处理了 | `active` / `consumed` / `released` |
+
+#### 不变量
+
+- **订单为 `paid` 意味着资金已被捕获**：`payments.status ∈ {succeeded, refund_pending, refunded}`，
+  且该订单**所有**预占都是 `consumed`。注意这不是「资金为 `succeeded`」——退款处理中同样是已捕获。
+- **订单为 `cancelled` 而资金已捕获，必须有退款记录**（`refund_pending` 或 `refunded`）：这是
+  「欠退款」的唯一信号，也是监控要盯的东西。
+- **资金为 `succeeded` 意味着库存真的被扣过**，而不是退回 `reserved`。
+- 「已付但库存已释放」是**合法且必须可表示**的组合（付款晚于过期释放）；不得靠发明第五种
+  订单状态或悄悄改回 `pending_payment` 来掩盖它。
+- 释放库存（过期或取消）必须先确认该订单**没有已结算资金**，否则事务回滚并响亮失败——
+  静默释放会让同一份库存被卖两次。
+
+---
+
+## 支付通道
+
+**定义：** 能真正收到钱的那条路。默认为 `MockPaymentProvider`（不扣款，永远返回
+「支付暂未开放」）；仅当 `STRIPE_ENABLED=true` 且密钥齐备时切换为 Stripe 托管 Checkout。
+
+#### 不变量
+
+- `payment_enabled` 是**部署级能力**（这个店能不能收钱），**不是**这笔订单能不能付。
+  单笔可付性由 `status` + `payment_status` + 返回的 `code` 共同表达。
+- **密钥归属**：`STRIPE_SECRET_KEY` 只由 Python 读取；`STRIPE_WEBHOOK_SECRET` 只由 Next
+  的 webhook 路由读取；浏览器两者都拿不到。
+- **金额不由客户端决定**：Python 从订单行重新计算并转成整数最小单位给 Stripe；
+  客户端只提交 `order_id`。
+- 半配置（只填一个密钥）必须在启动与预检阶段失败。
+- 关闭通道时行为必须与迁移前等价：不扣款、不把订单改为 `paid`。
+
+---
+
+## 可付窗口
+
+**定义：** 订单创建到 `expires_at` 之间、仍可发起支付的那段时间。
+
+#### 不变量
+
+- Stripe 托管 Checkout 的会话寿命有下限（30 分钟），所以**预占窗口必须显著长于它**；
+  否则「下单后立刻支付」这条最普通的流程会被自己的过期策略拒绝。
+- 已有订单剩余时间不足下限时，`payments/session` 必须给出**受控结局**（`order_not_payable`），
+  而不是先把请求发给 Stripe 再报错。
+- 返回页**不得**信任可伪造的查询参数：`?payment=success` 只控制横幅，页面必须回读订单真值。
+
+---
+
 ## CanonicalSize
 
 **定义：** 尺码的唯一存储形式 —— **EU 整档，35–48 的整数**（`type CanonicalSize = number`，
@@ -81,17 +137,16 @@ marketing 标题/副标题、描述、`price`、`sizes: CanonicalSize[]`、颜�
 ## CatalogAdapter
 
 **定义：** 目录读取契约（`src/server/catalog/adapter-contract.ts`）：
-`getProducts(filter?)` / `getProductByHandle(handle)` / `getCollections()` / `getBuyUrl(product)`。
-三种实现：`DbCatalogAdapter`（默认）、`SeedAdapter`（内存，测试用）、`shopifyStub`（占位）。
+`getProducts(filter?)` / `getProductByHandle(handle)` / `getCollections()`。
+两种实现：`DbCatalogAdapter`（默认）、`SeedAdapter`（内存，测试用）。
 
 #### 不变量
 
 - 运行时选择是**惰性**的：`adapter.ts` 的 `catalog()` 首次调用才读 `CATALOG_SOURCE` 并缓存实例
   （必须缓存：`DbCatalogAdapter` 内部持有「已灌种」promise）。
 - 筛选/排序语义**只有一处**：`catalog/filter.ts` 的 `filterProducts`，被 seed 与 db 两个适配器共用。
-- `getBuyUrl` 目前在所有实现中恒为 `null`：真实的购买通道是独立的 Shopify Buy Button
-  （`shopify-buy.ts`），**不经过本接口**。`SHOPIFY_DOMAIN` / `SHOPIFY_STOREFRONT_TOKEN` 一旦同配
-  会把目录源切到**会抛错**的 stub（刻意设计：预留位，见 README 与 `.env.example`）。
+- 来源选择的唯一开关是 `CATALOG_SOURCE`：`seed` → `SeedAdapter`，其余取值（含任何历史取值）
+  一律回落 `DbCatalogAdapter`，因此陈旧配置不会把目录切到失效实现。
 
 ---
 

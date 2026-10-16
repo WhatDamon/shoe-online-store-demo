@@ -40,7 +40,7 @@ const p: ProductView = {
 describe('ProductActions layout order', () => {
   it('renders size selector, then children slot, then buy CTA', () => {
     const { container } = render(
-      <ProductActions product={p} buyUrl={null}>
+      <ProductActions product={p}>
         <div data-testid="accordion-slot">Materials &amp; fit</div>
       </ProductActions>,
     )
@@ -107,7 +107,7 @@ describe('PDP colorway picker (decision #16: color selectable pre-order)', () =>
       json: async () => ({ items: [], total: '0.00', currency: 'USD' }),
     })
     vi.stubGlobal('fetch', fetcher)
-    render(<ProductActions product={multiColor} buyUrl={null} />)
+    render(<ProductActions product={multiColor} />)
     fireEvent.click(screen.getByRole('radio', { name: 'Ivory' }))
     fireEvent.click(screen.getByRole('radio', { name: 'US 8.5' }))
     await screen.findByText(/63.00/)
@@ -119,22 +119,17 @@ describe('PDP colorway picker (decision #16: color selectable pre-order)', () =>
     )
   })
   it('hides the color picker for single-color or color-less products', () => {
-    const { rerender } = render(<ProductActions product={p} buyUrl={null} />)
+    const { rerender } = render(<ProductActions product={p} />)
     expect(screen.queryByText('Color')).not.toBeInTheDocument()
     expect(screen.queryByRole('radio', { name: /Black|Ivory/ })).not.toBeInTheDocument()
 
-    rerender(
-      <ProductActions
-        product={{ ...p, colors: [{ name: 'Ivory', hex: '#f3ede2' }] }}
-        buyUrl={null}
-      />,
-    )
+    rerender(<ProductActions product={{ ...p, colors: [{ name: 'Ivory', hex: '#f3ede2' }] }} />)
     expect(screen.queryByText('Color')).not.toBeInTheDocument()
     expect(screen.queryByRole('radio', { name: 'Ivory' })).not.toBeInTheDocument()
   })
 
   it('shows one swatch per colorway and tracks the picked one in the legend', () => {
-    render(<ProductActions product={multiColor} buyUrl={null} />)
+    render(<ProductActions product={multiColor} />)
 
     const ink = screen.getByRole('radio', { name: 'Ink Black' }) as HTMLInputElement
     const ivory = screen.getByRole('radio', { name: 'Ivory' }) as HTMLInputElement
@@ -155,7 +150,7 @@ describe('PDP colorway picker (decision #16: color selectable pre-order)', () =>
     render(
       <ProductColorSelectionProvider product={multiColor}>
         <ProductGallery product={multiColor} />
-        <ProductActions product={multiColor} buyUrl={null} />
+        <ProductActions product={multiColor} />
       </ProductColorSelectionProvider>,
     )
 
@@ -177,42 +172,13 @@ describe('PDP colorway picker (decision #16: color selectable pre-order)', () =>
   })
 })
 
-// 商店直购形态（2026-09-06）：buyConfig 非 null → 本站颜色/尺码选择器与
-// demo 购买条整体隐藏，Buy Button 挂载；Find my size 与 children 插槽保留（克制：不删演示内容）。
-const storeCfg = {
-  productId: '9407853625559',
-  domain: 'demo.myshopify.com',
-  storefrontAccessToken: 'tok',
-  moneyFormat: '¥{{amount}}',
-}
-
-describe('ProductActions store-live takeover (Shopify Buy Button)', () => {
-  it('hides demo pickers + demo buy bar when buyConfig is present', () => {
-    const { container } = render(
-      <ProductActions product={multiColor} buyUrl={null} buyConfig={storeCfg}>
-        <div data-testid="accordion-slot">Materials &amp; fit</div>
-      </ProductActions>,
-    )
-
-    // 本站选择器与 demo 购买条不渲染
-    expect(screen.queryByText('Select size')).not.toBeInTheDocument()
-    expect(screen.queryByText('Color')).not.toBeInTheDocument()
-    // demo 购买条（ProductBuyBar）未渲染：其特征 role=status 不存在；同名 "Buy now"
-    // 只能是休眠 ShopifyBuyButton 的 SDK 未加载兜底按钮（禁用态），故所有 Buy now 均禁用。
-    expect(screen.queryByRole('status')).not.toBeInTheDocument()
-    for (const b of screen.queryAllByRole('button', { name: 'Add to cart' })) {
-      expect(b).toBeDisabled()
-    }
-    expect(screen.queryByText(/selected/)).not.toBeInTheDocument()
-
-    // 保留：Find my size、children 插槽、Buy Button 挂载点
-    expect(screen.getByRole('button', { name: 'Find my size' })).toBeInTheDocument()
-    expect(screen.getByTestId('accordion-slot')).toBeInTheDocument()
-    expect(container.querySelector('.shopify-buy[data-product-id="9407853625559"]')).not.toBeNull()
-  })
-
-  it('keeps demo UI when buyConfig is null', () => {
-    render(<ProductActions product={multiColor} buyUrl={null} buyConfig={null} />)
+// 购买通道收敛（2026-10-13 切片 A）：目录只剩「本站变体 + 加购」一条路径，「商店直购」
+// 形态（buyConfig / Buy Button）已下线。
+// 这是刻意的特征测试（characterization）：删除型改动在本文件里没有可失败的运行时断言，
+// 本任务真正的红灯在 api/catalog 载荷 shape、catalog 来源选择与 saved-pairs 三处。
+describe('ProductActions purchase channel', () => {
+  it('renders the demo buy bar with no store purchase channel', () => {
+    render(<ProductActions product={multiColor} />)
     expect(screen.getByText('Select size')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add to cart' })).toBeInTheDocument()
   })

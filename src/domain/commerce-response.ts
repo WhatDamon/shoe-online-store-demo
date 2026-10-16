@@ -1,4 +1,36 @@
-import type { CartLine, CartView, CommerceProduct, OrderView } from './commerce'
+import type {
+  CartLine,
+  CartView,
+  CommerceProduct,
+  OrderStatus,
+  OrderView,
+  PaymentCode,
+  PaymentSessionView,
+  PaymentStatus,
+  PaymentProvider,
+} from './commerce'
+
+const ORDER_STATUSES = ['pending_payment', 'paid', 'cancelled', 'refunded'] as const
+const PAYMENT_STATUSES = [
+  'disabled',
+  'requires_payment',
+  'succeeded',
+  'refund_pending',
+  'refunded',
+] as const
+const PAYMENT_CODES = [
+  'payment_disabled',
+  'payment_ready',
+  'order_not_payable',
+  'currency_unsupported',
+] as const
+const PAYMENT_PROVIDERS = ['mock', 'stripe'] as const
+
+function oneOf<const T extends readonly string[]>(value: unknown, allowed: T): T[number] {
+  return typeof value === 'string' && (allowed as readonly string[]).includes(value)
+    ? (value as T[number])
+    : invalid()
+}
 
 function invalid(): never {
   throw new Error('Invalid commerce response')
@@ -81,8 +113,11 @@ export function parseCartView(value: unknown): CartView {
 
 export function parseOrderView(value: unknown): OrderView {
   const data = record(value)
-  if (data.status !== 'pending_payment' && data.status !== 'cancelled') invalid()
-  if (data.payment_enabled !== false) invalid()
+  const status: OrderStatus = oneOf(data.status, ORDER_STATUSES)
+  const enabled = data.payment_enabled
+  if (typeof enabled !== 'boolean') invalid()
+  const funds = data.payment_status
+  const paymentStatus: PaymentStatus | null = funds === null ? null : oneOf(funds, PAYMENT_STATUSES)
   const reason = data.cancellation_reason
   if (reason !== null && reason !== 'expired' && reason !== 'customer_cancelled') invalid()
   const expires = data.expires_at === null ? null : text(data.expires_at)
@@ -96,10 +131,39 @@ export function parseOrderView(value: unknown): OrderView {
   return {
     ...parseCartView(data),
     id: text(data.id),
-    status: data.status,
+    status,
     expires_at: expires,
     cancellation_reason: reason,
-    payment_enabled: false,
+    payment_enabled: enabled,
+    payment_status: paymentStatus,
+    message: text(data.message),
+  }
+}
+
+/**
+ * `redirect_url` is the only value the client navigates to, so it must be an https URL and it
+ * must be present **only** when the backend actually opened a payable session. A missing key is
+ * treated as `null` so a serializer that omits nulls cannot be mistaken for "clear to pay".
+ */
+export function parsePaymentSessionView(value: unknown): PaymentSessionView {
+  const data = record(value)
+  const code: PaymentCode = oneOf(data.code, PAYMENT_CODES)
+  const enabled = data.payment_enabled
+  if (typeof enabled !== 'boolean') invalid()
+  const provider: PaymentProvider = oneOf(data.provider, PAYMENT_PROVIDERS)
+  const orderStatus: OrderStatus = oneOf(data.order_status, ORDER_STATUSES)
+  const raw = data.redirect_url
+  const redirect = raw === undefined || raw === null ? null : text(raw)
+  if (code === 'payment_ready') {
+    if (redirect === null || !/^https:\/\/[^\s]+$/.test(redirect)) invalid()
+  } else if (redirect !== null) invalid()
+  return {
+    code,
+    payment_enabled: enabled,
+    provider,
+    order_id: text(data.order_id),
+    order_status: orderStatus,
+    redirect_url: redirect,
     message: text(data.message),
   }
 }

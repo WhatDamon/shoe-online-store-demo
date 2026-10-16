@@ -15,10 +15,10 @@ import { fileURLToPath } from 'node:url'
 
 export const ENVIRONMENTS = ['development', 'production']
 
-const TRUTHY = ['1', 'true', 'yes']
 const TRUSTED_TLS_MODES = ['1', 'true', 'require', 'verify-full']
 const PLAINTEXT_TLS_MODES = ['0', 'false']
 const LOOPBACK_HOSTS = ['127.0.0.1', 'localhost', '::1', '[::1]']
+const TRUTHY = ['1', 'true', 'yes']
 
 /**
  * PowerShell 的 -in / -ne / -notin 默认大小写不敏感，-cne 才区分大小写。
@@ -42,6 +42,16 @@ function isReadableFile(value) {
     return existsSync(value) && statSync(value).isFile()
   } catch {
     return false
+  }
+}
+
+/** Returns the parsed URL only when it is absolute (scheme + host); otherwise `null`. */
+function absoluteUrl(value) {
+  try {
+    const url = new URL(String(value ?? ''))
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url : null
+  } catch {
+    return null
   }
 }
 
@@ -77,12 +87,6 @@ export function evaluatePreflight(env, environment) {
     }
   }
 
-  if (inList(env.SHOPIFY_ENABLED, TRUTHY)) {
-    failures.push(
-      'SHOPIFY_ENABLED=true is outside this MVP; keep the compatibility purchase path disabled.',
-    )
-  }
-
   if (
     inList(env.PG_SSL, PLAINTEXT_TLS_MODES) &&
     (environment === 'production' || !isBlank(env.PG_SSL_CA_FILE))
@@ -94,6 +98,25 @@ export function evaluatePreflight(env, environment) {
 
   if (!isBlank(env.PG_SSL_CA_FILE) && !isReadableFile(env.PG_SSL_CA_FILE)) {
     failures.push('PG_SSL_CA_FILE must point to a readable certificate bundle.')
+  }
+
+  // Stripe is either fully configured or fully absent. A half-configured channel is worse
+  // than a disabled one: it reads as "payments are on" while checkout cannot work, and the
+  // trading boundary would reject the request only once a customer had already tried to pay.
+  // The rules mirror backend/app/config.py's validate_stripe_configuration.
+  if (inList(env.STRIPE_ENABLED, TRUTHY)) {
+    if (isBlank(env.STRIPE_SECRET_KEY)) {
+      failures.push('STRIPE_SECRET_KEY is required when STRIPE_ENABLED=true.')
+    }
+    if (isBlank(env.STRIPE_WEBHOOK_SECRET) && environment === 'production') {
+      failures.push('STRIPE_WEBHOOK_SECRET is required in production when STRIPE_ENABLED=true.')
+    }
+    const site = absoluteUrl(env.PUBLIC_SITE_URL)
+    if (!site) {
+      failures.push('PUBLIC_SITE_URL must be an absolute http(s) URL when STRIPE_ENABLED=true.')
+    } else if (environment === 'production' && site.protocol !== 'https:') {
+      failures.push('PUBLIC_SITE_URL must use https in production.')
+    }
   }
 
   return failures

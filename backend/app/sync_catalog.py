@@ -66,7 +66,7 @@ def main(argv: list[str] | None = None) -> int:
     engine = None
     try:
         source = load_snapshot(args.catalog)
-        engine = sync_engine(settings.database_url, apply=args.apply)
+        engine = sync_engine(settings.commerce_database_url, apply=args.apply)
         with Session(engine) as db, db.begin():
             if not args.apply and engine.dialect.name == "postgresql":
                 db.execute(text("SET TRANSACTION READ ONLY"))

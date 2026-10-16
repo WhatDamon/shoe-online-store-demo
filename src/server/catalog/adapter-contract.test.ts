@@ -12,7 +12,6 @@ describe('catalog contract', () => {
       getProducts: async () => [],
       getProductByHandle: async () => null,
       getCollections: async () => [],
-      getBuyUrl: async () => null,
     }
     expect(typeof adapter.getProducts).toBe('function')
   })

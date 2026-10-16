@@ -129,7 +129,6 @@ export function SavedPairs() {
                 {row.colorCount > 0
                   ? ` · ${row.colorCount} color${row.colorCount === 1 ? '' : 's'}`
                   : ''}
-                {row.storeAvailable ? ' · On the store' : ''}
               </span>
             </span>
           </Link>

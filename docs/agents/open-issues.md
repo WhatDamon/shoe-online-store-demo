@@ -60,6 +60,38 @@
 
 ---
 
+## P1-C：支付真值边界与响应契约
+
+支付通道由 Mock 改为 Stripe（**默认关闭**，决策记录见 `docs/adr/0008-payment-channel.md`）。
+这不降低原有的真值边界要求，反而把它推到外部供应商上。
+
+**复核：**
+- `grep -rn "STRIPE_SECRET_KEY" src/` 应为空（密钥只在 Python）；`grep -rn "import stripe" backend/app/`
+  应只命中 `backend/app/infrastructure/stripe_gateway.py`（SDK 只在网关层）。
+- `backend/app/application/payments.py` 的 `create_payment_session` 应从订单行重算金额并在调用
+  网关**之前**与 `order.total` 比对；客户端请求体只有 `order_id`。
+- Stripe 关闭时：`POST /api/v1/payments/session` 返回 HTTP 200 + `code='payment_disabled'`，
+  且不产生任何出站调用、不写资金行。
+- `grep -rn "getBuyUrl\|SHOPIFY" src/ scripts/` 不应命中生产代码（旧购买通道已下线）。
+
+**要求：** 价格、可售变体、库存、订单与支付状态的真值只能在 Python；客户端只提交 `variant_id`、
+数量与幂等键，绝不提交价格、库存、订单状态或支付结果。金额计算用 `Decimal` 并在边界转整数最小单位；
+展示层的浮点金额不得流入交易计算。未启用支付时不得扣款、不得把订单改为 `paid`；半配置必须在
+启动与预检阶段失败。`payment_enabled` 是部署级能力，不是单笔订单的可付性。
+
+**响应契约放宽（必须与两侧同步）：** 可用状态词汇扩大到 `paid` / `refunded`，订单响应新增资金轴
+`payment_status`（可空，`disabled`/`requires_payment`/`succeeded`/`refund_pending`/`refunded`），
+`payment_enabled` 由字面量 `false` 放宽为布尔，`PaymentResponse` 去掉元信息为零的 `charged` 并新增
+`redirect_url`。TS 侧 `src/domain/commerce-response.ts` 必须**白名单校验**、**不得退化成任意字符串**：
+未知状态仍要拒绝，这是防线而不是障碍。
+
+**复核：** `npx vitest run src/domain/commerce-response.test.ts`（未知状态被拒、`payment_ready` 必须有
+https `redirect_url`、其余结局不得带 URL）；后端 `npx vitest` 无关，改跑
+`npm run verify:python` 覆盖 `backend/tests/test_payment_contract.py`。
+**要求：** 两侧契约必须同时变；只改一侧会让客户端拒绝每一个合法的成功付款响应。
+
+---
+
 ## P2：预算、Session、IP 和运行时契约
 
 ### AI 日预算竞态
@@ -154,6 +186,16 @@ libpq 的 `verify-full` 负责；轮换步骤、CA 更新窗口与回滚都没�
 `docs/ai-budget-recovery-2026-10-01.md`、`docs/unified-baseline-2026-09-30.md` 的正文仍按旧路径提到
 `HANDOVER.md`。它们是有日期的历史记录，不应改写；此处登记以便读者找到新位置。
 
+### 5. 历史文档仍描述已下线的商店兼容购买通道
+
+若干带日期的报告、未改写的历史 ADR（`0004`、`0005`）与 `docs/superpowers/` 下的历史计划/规格仍描述一条
+商店兼容购买通道（静态 handle→店号映射、Buy Button 接管 PDP、`getBuyUrl` 预留接口）。它们是**定点决策记录，
+不应改写**；当前代码不再包含该通道，移除决策与新支付通道决策已由 `docs/adr/0008-payment-channel.md` 登记。
+**复核：** `grep -rnE "getBuyUrl|storeAvailable" src scripts` 预期只命中**故意钉住历史响应容忍度**的测试
+（`src/app/api/catalog/route.test.ts`、`src/components/shop/saved-pairs.test.tsx`），不命中生产代码；
+`grep -rn "CATALOG_SOURCE" src/server/catalog` 应确认来源开关只剩 `seed` 与默认 `db`。
+**要求：** 新代码不得以此为理由保留第二条购买通道或第二套变体/结算入口；历史 ADR 与带日期的报告不回写。
+
 ---
 
 ## 需要单独环境才能复核的项
@@ -164,3 +206,10 @@ libpq 的 `verify-full` 负责；轮换步骤、CA 更新窗口与回滚都没�
 - **Python 全部门禁**（`npm run verify:python`）：必须先按 `backend/README.md` 建好 `backend/.venv`。
   未建环境时 `scripts/py.mjs` 会回退到 PATH 解释器并告警，缺依赖会以 `ModuleNotFoundError` 失败。
 - **生产部署、远程 CI、正式域名 SEO 复测**：需要真实域名与部署环境。
+- **真实 Stripe 调用与端到端付款**：需要 Stripe 测试账户与出站网络。要覆盖的是「创建订单 →
+  跳转托管结账 → 付款 → 回读订单」、事件重放（同一事件只变更一次）、付款晚于释放的竞态
+  （资金进 `refund_pending` 且补偿命令能推到终态）、未启用回归，以及直接访问
+  `/orders/{id}?payment=success` 不声称已付款。离线套件用注入的假网关验证逻辑，
+  **不能替代**这些复测。
+- **Stripe 可达性与公网 webhook 入口**：需要确认部署环境能出站到 Stripe，
+  且 Stripe 能回调到公开的 webhook 路由（本地无法证明）。

@@ -59,6 +59,41 @@ it('rejects cross-origin writes and arbitrary upstream paths', async () => {
   expect((await GET(req, { params: Promise.resolve({ path: ['admin'] }) })).status).toBe(404)
   expect(fetcher).not.toHaveBeenCalled()
 })
+it('allows the refund route and anchors the allowlist to it', async () => {
+  const fetcher = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }))
+  vi.stubGlobal('fetch', fetcher)
+  const orderId = '8f14e45f-ceea-467a-9e4f-1a2b3c4d5e6f'
+  const request = (path: string[]) =>
+    new NextRequest(`http://localhost:3000/api/commerce/${path.join('/')}`, {
+      method: 'POST',
+      headers: { origin: 'http://localhost:3000' },
+    })
+  const refund = await POST(request(['orders', orderId, 'refund']), {
+    params: Promise.resolve({ path: ['orders', orderId, 'refund'] }),
+  })
+  expect(refund.status).toBe(200)
+  expect(fetcher).toHaveBeenCalledOnce()
+
+  fetcher.mockClear()
+  const nested = await POST(request(['orders', orderId, 'refund', 'extra']), {
+    params: Promise.resolve({ path: ['orders', orderId, 'refund', 'extra'] }),
+  })
+  expect(nested.status).toBe(404)
+  expect(fetcher).not.toHaveBeenCalled()
+})
+it('rejects a cross-origin refund write', async () => {
+  const fetcher = vi.fn()
+  vi.stubGlobal('fetch', fetcher)
+  const orderId = '8f14e45f-ceea-467a-9e4f-1a2b3c4d5e6f'
+  const req = new NextRequest(`http://localhost:3000/api/commerce/orders/${orderId}/refund`, {
+    method: 'POST',
+    headers: { origin: 'https://attacker.example' },
+  })
+  expect(
+    (await POST(req, { params: Promise.resolve({ path: ['orders', orderId, 'refund'] }) })).status,
+  ).toBe(403)
+  expect(fetcher).not.toHaveBeenCalled()
+})
 it('preserves session and idempotency key across a retry and reports outages', async () => {
   const fetcher = vi.fn().mockRejectedValue(new Error('offline'))
   vi.stubGlobal('fetch', fetcher)

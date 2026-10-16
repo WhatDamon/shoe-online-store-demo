@@ -15,6 +15,7 @@ from app.domain.models import (
     Reservation,
     Variant,
 )
+from app.domain.states import ORDER_STATUSES, PAYMENT_STATUSES
 
 
 def test_openapi_describes_every_success_response(commerce):
@@ -31,6 +32,7 @@ def test_openapi_describes_every_success_response(commerce):
         ("/api/v1/checkout/create-order", "post", "OrderResponse"),
         ("/api/v1/orders/{order_id}", "get", "OrderResponse"),
         ("/api/v1/orders/{order_id}/cancel", "post", "OrderResponse"),
+        ("/api/v1/orders/{order_id}/refund", "post", "OrderResponse"),
         ("/api/v1/payments/session", "post", "PaymentResponse"),
     ]
     for path, method, model in expected:
@@ -40,6 +42,30 @@ def test_openapi_describes_every_success_response(commerce):
     schema = catalog["content"]["application/json"]["schema"]
     assert schema["type"] == "array"
     assert schema["items"]["$ref"] == "#/components/schemas/ProductResponse"
+
+
+def test_openapi_registers_widened_payment_contract(commerce):
+    client, _ = commerce
+    schemas = client.get("/openapi.json").json()["components"]["schemas"]
+    assert schemas["HealthResponse"]["properties"]["payment_enabled"]["type"] == "boolean"
+    assert schemas["OrderResponse"]["properties"]["payment_enabled"]["type"] == "boolean"
+    # The vocabulary must come from app.domain.states, not a second copy in the schema module.
+    assert schemas["OrderResponse"]["properties"]["status"]["enum"] == list(ORDER_STATUSES)
+    # The money axis is readable and nullable: ``null`` is "no payment row yet".
+    money_axis = schemas["OrderResponse"]["properties"]["payment_status"]["anyOf"]
+    assert {"type": "null"} in money_axis
+    assert [option["enum"] for option in money_axis if "enum" in option] == [list(PAYMENT_STATUSES)]
+    payment = schemas["PaymentResponse"]["properties"]
+    assert payment["order_status"]["enum"] == list(ORDER_STATUSES)
+    assert payment["code"]["enum"] == [
+        "payment_disabled",
+        "payment_ready",
+        "order_not_payable",
+        "currency_unsupported",
+    ]
+    assert payment["provider"]["enum"] == ["mock", "stripe"]
+    assert {"type": "null"} in payment["redirect_url"]["anyOf"]
+    assert "charged" not in payment
 
 
 def test_catalog_list_uses_batch_queries(commerce):
@@ -164,7 +190,13 @@ def test_internal_catalog_fields_are_not_exposed(commerce, monkeypatch):
 
 @pytest.mark.parametrize(
     ("field", "invalid"),
-    [("total", 118.0), ("status", "paid"), ("payment_enabled", True), ("quantity", "2")],
+    [
+        ("total", 118.0),
+        ("status", "shipped"),
+        ("payment_status", "shipped"),
+        ("payment_enabled", "yes"),
+        ("quantity", "2"),
+    ],
 )
 def test_invalid_order_response_rolls_back_checkout(commerce, variant, monkeypatch, field, invalid):
     client, engine = commerce
@@ -201,7 +233,13 @@ def test_invalid_order_response_rolls_back_checkout(commerce, variant, monkeypat
 
 @pytest.mark.parametrize(
     ("field", "invalid"),
-    [("charged", True), ("payment_enabled", True), ("provider", "live"), ("order_status", "paid")],
+    [
+        ("code", "payment_pending"),
+        ("payment_enabled", "yes"),
+        ("provider", "live"),
+        ("order_status", "unknown"),
+        ("redirect_url", "https://checkout.stripe.com/c/pay/leftover"),
+    ],
 )
 def test_invalid_payment_response_rolls_back_writes(commerce, variant, monkeypatch, field, invalid):
     client, engine = commerce

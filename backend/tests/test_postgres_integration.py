@@ -30,7 +30,7 @@ def test_integration_url_keeps_connection_security_options():
 
 
 def test_migrations_use_supplied_connection_without_opening_configured_database(monkeypatch):
-    monkeypatch.setattr(settings, "database_url", "unsupported://must-not-connect")
+    monkeypatch.setattr(settings, "commerce_database_url", "unsupported://must-not-connect")
     engine = make_engine("sqlite://")
     try:
         with engine.connect() as connection:

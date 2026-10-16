@@ -228,7 +228,6 @@ def test_retirement_preserves_order_snapshots_idempotency_and_stock_release(
     assert retry.status_code == 200
     assert retry.json() == order
     payment = client.post("/api/v1/payments/session", json={"order_id": order["id"]}).json()
-    assert payment["charged"] is False
     assert payment["order_status"] == "pending_payment"
     if release == "cancel":
         response = client.post(f"/api/v1/orders/{order['id']}/cancel")
@@ -268,7 +267,7 @@ def test_sqlite_cli_preview_is_read_only_and_does_not_create_database(
     exported = json.loads(CATALOG_PATH.read_text("utf-8"))
     path.write_text(json.dumps([p for p in exported if p["id"] != "evo-01"]), "utf-8")
     url = str(commerce_engine.url)
-    monkeypatch.setattr(settings, "database_url", url)
+    monkeypatch.setattr(settings, "commerce_database_url", url)
     before = database_state(commerce_engine)
     assert sync_catalog.main(["--catalog", str(path)]) == 0
     result = json.loads(capsys.readouterr().out)
@@ -302,7 +301,7 @@ def test_sqlite_cli_preview_is_read_only_and_does_not_create_database(
     assert json.loads(capsys.readouterr().err)["code"] == "catalog_sync_rejected"
     assert database_state(commerce_engine) == applied
     missing = tmp_path / "not-created.db"
-    monkeypatch.setattr(settings, "database_url", f"sqlite:///{missing.as_posix()}")
+    monkeypatch.setattr(settings, "commerce_database_url", f"sqlite:///{missing.as_posix()}")
     assert sync_catalog.main(["--catalog", str(path)]) == 1
     assert not missing.exists()
     assert json.loads(capsys.readouterr().err)["code"] == "catalog_sync_rejected"
@@ -333,7 +332,7 @@ def test_cli_rejects_invalid_snapshot_without_exposing_input_or_database_url(
     path = tmp_path / "private-snapshot.json"
     path.write_text(invalid, "utf-8")
     monkeypatch.setattr(
-        settings, "database_url", "postgresql://private-user:secret-password@private-db"
+        settings, "commerce_database_url", "postgresql://private-user:secret-password@private-db"
     )
     assert sync_catalog.main(["--catalog", str(path)]) == 1
     output = capsys.readouterr()

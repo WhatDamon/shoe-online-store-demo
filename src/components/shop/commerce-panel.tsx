@@ -3,24 +3,68 @@
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import type { CartView, OrderView } from '@/domain/commerce'
-import { parseCartView, parseOrderView } from '@/domain/commerce-response'
+import { parseCartView, parseOrderView, parsePaymentSessionView } from '@/domain/commerce-response'
 import { commerceRequest } from '@/lib/commerce-client'
 import { Button } from '@/components/ui/button'
 
 const pendingKey = 'evoloop-pending-checkout'
 
+function statusLabel(order: OrderView): string {
+  if (order.status === 'cancelled')
+    return order.cancellation_reason === 'expired' ? 'Expired' : 'Cancelled'
+  if (order.status === 'paid') return 'Paid'
+  if (order.status === 'refunded') return 'Refunded'
+  return 'Pending payment'
+}
+
+/** One line, chosen by the order itself so an enabled store never reads as "not available". */
+function paymentLine(order: OrderView): string {
+  if (order.payment_status === 'refund_pending')
+    return 'A refund for this order is being processed.'
+  if (order.status === 'refunded') return 'This order has been refunded.'
+  if (order.status === 'paid') return 'Payment received. Thank you.'
+  if (!order.payment_enabled) return 'Payments are not available yet.'
+  return 'No payment has been taken yet.'
+}
+
+function paymentExplanation(order: OrderView): string {
+  if (order.status === 'cancelled')
+    return 'No payment has been taken. Inventory has been released. Add the item to your cart again to purchase.'
+  if (order.status === 'refunded') return 'The payment for this order has been returned.'
+  if (order.status === 'paid')
+    return order.payment_status === 'refund_pending'
+      ? 'The payment went through, and a refund is on its way. No further action is needed.'
+      : 'This order has been paid for.'
+  return 'No payment has been taken. Inventory will be released automatically when this order expires, or you can cancel it sooner.'
+}
+
+/**
+ * The notice comes from a forgeable query parameter, so it may only add a banner about the
+ * *attempt* — never a claim about money. A return that claims success while the order itself
+ * still says otherwise is exactly the case that must not look paid.
+ */
+function noticeBanner(order: OrderView, notice: 'success' | 'cancelled' | null): string {
+  if (notice === 'cancelled') return 'Payment was cancelled. No payment has been taken.'
+  if (notice !== 'success') return ''
+  if (order.status === 'paid' || order.status === 'refunded') return ''
+  return "We haven't received a payment for this order yet. If you just paid, refresh this page in a moment."
+}
+
 export function CommercePanel({
   mode,
   orderId,
+  paymentNotice = null,
 }: {
   mode: 'cart' | 'checkout' | 'order'
   orderId?: string
+  paymentNotice?: 'success' | 'cancelled' | null
 }) {
   const [cart, setCart] = useState<CartView | null>(null)
   const [order, setOrder] = useState<OrderView | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [retryPending, setRetryPending] = useState(false)
+  const [payMessage, setPayMessage] = useState('')
   const inFlight = useRef(false)
 
   useEffect(() => {
@@ -99,6 +143,8 @@ export function CommercePanel({
 
   const view = order ?? cart
   const hasUnavailableItems = cart?.items.some((item) => item.sellable === false) ?? false
+  const banner = order ? noticeBanner(order, paymentNotice) : ''
+  const canPay = order?.status === 'pending_payment' && order.payment_enabled
   return (
     <section className="mx-auto max-w-3xl space-y-6 px-4 py-10">
       <h1 className="font-heading text-3xl font-semibold">
@@ -113,22 +159,12 @@ export function CommercePanel({
       {order && (
         <div className="space-y-2 rounded-xl border border-neutral-200 bg-surface p-5">
           <p className="break-all">Order ID: {order.id}</p>
-          <p>
-            Status:{' '}
-            {order.status === 'cancelled'
-              ? order.cancellation_reason === 'expired'
-                ? 'Expired'
-                : 'Cancelled'
-              : 'Pending payment'}
-          </p>
+          <p>Status: {statusLabel(order)}</p>
+          {banner && <p className="rounded-lg border border-neutral-300 p-3 text-sm">{banner}</p>}
           <p role="status" className="font-semibold">
-            Payments are not available yet.
+            {payMessage || paymentLine(order)}
           </p>
-          <p className="text-sm text-neutral-600">
-            {order.status === 'cancelled'
-              ? 'No payment has been taken. Inventory has been released. Add the item to your cart again to purchase.'
-              : 'No payment has been taken. Inventory will be released automatically when this order expires, or you can cancel it sooner.'}
-          </p>
+          <p className="text-sm text-neutral-600">{paymentExplanation(order)}</p>
           {order.status === 'pending_payment' && order.expires_at && (
             <p className="text-sm text-neutral-600">
               Inventory reserved until:{' '}
@@ -149,6 +185,27 @@ export function CommercePanel({
             Permanent order link (available only in this shopping session)
           </Link>
         </div>
+      )}
+      {canPay && order && (
+        <Button
+          disabled={busy}
+          onClick={() =>
+            act(async () => {
+              setPayMessage('')
+              const session = await commerceRequest('payments/session', parsePaymentSessionView, {
+                method: 'POST',
+                body: JSON.stringify({ order_id: order.id }),
+              })
+              if (session.code === 'payment_ready' && session.redirect_url) {
+                window.location.assign(session.redirect_url)
+                return
+              }
+              setPayMessage(session.message)
+            })
+          }
+        >
+          {busy ? 'Opening payment...' : 'Pay now'}
+        </Button>
       )}
       {view?.items.map((item) => (
         <article
@@ -212,7 +269,7 @@ export function CommercePanel({
         <div className="space-y-3">
           <p className="text-sm text-neutral-600">
             Your total is recalculated when you place the order. This local demo does not add
-            shipping or tax. Payments are not available yet.
+            shipping or tax.
           </p>
           <Button
             disabled={busy || ((!cart?.items.length || hasUnavailableItems) && !retryPending)}

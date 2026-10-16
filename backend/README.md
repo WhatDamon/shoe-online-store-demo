@@ -22,7 +22,11 @@ external webhook, or real payment provider is required. All amounts are calculat
 with Decimal and serialized as decimal strings. The only provider is
 `MockPaymentProvider`: `payment_disabled`, `charged=false`; it cannot mark an order paid.
 
-Pending orders reserve inventory for 30 minutes by default. The FastAPI lifespan runs a
+Pending orders reserve inventory for 60 minutes by default. That default is not a
+preference: Stripe refuses a Checkout Session shorter than 30 minutes, so a hold that
+expires inside that window would make every "order, then pay immediately" flow refuse
+itself. `RESERVATION_TTL_SECONDS` is therefore floor-bounded at 3600, and may only be
+raised above it. The FastAPI lifespan runs a
 bounded in-process sweeper every 30 seconds; `python -m app.expire_orders` also runs one
 manual batch. Both paths use the same transactional release code as cancellation.
 Each lifespan worker keeps its own transient `(expires_at, id)` cursor and a frozen
@@ -51,7 +55,7 @@ command is identical because `npm run py` resolves the interpreter
 
 ```bash
 python3.12 -m venv backend/.venv        # Windows: py -3.12 -m venv backend/.venv
-cp backend/.env.example backend/.env    # do not overwrite an existing backend/.env
+cp backend/.env.example backend/.env    # optional: only for backend-only overrides
 npm run py -- -m pip install -r requirements-dev.lock
 npm run db:migrate:python
 npm run py -- -m app.seed
@@ -70,8 +74,23 @@ The lock file pins the versions actually verified. To resolve fresh versions fro
 `uv pip install --python .venv/bin/python -r pyproject.toml --extra dev`
 (Windows: `.venv/Scripts/python.exe`).
 
-Run from `backend/`: default database is `backend/commerce.db`. Backend `.env`
-is resolved independently of the Next.js environment. Set `DATABASE_URL` to
+`backend/requirements-dev.lock` is a flat, fully pinned list (`name==version`, lowercase
+normalized names, alphabetical) installed verbatim by CI and by the setup commands above.
+It has no generator: after adding a dependency to `pyproject.toml`, install that lower
+bound and append only the packages the install added, in alphabetical order and using the
+normalized lowercase name. Do not re-freeze the whole environment to add one package:
+that moves unrelated pins verified separately, and the local interpreter version differs
+from CI's. Take each new version from the install output, not from a guessed number.
+
+```bash
+npm run py -- -m pip install 'stripe>=16,<17'   # the dependency just added to pyproject.toml
+npm run py -- -m pip freeze                     # copy only the new name==version lines
+```
+
+Run from `backend/`: default database is `backend/commerce.db`. Python reads its own key,
+`COMMERCE_DATABASE_URL` — deliberately not the Next.js `DATABASE_URL`, which points at the
+separate display/AI database, so both sides can share one root `.env`. Set
+`COMMERCE_DATABASE_URL` to
 `postgresql+psycopg://user:password@localhost:5432/evoloop` for local PostgreSQL, then run
 the same Alembic and seed commands. For a production process, set `APP_ENV=production`
 and keep it aligned with `NODE_ENV=production`; an `.env` development override is
@@ -303,7 +322,8 @@ template and other copies intact. Run it with
 
 ## MVP limitations
 
-- Pending orders expire after 30 minutes by default. Release occurs on the next bounded
+- Pending orders expire after 60 minutes by default (floor 3600: a shorter hold cannot
+  outlive a Stripe Checkout Session). Release occurs on the next bounded
   sweep or order access; server downtime and sweep backlogs can delay release. Run
   `python -m app.expire_orders` for a manual pass when needed.
 - Losing the anonymous cookie loses access to orders; no account recovery or admin UI.
@@ -313,4 +333,7 @@ template and other copies intact. Run it with
 - Inventory quantities and supplier-derived demo prices are fixtures, not live stock.
 - Total is the item subtotal in USD; no shipping, tax, discounts or payment processing.
 - SQLite serializes writes; PostgreSQL should be load-tested before multi-instance use.
-- No real payment, Shopify sync, external webhook, login, refunds, logistics or queue.
+- No login, logistics or queue. **Payments are off by default.** When `STRIPE_ENABLED=true` with a
+  complete key set the Python service opens Stripe hosted Checkout, ingests verified webhooks and
+  issues refunds (with `python -m app.refund_pending` as the repeatable compensation command);
+  while it is off nothing is charged and no order can reach `paid`.

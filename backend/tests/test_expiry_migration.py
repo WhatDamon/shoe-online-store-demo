@@ -12,7 +12,7 @@ from app.infrastructure.database import make_engine
 
 def test_upgrade_preserves_populated_orders_and_grants_grace(tmp_path, monkeypatch):
     url = f"sqlite:///{(tmp_path / 'migration.db').as_posix()}"
-    monkeypatch.setattr(settings, "database_url", url)
+    monkeypatch.setattr(settings, "commerce_database_url", url)
     config = Config(str(Path(__file__).parents[1] / "alembic.ini"))
     command.upgrade(config, "41e28c896353")
     engine = make_engine(url)

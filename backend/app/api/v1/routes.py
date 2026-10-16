@@ -1,12 +1,12 @@
+from dataclasses import asdict
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, Response
+from fastapi import APIRouter, Depends, Header, Request, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.application.catalog import require_sellable
 from app.application.commerce import (
-    MockPaymentProvider,
     cancel_order,
     cart_view,
     create_order,
@@ -20,9 +20,11 @@ from app.application.errors import (
     ProductNotFound,
     QuantityLimitExceeded,
 )
-from app.dependencies import anonymous_session, database, internal_proxy
+from app.application.payments import RefundRefused, create_payment_session, refund_order
+from app.application.webhooks import ingest_event
+from app.dependencies import anonymous_session, database, internal_proxy, webhook_proxy
 from app.domain.models import CartItem, Inventory, Media, Product, Variant
-from app.schemas.commerce import AddItem, PaymentRequest, Quantity
+from app.schemas.commerce import AddItem, PaymentRequest, Quantity, StripeEventProjection
 from app.schemas.responses import CartResponse, OrderResponse, PaymentResponse, ProductResponse
 
 router = APIRouter(prefix="/api/v1", dependencies=[Depends(internal_proxy)])
@@ -182,10 +184,55 @@ def cancel(order_id: str, db: DB, sid: SessionID) -> dict:
     return cancel_order(db, sid, order_id)
 
 
+@router.post("/orders/{order_id}/refund", response_model=OrderResponse)
+def refund(order_id: str, db: DB, sid: SessionID, request: Request) -> Response | dict:
+    # Same ownership contract as cancel: another session's order is a plain 404.
+    outcome = refund_order(db, sid, order_id)
+    if isinstance(outcome, RefundRefused):
+        # Report the refusal instead of raising it: an exception would unwind this request's
+        # transaction and discard the failed refund attempt it just recorded, and that debt
+        # is what the compensation pass retries. ``app.main`` imports this module to register
+        # the router, so the shared response helper can only be imported here.
+        from app.main import error_response
+
+        refusal = outcome.error
+        return error_response(request, refusal.status_code, refusal.code, refusal.message)
+    return outcome.order
+
+
 @router.post("/payments/session", response_model=PaymentResponse)
 def payment(body: PaymentRequest, db: DB, sid: SessionID, response: Response) -> dict:
-    lock_cart(db, sid)
-    order = owned_order(db, sid, str(body.order_id))
-    expire_if_due(db, order)
-    response.status_code = 200  # Machine-readable disabled result, never a payment success.
-    return MockPaymentProvider().create_session(db, order)
+    response.status_code = 200  # Machine-readable outcome, never a payment success.
+    return asdict(create_payment_session(db, sid, str(body.order_id)))
+
+
+@router.post("/webhooks/stripe", response_model=None, dependencies=[Depends(webhook_proxy)])
+def stripe_webhook(projection: StripeEventProjection, db: DB, request: Request) -> Response | dict:
+    """Ingest one projected Stripe event forwarded by the Next public route.
+
+    The signature was verified there, against ``STRIPE_WEBHOOK_SECRET``, and the body is
+    already the projection this store acts on; the raw event never reaches Python. Like
+    every other ``/api/v1`` route this one requires the internal proxy credential -- and,
+    unlike them, it refuses to run without one being configured at all
+    (``dependencies.webhook_proxy``), because a forged event here writes "paid".
+
+    A processing failure is deliberately answered with a non-2xx. Stripe retries a delivery
+    it could not acknowledge, and folding this failure into a 2xx would silently drop a
+    payment this store has already taken money for. That is why this route reports the
+    failure instead of raising it: raising would roll back the ``failed`` record the retry
+    needs, leaving nothing to explain the lost event.
+    """
+    result = ingest_event(db, projection)
+    if result.status == "failed":
+        # Imported here for the same reason as the refund route does it: ``app.main``
+        # imports this module to register the router.
+        from app.main import error_response
+
+        return error_response(
+            request, 500, "webhook_processing_failed", "The event could not be processed"
+        )
+    return {
+        "status": result.status,
+        "event_id": result.event_id,
+        "order_id": result.order_id,
+    }

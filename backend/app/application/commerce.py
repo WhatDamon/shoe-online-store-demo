@@ -1,3 +1,5 @@
+import json
+import logging
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
@@ -11,9 +13,11 @@ from app.application.catalog import lock_products
 from app.application.errors import (
     EmptyCart,
     InsufficientStock,
+    OrderNotCancellable,
     OrderNotFound,
     VariantUnavailable,
 )
+from app.application.payments import SETTLED_PAYMENT_STATUSES, MockPaymentProvider
 from app.config import settings
 from app.domain.models import (
     Cart,
@@ -22,11 +26,36 @@ from app.domain.models import (
     Order,
     OrderItem,
     Payment,
-    PaymentEvent,
     Product,
     Reservation,
     Variant,
 )
+
+# The disabled payment provider lives in app.application.payments, which owns payment
+# orchestration; it is re-exported here so existing import sites keep working.
+__all__ = [
+    "MockPaymentProvider",
+    "as_utc",
+    "cancel_order",
+    "cart_view",
+    "create_order",
+    "expire_if_due",
+    "lock_cart",
+    "order_view",
+    "owned_order",
+    "release_order",
+]
+
+logger = logging.getLogger("commerce.orders")
+
+
+def _log_event(level: int, event: str, **fields: str | int) -> None:
+    try:
+        logger.log(level, json.dumps(dict(event=event, **fields)))
+    except Exception:
+        # Observability is best-effort: a broken handler/filter must not change
+        # transaction outcomes, nor replace the refusal the caller must see.
+        pass
 
 
 def lock_cart(db: Session, session_id: str) -> Cart:
@@ -85,17 +114,43 @@ def owned_order(db: Session, session_id: str, order_id: str) -> Order:
     return order
 
 
+def payment_message(order_status: str, payment_status: str | None) -> str:
+    """The money sentence shown with an order, derived from the same two axes the client reads.
+
+    A store with Stripe off keeps the historical sentence verbatim, because both the order page
+    and the support copy key off it. An enabled store must not say payments are unavailable:
+    that would contradict the ``payment_enabled`` flag travelling in the same response.
+    """
+    if not settings.stripe_ready:
+        return "Payments are not available yet."
+    if payment_status == "refund_pending":
+        return "A refund for this order is being processed."
+    if order_status == "refunded" or payment_status == "refunded":
+        return "This order has been refunded."
+    if order_status == "paid":
+        return "Payment received."
+    if order_status == "cancelled":
+        return "No payment has been taken."
+    return "No payment has been taken yet."
+
+
 def order_view(db: Session, order: Order) -> dict:
     items = db.scalars(select(OrderItem).where(OrderItem.order_id == order.id)).all()
+    # The money axis travels with the order on purpose. ``order.status`` answers only the
+    # fulfilment question, so a client that reads it alone cannot tell "paid" (money
+    # captured, refund owed, still a sale) from "paid and done", nor a released hold from
+    # money this customer is owed back. ``None`` is "no payment row yet".
+    money = db.scalar(select(Payment.status).where(Payment.order_id == order.id))
     return dict(
         id=order.id,
         status=order.status,
+        payment_status=money,
         expires_at=as_utc(order.expires_at).isoformat() if order.expires_at else None,
         cancellation_reason=order.cancellation_reason,
         total=str(order.total),
         currency=order.currency,
-        payment_enabled=False,
-        message="Payments are not available yet.",
+        payment_enabled=settings.stripe_ready,
+        message=payment_message(order.status, money),
         items=[
             dict(
                 id=i.id,
@@ -190,6 +245,20 @@ def as_utc(value: datetime) -> datetime:
 
 def release_order(db: Session, order: Order, reason: str) -> None:
     """Caller must hold the cart write lock before reading the order."""
+    # Guard before the first write, and on the money row rather than on ``order.status``:
+    # the state this refuses is an order still reading ``pending_payment`` while its payment
+    # already settled, which is exactly the one that would put captured stock back on sale.
+    # Raising rolls the caller's whole transaction back, and both the expiry sweep and the
+    # customer cancellation path come through here. No payment detail goes into the event:
+    # the session reference and the payment intent are not needed to explain a refusal.
+    settled = db.scalar(
+        select(Payment.id).where(
+            Payment.order_id == order.id, Payment.status.in_(SETTLED_PAYMENT_STATUSES)
+        )
+    )
+    if settled is not None:
+        _log_event(logging.ERROR, "inventory_release_refused", order_id=order.id, reason=reason)
+        raise RuntimeError("Inventory release refused for an order with a settled payment")
     if order.status != "pending_payment":
         return
     reservations = db.scalars(
@@ -247,27 +316,22 @@ def expire_if_due(db: Session, order: Order, *, now: datetime | None = None) -> 
 
 
 def cancel_order(db: Session, session_id: str, order_id: str) -> dict:
+    """Cancel an owned order, or say why it cannot be cancelled.
+
+    Cancellation answers on the fulfilment axis, so it has exactly three outcomes: a held
+    reservation is released, an already released order is a no-op, and a settled order is
+    refused with a stable code that routes the customer to the refund path. Without the
+    refusal, a settled order would reach the release guard and be reported as an
+    infrastructure failure the caller is told to retry.
+    """
     lock_cart(db, session_id)
     order = owned_order(db, session_id, order_id)
+    if order.status == "cancelled":
+        # Released already, by this customer, by expiry, or because money arrived after the
+        # stock went back on sale: a repeat releases nothing a second time.
+        return order_view(db, order)
+    if order.status in ("paid", "refunded"):
+        raise OrderNotCancellable()
     if not expire_if_due(db, order):
         release_order(db, order, "customer_cancelled")
     return order_view(db, order)
-
-
-class MockPaymentProvider:
-    def create_session(self, db: Session, order: Order) -> dict:
-        payment = db.scalar(select(Payment).where(Payment.order_id == order.id))
-        if payment is None:
-            payment = Payment(order_id=order.id)
-            db.add(payment)
-            db.flush()
-            db.add(PaymentEvent(payment_id=payment.id, event="payment_disabled"))
-        return dict(
-            code="payment_disabled",
-            payment_enabled=False,
-            provider="mock",
-            charged=False,
-            order_id=order.id,
-            order_status=order.status,
-            message="Payments are not available yet.",
-        )
