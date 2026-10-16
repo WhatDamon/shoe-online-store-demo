@@ -333,4 +333,7 @@ template and other copies intact. Run it with
 - Inventory quantities and supplier-derived demo prices are fixtures, not live stock.
 - Total is the item subtotal in USD; no shipping, tax, discounts or payment processing.
 - SQLite serializes writes; PostgreSQL should be load-tested before multi-instance use.
-- No real payment, external webhook, login, refunds, logistics or queue.
+- No login, logistics or queue. **Payments are off by default.** When `STRIPE_ENABLED=true` with a
+  complete key set the Python service opens Stripe hosted Checkout, ingests verified webhooks and
+  issues refunds (with `python -m app.refund_pending` as the repeatable compensation command);
+  while it is off nothing is charged and no order can reach `paid`.

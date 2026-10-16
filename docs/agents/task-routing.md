@@ -17,7 +17,7 @@
 | --- | --- | --- |
 | AI / embedding / 预算 / 护栏 | `src/app/api/ai/chat/route.ts`、`src/server/guardrails/`、`src/server/search/`、`docs/ai-request-boundary-2026-10-03.md`、`docs/ai-usage-accuracy-2026-10-02.md` | 0004 |
 | 首次上手 / 环境问题 | `README.md`、`backend/README.md`、`docs/implementation-report.md`、`docs/agents/verification.md` | — |
-| 交易闭环（购物车/订单/支付/库存） | `backend/README.md`、`backend/app/main.py`、`backend/app/api/v1/routes.py`、`backend/app/application/`、`backend/app/domain/models.py`、`backend/app/infrastructure/database.py`、`backend/app/schemas/`、`backend/migrations/`、`backend/tests/`、`src/app/api/commerce/[...path]/route.ts`、`docs/commerce-mvp-report.md`、`docs/agents/commerce-contract.md` | — |
+| 交易闭环（购物车/订单/支付/库存） | `backend/README.md`、`backend/app/main.py`、`backend/app/api/v1/routes.py`、`backend/app/application/`、`backend/app/domain/{models,states,money}.py`、`backend/app/infrastructure/{database,stripe_gateway}.py`、`backend/app/schemas/`、`backend/migrations/`、`backend/tests/`、`src/app/api/commerce/[...path]/route.ts`、`src/app/api/webhooks/stripe/route.ts`、`docs/commerce-mvp-report.md`、`docs/agents/commerce-contract.md` | 0008 |
 | 展示目录 / 变体 / 尺码 | `src/domain/product.ts`、`src/server/catalog/adapter-contract.ts`、`src/server/catalog/db-adapter.ts`、`src/db/schema.ts`、`src/db/schema-postgres.ts`、`src/app/api/catalog/route.ts`、`scripts/check-catalog-drift.mjs` | 0001、0002、0005、0007 |
 | 前端 / UI / 客户端组件 | `src/domain/`（同构层）、`src/components/`、`CONTEXT.md` | 0005 |
 | SEO / metadata / sitemap / JSON-LD | `src/lib/seo.ts`、`src/lib/site.ts`、`src/app/robots.ts`、`src/app/sitemap.ts`、`docs/seo-geo-plan.md` | — |
@@ -45,6 +45,7 @@
 | 0005 | 共享领域层 `src/domain/`，`server/` 不得被客户端运行时导入 | 碰客户端组件导入 |
 | 0006 | 包管理器层从 Bun 迁移到 npm | 碰依赖、锁文件、CI |
 | 0007 | TypeScript 展示库使用版本化 Drizzle 迁移 | 碰 `drizzle/` 迁移 |
+| 0008 | 支付通道改用 Stripe，真值留在 Python；根 `.env` 单一真源 | 碰支付、退款、webhook、金额或 env 归属 |
 
 ## 改 Next.js 之前
 

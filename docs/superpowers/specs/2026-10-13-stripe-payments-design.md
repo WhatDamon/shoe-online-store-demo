@@ -68,6 +68,14 @@ Next 侧继续只做展示、代理与 AI。Stripe 是支付通道，不是真�
 4. `orders.status='refunded'` ⇒ 资金状态为 `refunded`。
 5. 同一订单最多一条 `payments` 行（现有唯一约束保持）。
 
+> **更正（实现期发现，见 ADR 0008）。** 第 1 条的原文表述过强：资金轴单行无法同时为 `succeeded` 与
+> `refund_pending`，而「退款处理中」是合法的已捕获状态。修正后的口径为：
+> `orders.status='paid'` ⇒ 资金**已被捕获**，即 `payments.status ∈ {succeeded, refund_pending, refunded}`，
+> 且该订单所有预占为 `consumed`。这也意味着「已付 + `refund_pending`」是**合法组合**，
+> 客户端需要能读到资金轴才能区分「普通已付」与「已付但欠退款」。常驻契约见
+> `docs/agents/commerce-contract.md` 的「三条状态轴与不变量」。
+> 另：第 5 条已由现有唯一约束保证；第 2 条在实现中扩展为「资金为已结算即需退款记录」。
+
 ## 5. 数据模型与迁移
 
 一次 Alembic 迁移完成，**只放宽约束与新增可空列，不改写既有数据**。

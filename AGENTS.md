@@ -40,8 +40,12 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   都不可信；结账必须由 Python 交易边界重新读取并计算。
 - **Python commerce（`backend/`）是价格、可售变体、库存、购物车、订单和支付状态的真值。**
   TypeScript 侧承担展示目录、商品内容、搜索/embedding 和 AI。
-- **本 MVP 不接入真实支付。** 只能使用 `MockPaymentProvider`：不得扣款、不得把订单改为 `paid`，
-  支付接口必须返回明确的「支付暂未启用」结果。
+- **支付默认关闭，且真值在 Python。** 仅当 `STRIPE_ENABLED=true` 且密钥齐备时启用 Stripe；
+  **未启用时不得扣款、不得把订单改为 `paid`，支付接口必须返回明确的「支付暂未启用」结果**
+  （即 `MockPaymentProvider` 路径的行为）。`STRIPE_SECRET_KEY` 只由 Python 读取，Next 与浏览器
+  永不持有；金额由 Python 从订单行重新计算，客户端只提交 `order_id`。半配置（只填一个密钥）
+  必须在启动与预检阶段失败，而不是让结账在运行时才发现。决策记录见
+  `docs/adr/0008-payment-channel.md`；原因：真值边界不可由客户端或外部托管系统决定。
 - **默认不引入 Redis、Celery 或微服务拆分。** 若未来需要共享限流、Session、预算或任务状态，
   先提交容量与故障证据、接口设计、迁移与回滚方案，再引入共享基础设施。
 - **本地默认 SQLite，但模型与迁移必须保持 PostgreSQL 兼容。** 正式 schema 由迁移管理，不用运行时
