@@ -1,0 +1,206 @@
+{
+  "carts": [
+    { "currency": "USD", "items": [], "total": "0.00" },
+    {
+      "currency": "USD",
+      "items": [
+        {
+          "available": 120,
+          "color": "蓝色",
+          "id": "00000000-0000-4000-8000-000000000004",
+          "quantity": 2,
+          "sellable": true,
+          "size": 42,
+          "sku": "DEMO-BLUE-42",
+          "subtotal": "39.90",
+          "title": "Demo 轻量运动鞋",
+          "unit_price": "19.95",
+          "variant_id": "00000000-0000-4000-8000-000000000002"
+        }
+      ],
+      "total": "39.90"
+    },
+    {
+      "currency": "USD",
+      "items": [
+        {
+          "available": 120,
+          "color": "蓝色",
+          "id": "00000000-0000-4000-8000-000000000004",
+          "quantity": 99,
+          "sellable": true,
+          "size": 42,
+          "sku": "DEMO-BLUE-42",
+          "subtotal": "1975.05",
+          "title": "Demo 轻量运动鞋",
+          "unit_price": "19.95",
+          "variant_id": "00000000-0000-4000-8000-000000000002"
+        }
+      ],
+      "total": "1975.05"
+    },
+    {
+      "currency": "USD",
+      "items": [
+        {
+          "available": 0,
+          "color": "蓝色",
+          "id": "00000000-0000-4000-8000-000000000004",
+          "quantity": 2,
+          "sellable": false,
+          "size": 43,
+          "sku": "DEMO-BLUE-43",
+          "subtotal": "39.90",
+          "title": "Demo 轻量运动鞋",
+          "unit_price": "19.95",
+          "variant_id": "00000000-0000-4000-8000-000000000003"
+        }
+      ],
+      "total": "39.90"
+    }
+  ],
+  "orders": [
+    {
+      "cancellation_reason": null,
+      "currency": "USD",
+      "expires_at": "2030-01-02T03:04:05+00:00",
+      "id": "00000000-0000-4000-8000-000000000101",
+      "items": [
+        {
+          "color": "蓝色",
+          "id": "00000000-0000-4000-8000-000000000005",
+          "quantity": 2,
+          "size": 42,
+          "sku": "DEMO-BLUE-42",
+          "title": "Demo 轻量运动鞋",
+          "unit_price": "19.95",
+          "variant_id": "00000000-0000-4000-8000-000000000002"
+        }
+      ],
+      "message": "Payments are not available yet.",
+      "payment_enabled": false,
+      "status": "pending_payment",
+      "total": "39.90"
+    },
+    {
+      "cancellation_reason": "customer_cancelled",
+      "currency": "USD",
+      "expires_at": "2030-01-02T03:04:05+00:00",
+      "id": "00000000-0000-4000-8000-000000000102",
+      "items": [
+        {
+          "color": "蓝色",
+          "id": "00000000-0000-4000-8000-000000000005",
+          "quantity": 2,
+          "size": 42,
+          "sku": "DEMO-BLUE-42",
+          "title": "Demo 轻量运动鞋",
+          "unit_price": "19.95",
+          "variant_id": "00000000-0000-4000-8000-000000000002"
+        }
+      ],
+      "message": "Payments are not available yet.",
+      "payment_enabled": false,
+      "status": "cancelled",
+      "total": "39.90"
+    },
+    {
+      "cancellation_reason": "expired",
+      "currency": "USD",
+      "expires_at": "2030-01-02T03:04:05+00:00",
+      "id": "00000000-0000-4000-8000-000000000103",
+      "items": [
+        {
+          "color": "蓝色",
+          "id": "00000000-0000-4000-8000-000000000005",
+          "quantity": 2,
+          "size": 42,
+          "sku": "DEMO-BLUE-42",
+          "title": "Demo 轻量运动鞋",
+          "unit_price": "19.95",
+          "variant_id": "00000000-0000-4000-8000-000000000002"
+        }
+      ],
+      "message": "Payments are not available yet.",
+      "payment_enabled": false,
+      "status": "cancelled",
+      "total": "39.90"
+    },
+    {
+      "cancellation_reason": null,
+      "currency": "USD",
+      "expires_at": null,
+      "id": "00000000-0000-4000-8000-000000000104",
+      "items": [
+        {
+          "color": "蓝色",
+          "id": "00000000-0000-4000-8000-000000000005",
+          "quantity": 2,
+          "size": 42,
+          "sku": "DEMO-BLUE-42",
+          "title": "Demo 轻量运动鞋",
+          "unit_price": "19.95",
+          "variant_id": "00000000-0000-4000-8000-000000000002"
+        }
+      ],
+      "message": "Payments are not available yet.",
+      "payment_enabled": false,
+      "status": "pending_payment",
+      "total": "39.90"
+    }
+  ],
+  "payments": [
+    {
+      "charged": false,
+      "code": "payment_disabled",
+      "message": "Payments are not available yet.",
+      "order_id": "00000000-0000-4000-8000-000000000101",
+      "order_status": "pending_payment",
+      "payment_enabled": false,
+      "provider": "mock"
+    },
+    {
+      "charged": false,
+      "code": "payment_disabled",
+      "message": "Payments are not available yet.",
+      "order_id": "00000000-0000-4000-8000-000000000102",
+      "order_status": "cancelled",
+      "payment_enabled": false,
+      "provider": "mock"
+    }
+  ],
+  "products": [
+    {
+      "description": "仅供契约测试的合成商品。",
+      "handle": "demo-contract-shoe",
+      "id": "00000000-0000-4000-8000-000000000001",
+      "media": [
+        { "color": "蓝色", "url": "/demo/contract-shoe-blue.webp" },
+        { "color": null, "url": "/demo/contract-shoe-detail.webp" }
+      ],
+      "title": "Demo 轻量运动鞋",
+      "variants": [
+        {
+          "available": 120,
+          "color": "蓝色",
+          "color_hex": "#336699",
+          "currency": "USD",
+          "id": "00000000-0000-4000-8000-000000000002",
+          "price": "19.95",
+          "size": 42,
+          "sku": "DEMO-BLUE-42"
+        },
+        {
+          "available": 0,
+          "color": "蓝色",
+          "color_hex": "#336699",
+          "currency": "USD",
+          "id": "00000000-0000-4000-8000-000000000003",
+          "price": "19.95",
+          "size": 43,
+          "sku": "DEMO-BLUE-43"
+        }
+      ]
+    }
+  ]
+}

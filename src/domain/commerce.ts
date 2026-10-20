@@ -1,36 +1,18 @@
-export interface CommerceVariant {
-  id: string
-  color: string
-  size: number
-  price: string
-  currency: string
-  available: number
+import type { components, paths } from './commerce-api.generated'
+
+// API shapes come from Python. These projections retain the existing page contract.
+type Schemas = components['schemas']
+export type CommerceVariant = Pick<
+  Schemas['VariantResponse'],
+  'id' | 'color' | 'size' | 'price' | 'currency' | 'available'
+>
+export type CommerceProduct = {
+  [Key in keyof Pick<Schemas['ProductResponse'], 'variants'>]: CommerceVariant[]
 }
-export interface CommerceProduct {
-  variants: CommerceVariant[]
-}
-export interface CartLine {
-  id: string
-  variant_id: string
-  title: string
-  sku: string
-  color: string
-  size: number
-  quantity: number
-  unit_price: string
-  available?: number
-  sellable?: boolean
-}
-export interface CartView {
-  items: CartLine[]
-  total: string
-  currency: string
-}
-export interface OrderView extends CartView {
-  id: string
-  status: 'pending_payment' | 'cancelled'
-  expires_at: string | null
-  cancellation_reason: 'expired' | 'customer_cancelled' | null
-  payment_enabled: false
-  message: string
-}
+// Old cart responses omit inventory fields; order items never include them.
+export type CartLine = Schemas['OrderItemResponse'] &
+  Partial<Pick<Schemas['CartItemResponse'], 'available' | 'sellable'>>
+type CartResponse = paths['/api/v1/cart']['get']['responses'][200]['content']['application/json']
+export type CartView = Omit<CartResponse, 'items'> & { items: CartLine[] }
+export type OrderView = Omit<Schemas['OrderResponse'], 'items'> & { items: CartLine[] }
+export type PaymentView = Schemas['PaymentResponse']
