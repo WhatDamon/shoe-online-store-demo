@@ -17,6 +17,12 @@ import { useOptionalProductColorSelection } from './product-color-selection'
 
 interface ProductActionsProps {
   product: ProductView
+  /**
+   * 服务端（RSC）已算好的结算 URL（无 store → null）。
+   * **当前本组件并不消费它**：组件体解构中不含 buyUrl。它是已明文延后的商店直购
+   * 通道（getBuyUrl 恒为 null）的尾端，声明与调用点保留，以免单方面抹掉该预留
+   * 通道；真正的取舍在 getBuyUrl 一并决策时做。
+   */
   buyUrl: string | null
   buyConfig?: ShopifyBuyConfig | null
   sizeSystem?: SizeSystem
