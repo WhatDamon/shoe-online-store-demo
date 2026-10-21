@@ -189,7 +189,7 @@ See [`.env.example`](.env.example) for the annotated template. Summary:
 | `AI_EMBEDDING_MODEL` | `text-embedding-3-small` | Embedding model for semantic search (cached locally) |
 | `AI_MAX_TURNS` | `20` (max `100`) | Per-session turn cap (soft message when exceeded) |
 | `AI_MAX_OUTPUT_TOKENS` | `500` (max `2000`) | Max output tokens per provider response |
-| `AI_REQUEST_TIMEOUT_MS` | `20000` (max `120000`) | Provider request timeout |
+| `AI_REQUEST_TIMEOUT_MS` | `20000` (max `120000`) | Chat streaming and embedding fetch/body timeout; probe capped at 3000 ms |
 | `AI_MAX_MESSAGE_CHARS` | `800` (max `4000`) | Max characters per incoming user message |
 | `AI_DAILY_TOKEN_CAP` | `1000000` (max `10000000`) | UTC estimated-token budget; atomic admission, completed usage settlement and conservative accounting for uncertain calls |
 | `AI_SESSION_SECRET` | *(required in production)* | Private signing secret, at least 32 bytes; missing/short configuration fails closed |
