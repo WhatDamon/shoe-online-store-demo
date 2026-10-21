@@ -20,7 +20,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
-import { formatPrice } from '@/lib/format'
+import { market } from '@/lib/market'
 import { pageMetadata } from '@/lib/seo'
 import { absoluteUrl } from '@/lib/seo'
 import { JsonLd } from '@/components/seo/json-ld'
@@ -123,16 +123,14 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
                 </div>
               </div>
 
-              {/* 商店直购形态：demo $ 价不显示（价格仅由 Buy Button 以店币呈现，决策：不并存误导） */}
-              {buyConfig == null ? (
-                <p className="text-2xl font-semibold text-ink">
-                  {formatPrice(product.price.amount)}
-                </p>
-              ) : null}
-
               <p className="text-[15px] leading-7 text-neutral-600">{product.description}</p>
 
-              <ProductActions product={product} buyUrl={buyUrl} buyConfig={buyConfig}>
+              <ProductActions
+                product={product}
+                buyUrl={buyUrl}
+                buyConfig={buyConfig}
+                sizeSystem={market.sizeSystem}
+              >
                 <div className="flex flex-col gap-3">
                   {/* 详情手风琴分区标题：base-ui AccordionHeader 固定渲染 h3，
                   需 h2 祖先承接 h1 → h3 的标题层级（heading-order 修复）。 */}

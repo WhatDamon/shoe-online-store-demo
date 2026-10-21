@@ -14,15 +14,17 @@ describe('Python to frontend response contract', () => {
   it('accepts every Python-validated sample and preserves consumed fields', () => {
     for (const product of samples.products) {
       expect(parseCommerceProduct(product).variants).toEqual(
-        product.variants.map(({ id, color, size, price, currency, available }) => ({
+        product.variants.map(({ id, color, color_hex, size, price, currency, available }) => ({
           id,
           color,
+          color_hex,
           size,
           price,
           currency,
           available,
         })),
       )
+      expect(parseCommerceProduct(product).media).toEqual(product.media)
     }
     for (const cart of samples.carts) {
       expect(parseCartView(cart)).toEqual({

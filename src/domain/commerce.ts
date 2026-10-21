@@ -4,9 +4,9 @@ import type { components, paths } from './commerce-api.generated'
 type Schemas = components['schemas']
 export type CommerceVariant = Pick<
   Schemas['VariantResponse'],
-  'id' | 'color' | 'size' | 'price' | 'currency' | 'available'
+  'id' | 'color' | 'color_hex' | 'size' | 'price' | 'currency' | 'available'
 >
-export type CommerceProduct = {
+export type CommerceProduct = Pick<Schemas['ProductResponse'], 'media'> & {
   [Key in keyof Pick<Schemas['ProductResponse'], 'variants'>]: CommerceVariant[]
 }
 // Old cart responses omit inventory fields; order items never include them.

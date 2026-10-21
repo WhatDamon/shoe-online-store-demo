@@ -13,15 +13,22 @@ interface SizeSelectorProps {
   onChange: (value: CanonicalSize) => void
   /** 已保存「我的尺码」对应的 canonical（无则 null）：命中 chip 加品牌描边 + Your size 标记。 */
   match?: CanonicalSize | null
+  disabled?: boolean
 }
 
 // PDP 尺码选择：可访问 radio group（fieldset/legend）。受控选择；name="sizes"
 // 保证组内互斥。真实 input 为 sr-only，键盘焦点落在 input 上，视觉 chip 以
 // peer-focus-visible 提供可见轮廓。match（我的码）命中项以品牌色描边区分，
 // 选中态仍以 ink 底反白覆盖，二者可叠加不冲突。
-export function SizeSelector({ sizeOptions, selected, onChange, match = null }: SizeSelectorProps) {
+export function SizeSelector({
+  sizeOptions,
+  selected,
+  onChange,
+  match = null,
+  disabled = false,
+}: SizeSelectorProps) {
   return (
-    <fieldset>
+    <fieldset disabled={disabled}>
       <legend className="mb-2.5 text-sm font-medium text-ink">Select size</legend>
       <div className="flex flex-wrap gap-2">
         {sizeOptions.map((option) => {

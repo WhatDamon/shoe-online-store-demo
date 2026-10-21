@@ -18,18 +18,15 @@ const VIEW_LABELS: { view: ProductVisualView; label: string }[] = [
 export function ProductGallery({ product }: { product: ProductView }) {
   const photos = product.images ?? []
   const hasPhotos = photos.length > 0
-  const [photoIdx, setPhotoIdx] = useState(0)
   const [active, setActive] = useState<ProductVisualView>('side')
   const colorSelection = useOptionalProductColorSelection()
-  const linkedToColors = colorSelection?.imagesFollowColors === true
-  const activePhotoIdx = linkedToColors ? colorSelection.colorIndex : photoIdx
+  const imageFocus = colorSelection?.imageFocus
+  const [browsed, setBrowsed] = useState({ focus: imageFocus, index: 0 })
+  const mappedIndex = imageFocus?.url ? photos.indexOf(imageFocus.url) : -1
+  const activePhotoIdx = browsed.focus === imageFocus ? browsed.index : Math.max(mappedIndex, 0)
   const activePhoto = hasPhotos ? photos[Math.min(activePhotoIdx, photos.length - 1)] : null
-  const activeColor = linkedToColors ? product.colors?.[activePhotoIdx] : null
 
-  const selectPhoto = (index: number) => {
-    setPhotoIdx(index)
-    if (linkedToColors) colorSelection.setColorIndex(index)
-  }
+  const selectPhoto = (index: number) => setBrowsed({ focus: imageFocus, index })
 
   return (
     <div className="flex flex-col gap-3">
@@ -38,11 +35,7 @@ export function ProductGallery({ product }: { product: ProductView }) {
           <Image
             key={activePhoto}
             src={activePhoto}
-            alt={
-              activeColor
-                ? `${product.title} in ${activeColor.name}`
-                : `${product.title} photo ${activePhotoIdx + 1}`
-            }
+            alt={`${product.title} photo ${activePhotoIdx + 1}`}
             fill
             loading="eager"
             sizes="(min-width:1024px) 50vw, 100vw"
@@ -65,14 +58,13 @@ export function ProductGallery({ product }: { product: ProductView }) {
         {hasPhotos
           ? photos.map((src, i) => {
               const current = activePhotoIdx === i
-              const color = linkedToColors ? product.colors?.[i] : null
               return (
                 <button
                   key={src}
                   type="button"
                   onClick={() => selectPhoto(i)}
                   aria-pressed={current}
-                  aria-label={color ? `Show ${color.name}` : `Show photo ${i + 1}`}
+                  aria-label={`Show photo ${i + 1}`}
                   className={`rounded-xl border p-1 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400 ${
                     current
                       ? 'border-neutral-400 ring-1 ring-neutral-300'

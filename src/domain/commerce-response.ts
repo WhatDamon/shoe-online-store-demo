@@ -44,11 +44,16 @@ export function parseCommerceProduct(value: unknown): CommerceProduct {
       return {
         id: text(variant.id),
         color: text(variant.color),
+        color_hex: text(variant.color_hex),
         size: integer(variant.size, 1),
         price: money(variant.price),
         currency: currency(variant.currency),
         available: integer(variant.available, 0),
       }
+    }),
+    media: list(data.media, (entry) => {
+      const media = record(entry)
+      return { color: media.color === null ? null : text(media.color), url: text(media.url) }
     }),
   }
 }
